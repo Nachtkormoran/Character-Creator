@@ -11,11 +11,16 @@ const patchSchema = z
   .object({
     name: z.string().trim().min(1, "Der Name darf nicht leer sein.").max(120),
     imageData: z.string().nullable(),
+    groupId: z.string().nullable(),
   })
   .partial()
-  .refine((d) => d.name !== undefined || d.imageData !== undefined, {
-    message: "Keine Änderung angegeben.",
-  });
+  .refine(
+    (d) =>
+      d.name !== undefined ||
+      d.imageData !== undefined ||
+      d.groupId !== undefined,
+    { message: "Keine Änderung angegeben." },
+  );
 
 // Einzelnen Charakter laden.
 export async function GET(_request: Request, { params }: Context) {
@@ -42,10 +47,15 @@ export async function PATCH(request: Request, { params }: Context) {
         { status: 400 },
       );
     }
-    const data: { name?: string; imageData?: string | null } = {};
+    const data: {
+      name?: string;
+      imageData?: string | null;
+      groupId?: string | null;
+    } = {};
     if (parsed.data.name !== undefined) data.name = parsed.data.name;
     if (parsed.data.imageData !== undefined)
       data.imageData = parsed.data.imageData;
+    if (parsed.data.groupId !== undefined) data.groupId = parsed.data.groupId;
 
     const row = await prisma.character.update({ where: { id }, data });
     return NextResponse.json({ character: serializeCharacter(row) });

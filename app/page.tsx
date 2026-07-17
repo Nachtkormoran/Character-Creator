@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CharacterForm } from "./components/CharacterForm";
 import { CharacterResult } from "./components/CharacterResult";
 import {
   generateImage,
   generateText,
+  listGroups,
   saveCharacter,
 } from "@/lib/client";
 import {
@@ -13,6 +14,7 @@ import {
   type CharacterInput,
   type GeneratedCharacter,
 } from "@/lib/schema";
+import type { StoredGroup } from "@/lib/serialize";
 
 export default function Home() {
   // Ansicht: Eingabeformular oder Ergebnis
@@ -30,9 +32,20 @@ export default function Home() {
   const [imageStyle, setImageStyle] = useState<string>(DEFAULT_IMAGE_STYLE);
   const [includeTraits, setIncludeTraits] = useState(true);
   const [includeTextDetails, setIncludeTextDetails] = useState(false);
+  const [extraPrompt, setExtraPrompt] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const [groups, setGroups] = useState<StoredGroup[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+
+  // Gruppen laden, damit man den Charakter direkt beim Erstellen zuordnen kann.
+  useEffect(() => {
+    listGroups()
+      .then(setGroups)
+      .catch(() => {});
+  }, []);
 
   async function handleGenerate(formInput: CharacterInput) {
     setTextLoading(true);
@@ -73,6 +86,8 @@ export default function Home() {
     setImageError(null);
     setTextError(null);
     setSaved(false);
+    setSelectedGroupId(null);
+    setExtraPrompt("");
   }
 
   async function handleGenerateImage() {
@@ -83,6 +98,7 @@ export default function Home() {
       const { imageData } = await generateImage(character, imageStyle, {
         includeTraits,
         includeTextDetails,
+        extraPrompt,
       });
       setImageData(imageData);
       setSaved(false);
@@ -97,7 +113,12 @@ export default function Home() {
     if (!character || !input) return;
     setSaving(true);
     try {
-      await saveCharacter({ ...input, imageStyle }, character, imageData);
+      await saveCharacter(
+        { ...input, imageStyle },
+        character,
+        imageData,
+        selectedGroupId,
+      );
       setSaved(true);
     } catch (err) {
       setTextError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
@@ -167,6 +188,11 @@ export default function Home() {
           onIncludeTraitsChange={setIncludeTraits}
           includeTextDetails={includeTextDetails}
           onIncludeTextDetailsChange={setIncludeTextDetails}
+          extraPrompt={extraPrompt}
+          onExtraPromptChange={setExtraPrompt}
+          groups={groups}
+          groupId={selectedGroupId}
+          onGroupChange={setSelectedGroupId}
           onGenerateImage={handleGenerateImage}
           onSave={handleSave}
           saving={saving}

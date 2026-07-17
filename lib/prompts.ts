@@ -43,9 +43,13 @@ Anforderungen an das Ergebnis:
 export function buildImagePrompt(
   character: GeneratedCharacter,
   imageStyle: string,
-  options: { includeTraits?: boolean; visualDetails?: string } = {},
+  options: {
+    includeTraits?: boolean;
+    visualDetails?: string;
+    extraPrompt?: string;
+  } = {},
 ): string {
-  const { includeTraits = true, visualDetails } = options;
+  const { includeTraits = true, visualDetails, extraPrompt } = options;
   const m = character.merkmale;
 
   const stilBeschreibung: Record<string, string> = {
@@ -84,8 +88,13 @@ Character: ${character.name}.`;
 Additional visual details taken from the character description (clothing, environment, props, mood): ${visualDetails}`
     : "";
 
+  const extraBlock = extraPrompt?.trim()
+    ? `
+Additional instructions from the user (important – incorporate these even if they add attributes not mentioned above): ${extraPrompt.trim()}`
+    : "";
+
   return `Portrait of a single human character. ${stil}.
-${kontext}${merkmaleBlock}${detailsBlock}
+${kontext}${merkmaleBlock}${detailsBlock}${extraBlock}
 
 Framing: half-body / upper-body composition with a natural, candid pose (the character may look slightly off-camera). The fitting modern environment is visible behind them with depth of field. Only one person in the image, no text, no watermark.`;
 }

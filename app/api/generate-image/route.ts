@@ -16,6 +16,8 @@ const bodySchema = z.object({
   includeTraits: z.boolean().default(true),
   // Visuelle Details aus dem Fließtext extrahieren und aufnehmen
   includeTextDetails: z.boolean().default(false),
+  // Zusätzlicher freier Text, der im Bild-Prompt berücksichtigt wird
+  extraPrompt: z.string().max(1000).optional(),
 });
 
 export async function POST(request: Request) {
@@ -29,8 +31,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const { character, imageStyle, includeTraits, includeTextDetails } =
-      parsed.data;
+    const {
+      character,
+      imageStyle,
+      includeTraits,
+      includeTextDetails,
+      extraPrompt,
+    } = parsed.data;
 
     const visualDetails = includeTextDetails
       ? await extractVisualDetails(character.beschreibung)
@@ -39,6 +46,7 @@ export async function POST(request: Request) {
     const prompt = buildImagePrompt(character, imageStyle, {
       includeTraits,
       visualDetails,
+      extraPrompt,
     });
     const imageData = await getImageProvider().generatePortrait(prompt);
 

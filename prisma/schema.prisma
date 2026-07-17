@@ -14,12 +14,26 @@ datasource db {
   provider = "sqlite"
 }
 
+// Gruppe / Projekt, dem Charaktere zugeordnet werden können
+// (z. B. verschiedene Buch- oder Spieleprojekte).
+model Group {
+  id         String      @id @default(cuid())
+  createdAt  DateTime    @default(now())
+  name       String
+  characters Character[]
+}
+
 model Character {
   id          String   @id @default(cuid())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   name        String?
+
+  // Optionale Zuordnung zu einer Gruppe/einem Projekt.
+  // Wird die Gruppe gelöscht, bleibt der Charakter erhalten (groupId -> null).
+  groupId     String?
+  group       Group?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
 
   // Ursprüngliche Formular-Eingaben als JSON-String
   input       String

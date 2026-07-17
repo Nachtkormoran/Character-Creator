@@ -4,6 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { fileToDataUrl } from "@/lib/image";
 import { IMAGE_STYLES, type GeneratedCharacter } from "@/lib/schema";
+import type { StoredGroup } from "@/lib/serialize";
 import { TraitsTable } from "./TraitsTable";
 
 export function CharacterResult({
@@ -19,6 +20,11 @@ export function CharacterResult({
   onIncludeTraitsChange,
   includeTextDetails,
   onIncludeTextDetailsChange,
+  extraPrompt,
+  onExtraPromptChange,
+  groups,
+  groupId,
+  onGroupChange,
   onGenerateImage,
   onSave,
   saving,
@@ -36,6 +42,11 @@ export function CharacterResult({
   onIncludeTraitsChange: (value: boolean) => void;
   includeTextDetails: boolean;
   onIncludeTextDetailsChange: (value: boolean) => void;
+  extraPrompt: string;
+  onExtraPromptChange: (value: string) => void;
+  groups: StoredGroup[];
+  groupId: string | null;
+  onGroupChange: (value: string | null) => void;
   onGenerateImage: () => void;
   onSave: () => void;
   saving: boolean;
@@ -129,6 +140,21 @@ export function CharacterResult({
 
           <label className="mt-3 flex flex-col gap-1.5">
             <span className="text-xs font-medium text-foreground/60">
+              Zusätzliche Bild-Details (optional)
+            </span>
+            <textarea
+              value={extraPrompt}
+              onChange={(e) => onExtraPromptChange(e.target.value)}
+              disabled={busy}
+              rows={2}
+              maxLength={1000}
+              placeholder="Zusätzlich fürs Bild berücksichtigen – z. B. Attribute, die nicht in der Tabelle oder Beschreibung stehen (Kleidung, Pose, Requisiten, Hintergrund …)"
+              className="w-full resize-y rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+            />
+          </label>
+
+          <label className="mt-3 flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-foreground/60">
               Bild-Stil
             </span>
             <select
@@ -205,7 +231,7 @@ export function CharacterResult({
       </div>
 
       {/* Speichern */}
-      <div className="flex items-center gap-3 border-t border-black/10 pt-4 dark:border-white/10">
+      <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-4 dark:border-white/10">
         <button
           type="button"
           onClick={onSave}
@@ -214,6 +240,24 @@ export function CharacterResult({
         >
           {saved ? "Gespeichert ✓" : saving ? "Speichere …" : "Charakter speichern"}
         </button>
+
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-foreground/60">Gruppe:</span>
+          <select
+            value={groupId ?? ""}
+            onChange={(e) => onGroupChange(e.target.value || null)}
+            disabled={saving || saved}
+            className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+          >
+            <option value="">— keine —</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
         {saved && (
           <span className="text-sm text-foreground/60">
             In der Galerie verfügbar.

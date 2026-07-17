@@ -1,32 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  createGroup,
   deleteCharacter,
+  deleteGroup,
   generateImage,
   listCharacters,
+  listGroups,
+  updateCharacterGroup,
   updateCharacterImage,
   updateCharacterName,
 } from "@/lib/client";
 import { fileToDataUrl } from "@/lib/image";
 import { DEFAULT_IMAGE_STYLE, IMAGE_STYLES } from "@/lib/schema";
-import type { StoredCharacter } from "@/lib/serialize";
+import type { StoredCharacter, StoredGroup } from "@/lib/serialize";
 import { TraitsTable } from "../components/TraitsTable";
+
+const controlClass =
+  "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
 
 export default function GalleryPage() {
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
+  const [groups, setGroups] = useState<StoredGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<StoredCharacter | null>(null);
 
+  // Filter: "all" | "none" | groupId
+  const [filter, setFilter] = useState<string>("all");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
+
   useEffect(() => {
-    listCharacters()
-      .then(setCharacters)
+    Promise.all([listCharacters(), listGroups()])
+      .then(([chars, grps]) => {
+        setCharacters(chars);
+        setGroups(grps);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "Fehler."))
       .finally(() => setLoading(false));
   }, []);
+
+  // Charakter-Anzahl je Gruppe (clientseitig, immer aktuell)
+  const groupCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const c of characters) if (c.groupId) m[c.groupId] = (m[c.groupId] ?? 0) + 1;
+    return m;
+  }, [characters]);
+  const noneCount = characters.filter((c) => !c.groupId).length;
+
+  const visibleCharacters = characters.filter((c) => {
+    if (filter === "all") return true;
+    if (filter === "none") return c.groupId === null;
+    return c.groupId === filter;
+  });
 
   async function handleDelete(id: string) {
     if (!confirm("Diesen Charakter wirklich löschen?")) return;
@@ -52,6 +83,55 @@ export default function GalleryPage() {
     setSelected((s) => (s && s.id === id ? updated : s));
   }
 
+  async function handleAssignGroup(id: string, groupId: string | null) {
+    const updated = await updateCharacterGroup(id, groupId);
+    setCharacters((cs) => cs.map((x) => (x.id === id ? updated : x)));
+    setSelected((s) => (s && s.id === id ? updated : s));
+  }
+
+  async function handleCreateGroup(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newGroupName.trim();
+    if (!name || creatingGroup) return;
+    setCreatingGroup(true);
+    setGroupError(null);
+    try {
+      const group = await createGroup(name);
+      setGroups((gs) => [...gs, group].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewGroupName("");
+      setFilter(group.id);
+    } catch (err) {
+      setGroupError(err instanceof Error ? err.message : "Fehler.");
+    } finally {
+      setCreatingGroup(false);
+    }
+  }
+
+  async function handleDeleteGroup(id: string) {
+    const group = groups.find((g) => g.id === id);
+    if (
+      !confirm(
+        `Gruppe „${group?.name ?? ""}" löschen? Die zugeordneten Charaktere bleiben erhalten.`,
+      )
+    )
+      return;
+    const prevGroups = groups;
+    const prevChars = characters;
+    setGroups((gs) => gs.filter((g) => g.id !== id));
+    // Charaktere dieser Gruppe lokal auf "ohne Gruppe" setzen
+    setCharacters((cs) =>
+      cs.map((c) => (c.groupId === id ? { ...c, groupId: null } : c)),
+    );
+    setSelected((s) => (s && s.groupId === id ? { ...s, groupId: null } : s));
+    if (filter === id) setFilter("all");
+    try {
+      await deleteGroup(id);
+    } catch {
+      setGroups(prevGroups);
+      setCharacters(prevChars);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -62,6 +142,58 @@ export default function GalleryPage() {
         >
           + Neuer Charakter
         </Link>
+      </div>
+
+      {/* Gruppen-Filter & -Verwaltung */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-black/10 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]">
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-foreground/60">Anzeigen:</span>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className={controlClass}
+          >
+            <option value="all">Alle Charaktere ({characters.length})</option>
+            <option value="none">Ohne Gruppe ({noneCount})</option>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name} ({groupCounts[g.id] ?? 0})
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {filter !== "all" && filter !== "none" && (
+          <button
+            type="button"
+            onClick={() => handleDeleteGroup(filter)}
+            className="rounded-md border border-red-500/40 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
+          >
+            Gruppe löschen
+          </button>
+        )}
+
+        <form onSubmit={handleCreateGroup} className="ml-auto flex items-center gap-2">
+          <input
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            placeholder="Neue Gruppe …"
+            maxLength={80}
+            className={`${controlClass} w-40`}
+          />
+          <button
+            type="submit"
+            disabled={creatingGroup || !newGroupName.trim()}
+            className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+          >
+            {creatingGroup ? "…" : "Anlegen"}
+          </button>
+        </form>
+        {groupError && (
+          <span className="w-full text-xs text-red-600 dark:text-red-400">
+            {groupError}
+          </span>
+        )}
       </div>
 
       {loading && <p className="text-foreground/60">Lade Charaktere …</p>}
@@ -81,8 +213,14 @@ export default function GalleryPage() {
         </div>
       )}
 
+      {!loading && !error && characters.length > 0 && visibleCharacters.length === 0 && (
+        <div className="rounded-xl border border-dashed border-black/15 p-10 text-center text-foreground/60 dark:border-white/15">
+          Keine Charaktere in dieser Auswahl.
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {characters.map((c) => (
+        {visibleCharacters.map((c) => (
           <button
             key={c.id}
             onClick={() => setSelected(c)}
@@ -117,12 +255,14 @@ export default function GalleryPage() {
       {selected && (
         <DetailModal
           character={selected}
+          groups={groups}
           onClose={() => setSelected(null)}
           onDelete={() => handleDelete(selected.id)}
           onRename={(name) => handleRename(selected.id, name)}
           onPersistImage={(imageData) =>
             handlePersistImage(selected.id, imageData)
           }
+          onAssignGroup={(groupId) => handleAssignGroup(selected.id, groupId)}
         />
       )}
     </div>
@@ -131,16 +271,20 @@ export default function GalleryPage() {
 
 function DetailModal({
   character: c,
+  groups,
   onClose,
   onDelete,
   onRename,
   onPersistImage,
+  onAssignGroup,
 }: {
   character: StoredCharacter;
+  groups: StoredGroup[];
   onClose: () => void;
   onDelete: () => void;
   onRename: (name: string) => Promise<void>;
   onPersistImage: (imageData: string) => Promise<void>;
+  onAssignGroup: (groupId: string | null) => Promise<void>;
 }) {
   const [name, setName] = useState(c.character.name);
   const [savingName, setSavingName] = useState(false);
@@ -151,8 +295,20 @@ function DetailModal({
   );
   const [includeTraits, setIncludeTraits] = useState(true);
   const [includeTextDetails, setIncludeTextDetails] = useState(false);
+  const [extraPrompt, setExtraPrompt] = useState("");
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+
+  const [assigningGroup, setAssigningGroup] = useState(false);
+
+  async function assignGroup(groupId: string | null) {
+    setAssigningGroup(true);
+    try {
+      await onAssignGroup(groupId);
+    } finally {
+      setAssigningGroup(false);
+    }
+  }
 
   const trimmed = name.trim();
   const nameChanged = trimmed.length > 0 && trimmed !== c.character.name;
@@ -178,6 +334,7 @@ function DetailModal({
       const { imageData } = await generateImage(c.character, imageStyle, {
         includeTraits,
         includeTextDetails,
+        extraPrompt,
       });
       await onPersistImage(imageData);
     } catch (e) {
@@ -293,6 +450,21 @@ function DetailModal({
 
             <label className="mt-3 flex flex-col gap-1.5">
               <span className="text-xs font-medium text-foreground/60">
+                Zusätzliche Bild-Details (optional)
+              </span>
+              <textarea
+                value={extraPrompt}
+                onChange={(e) => setExtraPrompt(e.target.value)}
+                disabled={imageLoading}
+                rows={2}
+                maxLength={1000}
+                placeholder="Zusätzlich fürs Bild berücksichtigen – z. B. Attribute, die nicht in der Tabelle oder Beschreibung stehen (Kleidung, Pose, Requisiten, Hintergrund …)"
+                className="w-full resize-y rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              />
+            </label>
+
+            <label className="mt-3 flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-foreground/60">
                 Bild-Stil
               </span>
               <select
@@ -367,16 +539,34 @@ function DetailModal({
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-between border-t border-black/10 pt-4 dark:border-white/10">
-          <span className="text-xs text-foreground/50">
-            Erstellt am {new Date(c.createdAt).toLocaleString("de-DE")}
-          </span>
-          <button
-            onClick={onDelete}
-            className="rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
-          >
-            Löschen
-          </button>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4 dark:border-white/10">
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-foreground/60">Gruppe:</span>
+            <select
+              value={c.groupId ?? ""}
+              onChange={(e) => assignGroup(e.target.value || null)}
+              disabled={assigningGroup}
+              className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+            >
+              <option value="">— keine —</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-foreground/50">
+              {new Date(c.createdAt).toLocaleDateString("de-DE")}
+            </span>
+            <button
+              onClick={onDelete}
+              className="rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
+            >
+              Löschen
+            </button>
+          </div>
         </div>
       </div>
     </div>
