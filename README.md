@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Charakter Creator
 
-## Getting Started
+Eine Web-App, um glaubwürdige menschliche Charaktere für Buch oder Spiel zu erstellen.
+Aus wenigen Vorgaben (Geschlecht, Aussehen, Hintergrund) erzeugt die App per OpenAI:
 
-First, run the development server:
+- einen **ausführlichen Charaktertext**,
+- eine **Tabelle mit Körpermerkmalen** (Größe, Gewicht, …),
+- ein **Portrait-Bild** (`gpt-image-1`).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Charaktere lassen sich **speichern** und in einer **Galerie** wiederfinden.
+
+## Tech-Stack
+
+- **Next.js 16** (App Router) + **React 19** + **TypeScript**
+- **Tailwind CSS v4**
+- **OpenAI API** – Text (`gpt-4o`, Structured Outputs) & Bild (`gpt-image-1`)
+- **Prisma 7** + **SQLite** (lokal, dateibasiert)
+
+## Einrichtung
+
+1. Abhängigkeiten installieren (bereits geschehen, sonst):
+
+   ```bash
+   npm install
+   ```
+
+2. **OpenAI-API-Key eintragen** in [.env.local](.env.local):
+
+   ```
+   OPENAI_API_KEY=sk-...
+   ```
+
+   > Für `gpt-image-1` muss die OpenAI-Organisation ggf. verifiziert sein.
+   > Modelle lassen sich dort ebenfalls über `OPENAI_TEXT_MODEL` /
+   > `OPENAI_IMAGE_MODEL` anpassen.
+
+3. Datenbank ist bereits migriert. Bei Schema-Änderungen:
+
+   ```bash
+   npx prisma migrate dev
+   ```
+
+4. Dev-Server starten:
+
+   ```bash
+   npm run dev
+   ```
+
+   → http://localhost:3000
+
+## Projektstruktur
+
+```
+app/
+  page.tsx                 Formular + Ergebnis (Text, Tabelle, Portrait)
+  gallery/page.tsx         Gespeicherte Charaktere
+  components/              Formular, Ergebnis, Merkmals-Tabelle
+  api/
+    generate-text/         → OpenAI Text (Structured Output)
+    generate-image/        → OpenAI Bild (gpt-image-1)
+    characters/            → Speichern / Laden / Löschen
+  generated/prisma/        Generierter Prisma-Client (nicht editieren)
+lib/
+  schema.ts                Zod-Schemas & Typen (Eingaben, Merkmale)
+  prompts.ts               Prompt-Bausteine für Text & Bild
+  openai.ts                OpenAI-Client (nur serverseitig)
+  imageProvider.ts         Austauschbare Bild-Provider-Abstraktion
+  prisma.ts                Prisma-Client (SQLite via better-sqlite3)
+  client.ts                Typisierte fetch-Helfer fürs Frontend
+prisma/schema.prisma       Datenmodell
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Später: Deployment auf Vercel
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Prisma-`provider` in [prisma/schema.prisma](prisma/schema.prisma) auf
+  `postgresql` umstellen (z. B. Vercel Postgres / Neon) und `DATABASE_URL`
+  setzen. Die Modelle bleiben nahezu gleich.
+- `OPENAI_API_KEY` als Environment-Variable in Vercel hinterlegen.
+- Optional: Login/Authentifizierung ergänzen.
+- Bilder werden aktuell als base64 in der DB abgelegt; für Produktion lohnt
+  sich ein Blob-Storage (z. B. Vercel Blob).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Bild-Provider wechseln
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Die Bildgenerierung ist in [lib/imageProvider.ts](lib/imageProvider.ts) hinter
+einem Interface gekapselt. Um z. B. Flux (via Replicate) statt OpenAI zu nutzen,
+genügt eine weitere `ImageProvider`-Implementierung – der übrige Code bleibt
+unverändert.

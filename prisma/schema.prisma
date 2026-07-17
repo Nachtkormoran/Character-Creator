@@ -1,0 +1,40 @@
+// Prisma schema für den Charakter Creator
+// Docs: https://pris.ly/d/prisma-schema
+//
+// Aktuell SQLite (lokal, dateibasiert). Für ein späteres Deployment auf
+// Vercel kann der Provider auf "postgresql" umgestellt werden – die Modelle
+// bleiben nahezu unverändert.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Character {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  name        String?
+
+  // Ursprüngliche Formular-Eingaben als JSON-String
+  input       String
+
+  // Ein bis zwei Sätze als Zusammenfassung
+  shortDescription String?
+
+  // Ausführlicher Fließtext zum Charakter
+  description String
+
+  // Strukturierte Körper-/Charaktermerkmale als JSON-String
+  // (SQLite kennt keinen nativen JSON-Typ, daher als String gespeichert)
+  traits      String
+
+  // Portrait als Data-URL (base64). Optional, da das Bild separat/später
+  // erzeugt werden kann.
+  imageData   String?
+}

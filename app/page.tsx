@@ -1,65 +1,170 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { CharacterForm } from "./components/CharacterForm";
+import { CharacterResult } from "./components/CharacterResult";
+import {
+  generateImage,
+  generateText,
+  saveCharacter,
+} from "@/lib/client";
+import {
+  DEFAULT_IMAGE_STYLE,
+  type CharacterInput,
+  type GeneratedCharacter,
+} from "@/lib/schema";
 
 export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+  // Ansicht: Eingabeformular oder Ergebnis
+  const [view, setView] = useState<"form" | "result">("form");
+
+  const [input, setInput] = useState<CharacterInput | null>(null);
+  const [character, setCharacter] = useState<GeneratedCharacter | null>(null);
+
+  const [textLoading, setTextLoading] = useState(false);
+  const [textError, setTextError] = useState<string | null>(null);
+
+  const [imageData, setImageData] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageStyle, setImageStyle] = useState<string>(DEFAULT_IMAGE_STYLE);
+  const [includeTraits, setIncludeTraits] = useState(true);
+  const [includeTextDetails, setIncludeTextDetails] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function handleGenerate(formInput: CharacterInput) {
+    setTextLoading(true);
+    setTextError(null);
+    setCharacter(null);
+    setImageData(null);
+    setImageError(null);
+    setSaved(false);
+    setInput(formInput);
+    setView("result"); // sofort zur Ergebnis-Ansicht wechseln
+    try {
+      const { character } = await generateText(formInput);
+      setCharacter(character);
+    } catch (err) {
+      setTextError(err instanceof Error ? err.message : "Fehler.");
+    } finally {
+      setTextLoading(false);
+    }
+  }
+
+  function handleNameChange(name: string) {
+    setCharacter((c) => (c ? { ...c, name } : c));
+  }
+
+  // Zurück zum Formular für einen neuen Charakter
+  function handleNew() {
+    setView("form");
+    setCharacter(null);
+    setInput(null);
+    setImageData(null);
+    setImageError(null);
+    setTextError(null);
+    setSaved(false);
+  }
+
+  async function handleGenerateImage() {
+    if (!character || !input) return;
+    setImageLoading(true);
+    setImageError(null);
+    try {
+      const { imageData } = await generateImage(character, imageStyle, {
+        includeTraits,
+        includeTextDetails,
+      });
+      setImageData(imageData);
+      setSaved(false);
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : "Fehler.");
+    } finally {
+      setImageLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!character || !input) return;
+    setSaving(true);
+    try {
+      await saveCharacter({ ...input, imageStyle }, character, imageData);
+      setSaved(true);
+    } catch (err) {
+      setTextError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (view === "form") {
+    return (
+      <div className="flex flex-col gap-8">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Charakter erstellen
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-2 max-w-2xl text-foreground/70">
+            Gib ein paar Vorgaben an – der Rest wird passend ergänzt.
+            Anschließend entsteht ein ausführlicher Text, eine Merkmals-Tabelle
+            und auf Wunsch ein Portrait.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <CharacterForm onGenerate={handleGenerate} loading={textLoading} />
+      </div>
+    );
+  }
+
+  // Ergebnis-Ansicht
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          Dein Charakter
+        </h1>
+        <button
+          type="button"
+          onClick={handleNew}
+          className="shrink-0 rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+        >
+          + Neuen Charakter erstellen
+        </button>
+      </div>
+
+      {textError && (
+        <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+          {textError}
         </div>
-      </main>
+      )}
+
+      {textLoading && (
+        <div className="rounded-xl border border-black/10 bg-white p-6 text-center text-foreground/60 dark:border-white/10 dark:bg-white/[0.03]">
+          Der Charakter wird erschaffen … einen Moment.
+        </div>
+      )}
+
+      {character && (
+        <CharacterResult
+          character={character}
+          imageData={imageData}
+          imageLoading={imageLoading}
+          imageError={imageError}
+          imageStyle={imageStyle}
+          onImageStyleChange={setImageStyle}
+          onNameChange={handleNameChange}
+          includeTraits={includeTraits}
+          onIncludeTraitsChange={setIncludeTraits}
+          includeTextDetails={includeTextDetails}
+          onIncludeTextDetailsChange={setIncludeTextDetails}
+          onGenerateImage={handleGenerateImage}
+          onSave={handleSave}
+          saving={saving}
+          saved={saved}
+        />
+      )}
     </div>
   );
 }
