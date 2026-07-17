@@ -66,10 +66,6 @@ export default function Home() {
     }
   }
 
-  function handleNameChange(name: string) {
-    setCharacter((c) => (c ? { ...c, name } : c));
-  }
-
   // Hochgeladenes oder erzeugtes Bild setzen (erneutes Speichern ermöglichen)
   function handleSetImage(dataUrl: string) {
     setImageData(dataUrl);
@@ -183,7 +179,7 @@ export default function Home() {
           imageStyle={imageStyle}
           onImageStyleChange={setImageStyle}
           onSetImage={handleSetImage}
-          onNameChange={handleNameChange}
+          onCharacterChange={setCharacter}
           includeTraits={includeTraits}
           onIncludeTraitsChange={setIncludeTraits}
           includeTextDetails={includeTextDetails}

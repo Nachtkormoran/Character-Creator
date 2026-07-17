@@ -77,6 +77,22 @@ export const characterTraitsSchema = z.object({
 
 export type CharacterTraits = z.infer<typeof characterTraitsSchema>;
 
+/**
+ * Wendet eine (String-)Änderung auf ein Merkmal an und liefert ein neues
+ * Merkmals-Objekt. `alter` wird dabei in eine Zahl konvertiert.
+ */
+export function withTrait(
+  merkmale: CharacterTraits,
+  key: keyof CharacterTraits,
+  value: string,
+): CharacterTraits {
+  if (key === "alter") {
+    const n = parseInt(value, 10);
+    return { ...merkmale, alter: Number.isNaN(n) ? 0 : n };
+  }
+  return { ...merkmale, [key]: value } as CharacterTraits;
+}
+
 /** Reihenfolge & Anzeigenamen für die Merkmals-Tabelle. */
 export const TRAIT_LABELS: Record<keyof CharacterTraits, string> = {
   alter: "Alter",

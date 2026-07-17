@@ -101,6 +101,25 @@ export async function updateCharacterGroup(
   return data.character as StoredCharacter;
 }
 
+export async function updateCharacterContent(
+  id: string,
+  character: GeneratedCharacter,
+): Promise<StoredCharacter> {
+  const res = await fetch(`/api/characters/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: character.name,
+      shortDescription: character.kurzbeschreibung,
+      description: character.beschreibung,
+      traits: character.merkmale,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Speichern fehlgeschlagen.");
+  return data.character as StoredCharacter;
+}
+
 export async function deleteCharacter(id: string): Promise<void> {
   const res = await fetch(`/api/characters/${id}`, { method: "DELETE" });
   if (!res.ok) {

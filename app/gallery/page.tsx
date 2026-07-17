@@ -10,17 +10,33 @@ import {
   generateImage,
   listCharacters,
   listGroups,
+  updateCharacterContent,
   updateCharacterGroup,
   updateCharacterImage,
-  updateCharacterName,
 } from "@/lib/client";
 import { fileToDataUrl } from "@/lib/image";
-import { DEFAULT_IMAGE_STYLE, IMAGE_STYLES } from "@/lib/schema";
+import {
+  DEFAULT_IMAGE_STYLE,
+  IMAGE_STYLES,
+  withTrait,
+  type CharacterTraits,
+  type GeneratedCharacter,
+} from "@/lib/schema";
 import type { StoredCharacter, StoredGroup } from "@/lib/serialize";
+import { AutoTextarea } from "../components/AutoTextarea";
 import { TraitsTable } from "../components/TraitsTable";
 
 const controlClass =
   "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
+
+/** Erzeugt einen dateisystem-tauglichen Namen für den PDF-Download. */
+function pdfFileName(name: string): string {
+  const clean = name
+    .trim()
+    .replace(/[^\p{L}\p{N}]+/gu, "_")
+    .replace(/^_+|_+$/g, "");
+  return clean || "charakter";
+}
 
 export default function GalleryPage() {
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
@@ -71,8 +87,8 @@ export default function GalleryPage() {
     }
   }
 
-  async function handleRename(id: string, name: string) {
-    const updated = await updateCharacterName(id, name);
+  async function handleSaveContent(id: string, character: GeneratedCharacter) {
+    const updated = await updateCharacterContent(id, character);
     setCharacters((cs) => cs.map((x) => (x.id === id ? updated : x)));
     setSelected((s) => (s && s.id === id ? updated : s));
   }
@@ -254,11 +270,14 @@ export default function GalleryPage() {
 
       {selected && (
         <DetailModal
+          key={selected.id}
           character={selected}
           groups={groups}
           onClose={() => setSelected(null)}
           onDelete={() => handleDelete(selected.id)}
-          onRename={(name) => handleRename(selected.id, name)}
+          onSaveContent={(character) =>
+            handleSaveContent(selected.id, character)
+          }
           onPersistImage={(imageData) =>
             handlePersistImage(selected.id, imageData)
           }
@@ -274,7 +293,7 @@ function DetailModal({
   groups,
   onClose,
   onDelete,
-  onRename,
+  onSaveContent,
   onPersistImage,
   onAssignGroup,
 }: {
@@ -282,13 +301,15 @@ function DetailModal({
   groups: StoredGroup[];
   onClose: () => void;
   onDelete: () => void;
-  onRename: (name: string) => Promise<void>;
+  onSaveContent: (character: GeneratedCharacter) => Promise<void>;
   onPersistImage: (imageData: string) => Promise<void>;
   onAssignGroup: (groupId: string | null) => Promise<void>;
 }) {
-  const [name, setName] = useState(c.character.name);
-  const [savingName, setSavingName] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
+  // Editierbare Kopie der Charakter-Inhalte (Name, Kurzbeschreibung, Text,
+  // Merkmale). Persistiert erst über "Änderungen speichern".
+  const [edited, setEdited] = useState<GeneratedCharacter>(c.character);
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   const [imageStyle, setImageStyle] = useState<string>(
     c.input.imageStyle || DEFAULT_IMAGE_STYLE,
@@ -300,6 +321,67 @@ function DetailModal({
   const [imageError, setImageError] = useState<string | null>(null);
 
   const [assigningGroup, setAssigningGroup] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  async function exportPdf() {
+    if (exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const { renderCharacterPdfBlob } = await import(
+        "../components/CharacterPdf"
+      );
+      const groupName = groups.find((g) => g.id === c.groupId)?.name ?? null;
+      const blob = await renderCharacterPdfBlob({
+        name: edited.name,
+        kurzbeschreibung: edited.kurzbeschreibung,
+        beschreibung: edited.beschreibung,
+        merkmale: edited.merkmale,
+        imageData: c.imageData,
+        groupName,
+        createdAt: c.createdAt,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${pdfFileName(edited.name)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Export fehlgeschlagen.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const setField = <K extends keyof GeneratedCharacter>(
+    key: K,
+    value: GeneratedCharacter[K],
+  ) => setEdited((e) => ({ ...e, [key]: value }));
+
+  const setTrait = (key: keyof CharacterTraits, value: string) =>
+    setEdited((e) => ({ ...e, merkmale: withTrait(e.merkmale, key, value) }));
+
+  const dirty = JSON.stringify(edited) !== JSON.stringify(c.character);
+  const nameValid = edited.name.trim().length > 0;
+
+  async function saveEdits() {
+    if (!dirty || !nameValid || savingEdits) return;
+    setSavingEdits(true);
+    setEditError(null);
+    const payload = { ...edited, name: edited.name.trim() };
+    try {
+      await onSaveContent(payload);
+      setEdited(payload);
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setSavingEdits(false);
+    }
+  }
 
   async function assignGroup(groupId: string | null) {
     setAssigningGroup(true);
@@ -310,28 +392,12 @@ function DetailModal({
     }
   }
 
-  const trimmed = name.trim();
-  const nameChanged = trimmed.length > 0 && trimmed !== c.character.name;
-
-  async function saveName() {
-    if (!nameChanged || savingName) return;
-    setSavingName(true);
-    setNameError(null);
-    try {
-      await onRename(trimmed);
-    } catch (e) {
-      setNameError(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setSavingName(false);
-    }
-  }
-
   async function regenerateImage() {
     if (imageLoading) return;
     setImageLoading(true);
     setImageError(null);
     try {
-      const { imageData } = await generateImage(c.character, imageStyle, {
+      const { imageData } = await generateImage(edited, imageStyle, {
         includeTraits,
         includeTextDetails,
         extraPrompt,
@@ -371,34 +437,19 @@ function DetailModal({
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") saveName();
-                }}
-                aria-label="Name des Charakters"
-                className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 -mx-2 text-2xl font-semibold outline-none transition hover:border-black/15 focus:border-black/40 dark:hover:border-white/15 dark:focus:border-white/40"
-              />
-              {nameChanged && (
-                <button
-                  onClick={saveName}
-                  disabled={savingName}
-                  className="shrink-0 rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
-                >
-                  {savingName ? "…" : "Speichern"}
-                </button>
-              )}
-            </div>
-            {nameError && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                {nameError}
-              </p>
-            )}
-            <p className="mt-1 text-foreground/70 italic">
-              {c.character.kurzbeschreibung}
-            </p>
+            <input
+              value={edited.name}
+              onChange={(e) => setField("name", e.target.value)}
+              aria-label="Name des Charakters"
+              className="w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 py-1 -mx-2 text-2xl font-semibold outline-none transition hover:border-black/15 focus:border-black/40 dark:hover:border-white/15 dark:focus:border-white/40"
+            />
+            <AutoTextarea
+              value={edited.kurzbeschreibung}
+              onChange={(value) => setField("kurzbeschreibung", value)}
+              ariaLabel="Kurzbeschreibung"
+              placeholder="Kurzbeschreibung"
+              className="mt-1 text-foreground/70 italic"
+            />
           </div>
           <button
             onClick={onClose}
@@ -409,11 +460,39 @@ function DetailModal({
           </button>
         </div>
 
+        {/* Änderungen speichern (erscheint bei Änderungen) */}
+        {dirty && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+            <span className="text-sm text-amber-800 dark:text-amber-300">
+              Ungespeicherte Änderungen
+            </span>
+            <button
+              onClick={saveEdits}
+              disabled={savingEdits || !nameValid}
+              className="ml-auto rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+            >
+              {savingEdits ? "Speichere …" : "Änderungen speichern"}
+            </button>
+            <button
+              onClick={() => setEdited(c.character)}
+              disabled={savingEdits}
+              className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
+            >
+              Verwerfen
+            </button>
+            {editError && (
+              <span className="w-full text-xs text-red-600 dark:text-red-400">
+                {editError}
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="mb-6">
           <h3 className="mb-2 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
             Merkmale
           </h3>
-          <TraitsTable traits={c.character.merkmale} />
+          <TraitsTable traits={edited.merkmale} onChange={setTrait} />
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_240px]">
@@ -423,12 +502,15 @@ function DetailModal({
                 Beschreibung
               </h3>
               <span className="text-xs text-foreground/50">
-                {c.character.beschreibung.length.toLocaleString("de-DE")} Zeichen
+                {edited.beschreibung.length.toLocaleString("de-DE")} Zeichen
               </span>
             </div>
-            <div className="leading-relaxed whitespace-pre-line text-[15px]">
-              {c.character.beschreibung}
-            </div>
+            <AutoTextarea
+              value={edited.beschreibung}
+              onChange={(value) => setField("beschreibung", value)}
+              ariaLabel="Beschreibung"
+              className="text-[15px]"
+            />
           </div>
           <div className="order-1 md:order-2">
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.03]">
@@ -561,12 +643,24 @@ function DetailModal({
               {new Date(c.createdAt).toLocaleDateString("de-DE")}
             </span>
             <button
+              onClick={exportPdf}
+              disabled={exporting}
+              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              {exporting ? "Erstelle PDF …" : "Als PDF exportieren"}
+            </button>
+            <button
               onClick={onDelete}
               className="rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
             >
               Löschen
             </button>
           </div>
+          {exportError && (
+            <span className="w-full text-right text-xs text-red-600 dark:text-red-400">
+              {exportError}
+            </span>
+          )}
         </div>
       </div>
     </div>

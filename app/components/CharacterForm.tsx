@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { DEFAULT_IMAGE_STYLE, GENDERS, type CharacterInput } from "@/lib/schema";
+import {
+  DEFAULT_GENRE,
+  GENRE_TEMPLATES,
+} from "@/lib/templates";
 
 const EMPTY: CharacterInput = {
   gender: "egal",
@@ -45,12 +49,26 @@ export function CharacterForm({
   loading: boolean;
 }) {
   const [form, setForm] = useState<CharacterInput>(EMPTY);
+  const [genre, setGenre] = useState<string>(DEFAULT_GENRE);
 
   function update<K extends keyof CharacterInput>(
     key: K,
     value: CharacterInput[K],
   ) {
     setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  // Genre-Vorlage anwenden: nur die von der Vorlage definierten Felder
+  // überschreiben (Merge), alles andere bleibt erhalten.
+  function applyGenre(id: string) {
+    setGenre(id);
+    const template = GENRE_TEMPLATES.find((t) => t.id === id);
+    if (template) setForm((f) => ({ ...f, ...template.values }));
+  }
+
+  function reset() {
+    setForm(EMPTY);
+    setGenre(DEFAULT_GENRE);
   }
 
   return (
@@ -61,6 +79,23 @@ export function CharacterForm({
       }}
       className="flex flex-col gap-5 rounded-xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03]"
     >
+      <Field
+        label="Genre-Vorlage"
+        hint="Belegt das Setting genre-passend vor – alle anderen Felder bleiben unverändert."
+      >
+        <select
+          className={inputClass}
+          value={genre}
+          onChange={(e) => applyGenre(e.target.value)}
+        >
+          {GENRE_TEMPLATES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.emoji} {t.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Geschlecht">
           <select
@@ -163,7 +198,7 @@ export function CharacterForm({
         </button>
         <button
           type="button"
-          onClick={() => setForm(EMPTY)}
+          onClick={reset}
           disabled={loading}
           className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
         >

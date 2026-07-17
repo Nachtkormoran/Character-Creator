@@ -3,8 +3,14 @@
 import { useState } from "react";
 import Image from "next/image";
 import { fileToDataUrl } from "@/lib/image";
-import { IMAGE_STYLES, type GeneratedCharacter } from "@/lib/schema";
+import {
+  IMAGE_STYLES,
+  withTrait,
+  type CharacterTraits,
+  type GeneratedCharacter,
+} from "@/lib/schema";
 import type { StoredGroup } from "@/lib/serialize";
+import { AutoTextarea } from "./AutoTextarea";
 import { TraitsTable } from "./TraitsTable";
 
 export function CharacterResult({
@@ -15,7 +21,7 @@ export function CharacterResult({
   imageStyle,
   onImageStyleChange,
   onSetImage,
-  onNameChange,
+  onCharacterChange,
   includeTraits,
   onIncludeTraitsChange,
   includeTextDetails,
@@ -37,7 +43,7 @@ export function CharacterResult({
   imageStyle: string;
   onImageStyleChange: (value: string) => void;
   onSetImage: (dataUrl: string) => void;
-  onNameChange: (value: string) => void;
+  onCharacterChange: (next: GeneratedCharacter) => void;
   includeTraits: boolean;
   onIncludeTraitsChange: (value: boolean) => void;
   includeTextDetails: boolean;
@@ -75,28 +81,41 @@ export function CharacterResult({
 
   const busy = imageLoading || uploading;
 
+  const setField = <K extends keyof GeneratedCharacter>(
+    key: K,
+    value: GeneratedCharacter[K],
+  ) => onCharacterChange({ ...character, [key]: value });
+
+  const setTrait = (key: keyof CharacterTraits, value: string) =>
+    onCharacterChange({
+      ...character,
+      merkmale: withTrait(character.merkmale, key, value),
+    });
+
   return (
     <div className="flex flex-col gap-6 rounded-xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
       <div>
         <input
           value={character.name}
-          onChange={(e) => onNameChange(e.target.value)}
+          onChange={(e) => setField("name", e.target.value)}
           aria-label="Name des Charakters"
           className="w-full rounded-md border border-transparent bg-transparent px-2 py-1 -mx-2 text-2xl font-semibold outline-none transition hover:border-black/15 focus:border-black/40 dark:hover:border-white/15 dark:focus:border-white/40"
         />
-        {character.kurzbeschreibung && (
-          <p className="mt-1 text-foreground/70 italic">
-            {character.kurzbeschreibung}
-          </p>
-        )}
+        <AutoTextarea
+          value={character.kurzbeschreibung}
+          onChange={(value) => setField("kurzbeschreibung", value)}
+          ariaLabel="Kurzbeschreibung"
+          placeholder="Kurzbeschreibung"
+          className="mt-1 text-foreground/70 italic"
+        />
       </div>
 
-      {/* Merkmals-Tabelle – über dem Text */}
+      {/* Merkmals-Tabelle – über dem Text, editierbar */}
       <div>
         <h3 className="mb-2 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
           Merkmale
         </h3>
-        <TraitsTable traits={character.merkmale} />
+        <TraitsTable traits={character.merkmale} onChange={setTrait} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_280px]">
@@ -110,9 +129,12 @@ export function CharacterResult({
               {charCount.toLocaleString("de-DE")} Zeichen
             </span>
           </div>
-          <div className="space-y-3 leading-relaxed whitespace-pre-line text-[15px]">
-            {character.beschreibung}
-          </div>
+          <AutoTextarea
+            value={character.beschreibung}
+            onChange={(value) => setField("beschreibung", value)}
+            ariaLabel="Beschreibung"
+            className="text-[15px]"
+          />
         </div>
 
         {/* Portrait + Stilauswahl */}
