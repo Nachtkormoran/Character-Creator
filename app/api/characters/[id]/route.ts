@@ -7,9 +7,15 @@ export const runtime = "nodejs";
 
 type Context = { params: Promise<{ id: string }> };
 
-const patchSchema = z.object({
-  name: z.string().trim().min(1, "Der Name darf nicht leer sein.").max(120),
-});
+const patchSchema = z
+  .object({
+    name: z.string().trim().min(1, "Der Name darf nicht leer sein.").max(120),
+    imageData: z.string().nullable(),
+  })
+  .partial()
+  .refine((d) => d.name !== undefined || d.imageData !== undefined, {
+    message: "Keine Änderung angegeben.",
+  });
 
 // Einzelnen Charakter laden.
 export async function GET(_request: Request, { params }: Context) {
@@ -36,10 +42,12 @@ export async function PATCH(request: Request, { params }: Context) {
         { status: 400 },
       );
     }
-    const row = await prisma.character.update({
-      where: { id },
-      data: { name: parsed.data.name },
-    });
+    const data: { name?: string; imageData?: string | null } = {};
+    if (parsed.data.name !== undefined) data.name = parsed.data.name;
+    if (parsed.data.imageData !== undefined)
+      data.imageData = parsed.data.imageData;
+
+    const row = await prisma.character.update({ where: { id }, data });
     return NextResponse.json({ character: serializeCharacter(row) });
   } catch {
     return NextResponse.json(

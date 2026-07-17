@@ -67,6 +67,20 @@ export async function updateCharacterName(
   return data.character as StoredCharacter;
 }
 
+export async function updateCharacterImage(
+  id: string,
+  imageData: string,
+): Promise<StoredCharacter> {
+  const res = await fetch(`/api/characters/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageData }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Bild speichern fehlgeschlagen.");
+  return data.character as StoredCharacter;
+}
+
 export async function deleteCharacter(id: string): Promise<void> {
   const res = await fetch(`/api/characters/${id}`, { method: "DELETE" });
   if (!res.ok) {

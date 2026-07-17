@@ -5,9 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   deleteCharacter,
+  generateImage,
   listCharacters,
+  updateCharacterImage,
   updateCharacterName,
 } from "@/lib/client";
+import { fileToDataUrl } from "@/lib/image";
+import { DEFAULT_IMAGE_STYLE, IMAGE_STYLES } from "@/lib/schema";
 import type { StoredCharacter } from "@/lib/serialize";
 import { TraitsTable } from "../components/TraitsTable";
 
@@ -38,6 +42,12 @@ export default function GalleryPage() {
 
   async function handleRename(id: string, name: string) {
     const updated = await updateCharacterName(id, name);
+    setCharacters((cs) => cs.map((x) => (x.id === id ? updated : x)));
+    setSelected((s) => (s && s.id === id ? updated : s));
+  }
+
+  async function handlePersistImage(id: string, imageData: string) {
+    const updated = await updateCharacterImage(id, imageData);
     setCharacters((cs) => cs.map((x) => (x.id === id ? updated : x)));
     setSelected((s) => (s && s.id === id ? updated : s));
   }
@@ -110,6 +120,9 @@ export default function GalleryPage() {
           onClose={() => setSelected(null)}
           onDelete={() => handleDelete(selected.id)}
           onRename={(name) => handleRename(selected.id, name)}
+          onPersistImage={(imageData) =>
+            handlePersistImage(selected.id, imageData)
+          }
         />
       )}
     </div>
@@ -121,15 +134,25 @@ function DetailModal({
   onClose,
   onDelete,
   onRename,
+  onPersistImage,
 }: {
   character: StoredCharacter;
   onClose: () => void;
   onDelete: () => void;
   onRename: (name: string) => Promise<void>;
+  onPersistImage: (imageData: string) => Promise<void>;
 }) {
   const [name, setName] = useState(c.character.name);
   const [savingName, setSavingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
+
+  const [imageStyle, setImageStyle] = useState<string>(
+    c.input.imageStyle || DEFAULT_IMAGE_STYLE,
+  );
+  const [includeTraits, setIncludeTraits] = useState(true);
+  const [includeTextDetails, setIncludeTextDetails] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const trimmed = name.trim();
   const nameChanged = trimmed.length > 0 && trimmed !== c.character.name;
@@ -144,6 +167,39 @@ function DetailModal({
       setNameError(e instanceof Error ? e.message : "Fehler.");
     } finally {
       setSavingName(false);
+    }
+  }
+
+  async function regenerateImage() {
+    if (imageLoading) return;
+    setImageLoading(true);
+    setImageError(null);
+    try {
+      const { imageData } = await generateImage(c.character, imageStyle, {
+        includeTraits,
+        includeTextDetails,
+      });
+      await onPersistImage(imageData);
+    } catch (e) {
+      setImageError(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setImageLoading(false);
+    }
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || imageLoading) return;
+    setImageLoading(true);
+    setImageError(null);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      await onPersistImage(dataUrl);
+    } catch (err) {
+      setImageError(err instanceof Error ? err.message : "Fehler beim Upload.");
+    } finally {
+      setImageLoading(false);
     }
   }
 
@@ -217,9 +273,9 @@ function DetailModal({
               {c.character.beschreibung}
             </div>
           </div>
-          {c.imageData && (
-            <div className="order-1 md:order-2">
-              <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
+          <div className="order-1 md:order-2">
+            <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.03]">
+              {c.imageData ? (
                 <Image
                   src={c.imageData}
                   alt={c.character.name}
@@ -228,9 +284,87 @@ function DetailModal({
                   className="object-cover"
                   unoptimized
                 />
-              </div>
+              ) : (
+                <div className="flex h-full items-center justify-center p-4 text-center text-sm text-foreground/40">
+                  {imageLoading ? "Bild wird erzeugt …" : "Kein Bild"}
+                </div>
+              )}
             </div>
-          )}
+
+            <label className="mt-3 flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-foreground/60">
+                Bild-Stil
+              </span>
+              <select
+                value={imageStyle}
+                onChange={(e) => setImageStyle(e.target.value)}
+                disabled={imageLoading}
+                className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              >
+                {IMAGE_STYLES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="mt-3 flex flex-col gap-2">
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={includeTraits}
+                  onChange={(e) => setIncludeTraits(e.target.checked)}
+                  disabled={imageLoading}
+                  className="mt-0.5"
+                />
+                <span>Merkmalstabelle einbeziehen (inkl. Persönlichkeit)</span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={includeTextDetails}
+                  onChange={(e) => setIncludeTextDetails(e.target.checked)}
+                  disabled={imageLoading}
+                  className="mt-0.5"
+                />
+                <span>Visuelle Details aus Fließtext miteinbeziehen</span>
+              </label>
+            </div>
+
+            <button
+              type="button"
+              onClick={regenerateImage}
+              disabled={imageLoading}
+              className="mt-3 w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              {imageLoading
+                ? "Erzeuge …"
+                : c.imageData
+                  ? "Neues Bild erzeugen"
+                  : "Bild erzeugen"}
+            </button>
+
+            <label
+              className={`mt-2 block w-full cursor-pointer rounded-md border border-black/15 px-4 py-2 text-center text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06] ${
+                imageLoading ? "pointer-events-none opacity-50" : ""
+              }`}
+            >
+              Bild hochladen
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleUpload}
+                disabled={imageLoading}
+              />
+            </label>
+            {imageError && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {imageError}
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="mt-6 flex items-center justify-between border-t border-black/10 pt-4 dark:border-white/10">

@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
+import { fileToDataUrl } from "@/lib/image";
 import { IMAGE_STYLES, type GeneratedCharacter } from "@/lib/schema";
 import { TraitsTable } from "./TraitsTable";
 
@@ -11,6 +13,7 @@ export function CharacterResult({
   imageError,
   imageStyle,
   onImageStyleChange,
+  onSetImage,
   onNameChange,
   includeTraits,
   onIncludeTraitsChange,
@@ -27,6 +30,7 @@ export function CharacterResult({
   imageError: string | null;
   imageStyle: string;
   onImageStyleChange: (value: string) => void;
+  onSetImage: (dataUrl: string) => void;
   onNameChange: (value: string) => void;
   includeTraits: boolean;
   onIncludeTraitsChange: (value: boolean) => void;
@@ -38,6 +42,27 @@ export function CharacterResult({
   saved: boolean;
 }) {
   const charCount = character.beschreibung.length;
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // erlaubt erneutes Wählen derselben Datei
+    if (!file) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      onSetImage(dataUrl);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Fehler beim Upload.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const busy = imageLoading || uploading;
 
   return (
     <div className="flex flex-col gap-6 rounded-xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03]">
@@ -95,7 +120,9 @@ export function CharacterResult({
               <div className="flex h-full items-center justify-center p-4 text-center text-sm text-foreground/40">
                 {imageLoading
                   ? "Portrait wird erzeugt …"
-                  : "Noch kein Portrait"}
+                  : uploading
+                    ? "Bild wird geladen …"
+                    : "Noch kein Portrait"}
               </div>
             )}
           </div>
@@ -144,7 +171,7 @@ export function CharacterResult({
           <button
             type="button"
             onClick={onGenerateImage}
-            disabled={imageLoading}
+            disabled={busy}
             className="mt-2 w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
           >
             {imageLoading
@@ -153,9 +180,25 @@ export function CharacterResult({
                 ? "Neues Portrait erzeugen"
                 : "Portrait erzeugen"}
           </button>
-          {imageError && (
+
+          <label
+            className={`mt-2 block w-full cursor-pointer rounded-md border border-black/15 px-4 py-2 text-center text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06] ${
+              busy ? "pointer-events-none opacity-50" : ""
+            }`}
+          >
+            {uploading ? "Lade hoch …" : "Bild hochladen"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={busy}
+            />
+          </label>
+
+          {(imageError || uploadError) && (
             <p className="mt-2 text-xs text-red-600 dark:text-red-400">
-              {imageError}
+              {imageError || uploadError}
             </p>
           )}
         </div>

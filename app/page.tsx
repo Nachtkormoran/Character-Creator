@@ -57,6 +57,13 @@ export default function Home() {
     setCharacter((c) => (c ? { ...c, name } : c));
   }
 
+  // Hochgeladenes oder erzeugtes Bild setzen (erneutes Speichern ermöglichen)
+  function handleSetImage(dataUrl: string) {
+    setImageData(dataUrl);
+    setImageError(null);
+    setSaved(false);
+  }
+
   // Zurück zum Formular für einen neuen Charakter
   function handleNew() {
     setView("form");
@@ -154,6 +161,7 @@ export default function Home() {
           imageError={imageError}
           imageStyle={imageStyle}
           onImageStyleChange={setImageStyle}
+          onSetImage={handleSetImage}
           onNameChange={handleNameChange}
           includeTraits={includeTraits}
           onIncludeTraitsChange={setIncludeTraits}
