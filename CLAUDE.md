@@ -182,13 +182,23 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   (Stand-Datum in `IMAGE_PRICES_AS_OF`, ohne Gewähr) und beeinflusst nichts.
 - `templates.ts` – statische Genre-Vorlagen; belegen beim Auswählen im Formular
   per Merge das `setting`-Feld vor.
-- `inspiration.ts` – je 100 Bausteine für die Würfel an „Aussehen",
+- `inspiration.ts` – Bausteine für die Würfel an „Aussehen",
   „Persönlichkeit" und „Hintergrund"; `pickSome` zieht mehrere **ohne
   Wiederholung**. Hier gibt es bewusst **keine Genre-Markierung** wie bei den
   Berufen: die Einträge sind so formuliert, dass sie überall passen (Körper und
   Auftreten statt Kleidungsstücke, Lebensereignisse statt setting-gebundener
-  Stationen). Der Hintergrund verbindet mit **Semikolon**, weil seine Einträge
-  selbst Kommas enthalten.
+  Stationen). Aussehen und Hintergrund verbinden mit **Semikolon**, weil ihre
+  Einträge selbst Kommas enthalten („silbergraues Haar, mit Stolz getragen").
+  **Das Aussehen hat drei Listen zu je 100:** `FEMALE_APPEARANCE`,
+  `MALE_APPEARANCE` und `NEUTRAL_APPEARANCE`. `randomAppearance(gender)` zieht
+  2–3 geschlechtsspezifische plus 1–2 neutrale Merkmale. Das Geschlecht ist
+  **Freitext** und wird wie in `names.ts` per `startsWith` geprüft, damit auch
+  ein gespeichertes Merkmal hineinpasst. Bei „egal"/„divers" entscheidet eine
+  **Münze für eine der beiden Listen**, statt aus beiden zu mischen – ein Bart
+  neben schweren Ohrringen wäre kein vielfältiger Charakter, sondern ein
+  widersprüchlicher. In `NEUTRAL_APPEARANCE` gehört deshalb nur, was an jedem
+  Charakter funktioniert (Augen, Haut, Narben, Gewohnheiten, Mitgeführtes) –
+  **kein** Haarschnitt und kein Schnitt der Kleidung.
 - `professions.ts` – 300 Berufe für den Würfel am Feld „Beruf / Rolle", jeder
   mit den Genres markiert, in die er passt (`randomProfession(genre)` filtert
   danach). Die Markierung ist der Zweck der Struktur: eine flache Liste würde

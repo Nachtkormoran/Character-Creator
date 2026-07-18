@@ -249,10 +249,10 @@ export function CharacterForm({
             placeholder="z. B. lange rote Haare, Sommersprossen, schlank, trägt eine abgewetzte Lederjacke"
           />
           <DiceButton
-            onClick={() => update("appearance", randomAppearance())}
+            onClick={() => update("appearance", randomAppearance(form.gender))}
             disabled={loading}
             label="Aussehen würfeln"
-            title="Drei bis vier zufällige Merkmale zum Aussehen"
+            title="Zufällige Merkmale zum Aussehen, passend zum gewählten Geschlecht"
           />
         </div>
       </Field>
