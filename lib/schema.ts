@@ -125,6 +125,11 @@ export function isKnownImageModel(value: string): value is ImageModel {
 
 export const characterInputSchema = z.object({
   // Grundlegende Vorgaben
+  /**
+   * Wunschname, optional. Ein einzelnes Wort wird als Vorname verstanden und
+   * vom Modell um einen Nachnamen ergänzt (s. `buildTextPrompt`).
+   */
+  name: z.string().trim().max(120).optional().default(""),
   gender: z.enum(GENDERS).default("egal"),
   age: z.string().trim().max(60).optional().default(""),
   ethnicity: z.string().trim().max(120).optional().default(""),

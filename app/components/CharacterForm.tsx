@@ -8,6 +8,7 @@ import {
 } from "@/lib/templates";
 
 const EMPTY: CharacterInput = {
+  name: "",
   gender: "egal",
   age: "",
   ethnicity: "",
@@ -94,6 +95,19 @@ export function CharacterForm({
             </option>
           ))}
         </select>
+      </Field>
+
+      <Field
+        label="Name"
+        hint="Nur ein Vorname? Dann wird ein passender Nachname ergänzt. Frei lassen für einen erfundenen Namen."
+      >
+        <input
+          className={inputClass}
+          value={form.name}
+          onChange={(e) => update("name", e.target.value)}
+          placeholder="z. B. „Mira“ oder „Mira Sandoval“"
+          maxLength={120}
+        />
       </Field>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

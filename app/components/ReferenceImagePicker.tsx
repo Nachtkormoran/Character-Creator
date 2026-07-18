@@ -98,7 +98,7 @@ export function ReferenceImagePicker({
               disabled={disabled || loading}
               className="flex-1 rounded-md border border-dashed border-black/20 px-3 py-2 text-center text-sm text-foreground/60 transition hover:border-black/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/20 dark:hover:border-white/40"
             >
-              Eigenes Bild wählen …
+              Charakterbild wählen …
             </button>
           )}
         </div>

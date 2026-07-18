@@ -12,7 +12,17 @@ function line(label: string, value?: string): string {
  * Inhalt und Ton – nicht das Format.
  */
 export function buildTextPrompt(input: CharacterInput): string {
+  const wunschname = (input.name || "").trim();
+  /**
+   * Ein einzelnes Wort verstehen wir als Vornamen, der um einen passenden
+   * Nachnamen ergänzt wird; ab zwei Wörtern gilt der Name als vollständig und
+   * wird unverändert übernommen. „Anna-Maria" zählt dabei als ein Wort – ein
+   * Doppelvorname ist immer noch ein Vorname.
+   */
+  const nurVorname = wunschname !== "" && !/\s/.test(wunschname);
+
   const vorgaben =
+    line(nurVorname ? "Vorname" : "Name", wunschname) +
     line("Geschlecht", input.gender === "egal" ? "" : input.gender) +
     line("Alter", input.age) +
     line("Herkunft/Ethnie", input.ethnicity) +
@@ -23,6 +33,14 @@ export function buildTextPrompt(input: CharacterInput): string {
     line("Persönlichkeit", input.personality) +
     line("Weitere Wünsche", input.notes);
 
+  // Die Namens-Anforderung ersetzt die freie Namenswahl, sobald etwas
+  // vorgegeben ist – sonst stünden beide widersprüchlich nebeneinander.
+  const nameAnforderung = !wunschname
+    ? "- Ein vollständiger, zum Setting passender Name."
+    : nurVorname
+      ? `- Der Vorname lautet exakt „${wunschname}". Übernimm ihn unverändert (auch Schreibweise) und ergänze einen dazu passenden Nachnamen, stimmig zu Herkunft und Setting. Das Feld für den Namen enthält beides zusammen.`
+      : `- Der Name lautet exakt „${wunschname}". Übernimm ihn unverändert und ergänze nichts.`;
+
   return `Erstelle einen glaubwürdigen, vielschichtigen menschlichen Charakter, der z. B. in einem Buch oder Spiel verwendet werden kann.
 
 Halte dich an die folgenden Vorgaben. Für alle nicht angegebenen Aspekte triffst du selbst stimmige, kreative und in sich konsistente Entscheidungen.
@@ -30,7 +48,7 @@ Halte dich an die folgenden Vorgaben. Für alle nicht angegebenen Aspekte triffs
 Vorgaben:
 ${vorgaben || "- (keine spezifischen Vorgaben – gestalte den Charakter frei)\n"}
 Anforderungen an das Ergebnis:
-- Ein vollständiger, zum Setting passender Name.
+${nameAnforderung}
 - Eine kompakte Beschreibung in 2–3 kurzen Absätzen (insgesamt ca. 700–1000 Zeichen) zu Aussehen, Persönlichkeit und Hintergrund. Fasse dich prägnant, keine Ausschweifungen.
 - Konkrete, konsistente Körpermerkmale (Größe und Gewicht als realistische Werte mit Einheit).
 - Schreibe auf Deutsch, lebendig und plastisch, aber ohne Kitsch.

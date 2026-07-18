@@ -102,7 +102,12 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
 - `schema.ts` – Zod-Schemas & Typen (`CharacterInput`, `CharacterTraits` mit
   `TRAIT_LABELS`, `GeneratedCharacter`, `IMAGE_STYLES`). **Single source of
   truth**, von Client und Server geteilt.
-- `prompts.ts` – `buildTextPrompt` / `buildImagePrompt`. Der Bild-Prompt wird
+- `prompts.ts` – `buildTextPrompt` / `buildImagePrompt`. Der **Wunschname**
+  (`input.name`, optional) wird hier ausgewertet: ein einzelnes Wort gilt als
+  Vorname und wird um einen passenden Nachnamen ergänzt, ab zwei Wörtern gilt
+  der Name als vollständig und bleibt unverändert. Die Namens-Anforderung
+  **ersetzt** dabei die freie Namenswahl in der Anforderungsliste – beide
+  nebeneinander wären widersprüchlich. Der Bild-Prompt wird
   aus Optionen `{ includeTraits, visualDetails, extraPrompt }` + Kurzbeschreibung
   (Szenen-Kontext) + Stilbeschreibung zusammengesetzt. **Hier** wird der Bild-Look
   getunt. Neben `stilBeschreibung` gibt es `framingBeschreibung`: Der
