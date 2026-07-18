@@ -288,14 +288,22 @@ export default function GalleryPage() {
           </select>
         </label>
 
-        <div className="relative flex items-center">
+        {/*
+          Die Suche füllt den Rest der Zeile und gibt bei Platzmangel als erste
+          nach (`flex-1` statt fester Breite). Mit `w-64` rutschte die
+          Gruppen-Anlage schon auf eine zweite Zeile, obwohl rechts noch Platz
+          war – die feste Breite gab ihn nicht her.
+        */}
+        <div className="relative flex min-w-48 flex-1 items-center">
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Suchen (Name, Text, Merkmale) …"
-            aria-label="Charaktere durchsuchen"
-            className={`${controlClass} w-64`}
+            // Kurz halten: das Feld schrumpft mit, ein langer Platzhalter
+            // würde abgeschnitten. Der volle Umfang steht im aria-label.
+            placeholder="Suchen …"
+            aria-label="Charaktere durchsuchen (Name, Text, Merkmale)"
+            className={`${controlClass} w-full`}
           />
           {query && (
             <button
@@ -309,32 +317,41 @@ export default function GalleryPage() {
           )}
         </div>
 
-        {filter !== "all" && filter !== "none" && (
-          <button
-            type="button"
-            onClick={() => handleDeleteGroup(filter)}
-            className="rounded-md border border-red-500/40 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
-          >
-            Gruppe löschen
-          </button>
-        )}
+        {/*
+          Die beiden Gruppen-Bedienelemente bleiben als Block zusammen. Sobald
+          der Löschen-Knopf dazukommt, passen fünf Elemente nicht mehr in die
+          Zeile (der Rahmen ist `max-w-5xl`); dann rutscht der ganze Block nach
+          unten statt nur das Eingabefeld. Kein `ml-auto` nötig – die Suche
+          schiebt ihn nach rechts.
+        */}
+        <div className="flex shrink-0 items-center gap-2">
+          {filter !== "all" && filter !== "none" && (
+            <button
+              type="button"
+              onClick={() => handleDeleteGroup(filter)}
+              className="rounded-md border border-red-500/40 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
+            >
+              Gruppe löschen
+            </button>
+          )}
 
-        <form onSubmit={handleCreateGroup} className="ml-auto flex items-center gap-2">
-          <input
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            placeholder="Neue Gruppe …"
-            maxLength={80}
-            className={`${controlClass} w-40`}
-          />
-          <button
-            type="submit"
-            disabled={creatingGroup || !newGroupName.trim()}
-            className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
-          >
-            {creatingGroup ? "…" : "Anlegen"}
-          </button>
-        </form>
+          <form onSubmit={handleCreateGroup} className="flex items-center gap-2">
+            <input
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              placeholder="Neue Gruppe …"
+              maxLength={80}
+              className={`${controlClass} w-36`}
+            />
+            <button
+              type="submit"
+              disabled={creatingGroup || !newGroupName.trim()}
+              className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+            >
+              {creatingGroup ? "…" : "Anlegen"}
+            </button>
+          </form>
+        </div>
         {groupError && (
           <span className="w-full text-xs text-red-600 dark:text-red-400">
             {groupError}
