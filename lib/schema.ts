@@ -237,6 +237,47 @@ export const TRAIT_LABELS: Record<keyof CharacterTraits, string> = {
   persoenlichkeit: "Persönlichkeit",
 };
 
+/**
+ * Reihenfolge & Anzeigenamen der **Formular-Vorgaben** (`CharacterInput`) für
+ * die Vorgaben-Ansicht in der Galerie. Reihenfolge wie im Erstellen-Formular,
+ * damit die Ansicht sich liest wie das ausgefüllte Formular.
+ *
+ * Diese Karte ist zugleich die Feldliste der Anzeige: Charaktere aus älteren
+ * Ständen haben nicht alle Schlüssel im gespeicherten JSON. Über die Labels zu
+ * laufen statt über die Schlüssel des Objekts zeigt solche Felder als leer an,
+ * statt sie stillschweigend zu unterschlagen.
+ */
+export const INPUT_LABELS: Record<keyof CharacterInput, string> = {
+  name: "Wunschname",
+  gender: "Geschlecht",
+  age: "Alter",
+  ethnicity: "Herkunft / Ethnie",
+  appearance: "Aussehen",
+  personality: "Persönlichkeit",
+  setting: "Setting / Genre",
+  occupation: "Beruf / Rolle",
+  background: "Hintergrund",
+  notes: "Weitere Wünsche",
+  imageStyle: "Bild-Stil",
+};
+
+/**
+ * Anzeigewert einer einzelnen Vorgabe. `imageStyle` wird auf sein Label
+ * abgebildet („illustration" → „Illustration"), alles andere bleibt Freitext.
+ * Leer bleibt leer – die Anzeige entscheidet, wie sie das darstellt.
+ */
+export function inputDisplayValue(
+  key: keyof CharacterInput,
+  input: Partial<CharacterInput>,
+): string {
+  const raw = input[key];
+  if (typeof raw !== "string" || raw.trim() === "") return "";
+  if (key === "imageStyle") {
+    return IMAGE_STYLES.find((s) => s.value === raw)?.label ?? raw;
+  }
+  return raw;
+}
+
 // ---------------------------------------------------------------------------
 // Vollständiges generiertes Ergebnis
 // ---------------------------------------------------------------------------

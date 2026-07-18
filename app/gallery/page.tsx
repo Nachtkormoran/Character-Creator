@@ -30,6 +30,7 @@ import { AutoTextarea } from "../components/AutoTextarea";
 import { CharacterImagesModal } from "../components/CharacterImagesModal";
 import { ImageLightbox } from "../components/ImageLightbox";
 import { TraitsTable } from "../components/TraitsTable";
+import { CharacterInputModal } from "../components/CharacterInputModal";
 
 const controlClass =
   "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
@@ -443,6 +444,9 @@ function DetailModal({
   // Alles rund um Bilder liegt in der eigenen Bilder-Ansicht.
   const [imagesOpen, setImagesOpen] = useState(false);
 
+  // Die ursprünglichen Formular-Vorgaben ebenso – reine Anzeige.
+  const [inputOpen, setInputOpen] = useState(false);
+
   // Das Original des Primärbilds kommt aus keiner Listen-Antwort (nur das
   // Thumbnail) und wird für Vollbild, Bild-Export und PDF nachgeladen.
   const [fullImage, setFullImage] = useState<string | null>(null);
@@ -753,6 +757,12 @@ function DetailModal({
               {new Date(c.createdAt).toLocaleDateString("de-DE")}
             </span>
             <button
+              onClick={() => setInputOpen(true)}
+              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              Vorgaben anzeigen
+            </button>
+            <button
               onClick={exportPdf}
               disabled={exporting}
               className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
@@ -780,6 +790,14 @@ function DetailModal({
           edited={edited}
           onChange={onCharacterUpdated}
           onClose={() => setImagesOpen(false)}
+        />
+      )}
+
+      {inputOpen && (
+        <CharacterInputModal
+          input={c.input ?? {}}
+          name={c.character.name}
+          onClose={() => setInputOpen(false)}
         />
       )}
 

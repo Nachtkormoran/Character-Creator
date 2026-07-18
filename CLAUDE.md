@@ -101,6 +101,16 @@ einzelnen Kachel, damit jedes Bild einzeln herunterladbar ist – bei mehr als
 einem Bild bekommt die Datei ihre Position angehängt (`Name_2.png`), sonst
 überschrieben sich die Downloads gegenseitig.
 
+**Vorgaben-Ansicht:** Die Formular-Eingaben, aus denen ein Charakter entstanden
+ist, liegen seit jeher in der Spalte `input` (JSON-String) und sind über
+`StoredCharacter.input` bereits im Client. Der Fußzeilen-Knopf „Vorgaben
+anzeigen" öffnet sie als eigene Ebene (`CharacterInputModal`). Bewusst **reine
+Anzeige, nicht editierbar**: die Werte protokollieren den Erstellungszeitpunkt.
+Wären sie änderbar, stünde in der DB eine Vorgabe, aus der der gespeicherte
+Text nie entstanden ist. Gerendert wird über `INPUT_LABELS`, nicht über die
+Schlüssel des Objekts – Altbestände haben nicht alle Felder, und die fehlen so
+sichtbar („— nichts angegeben —") statt lautlos.
+
 **Editierbare Felder:** Name, Kurzbeschreibung, Beschreibung und alle Merkmale
 sind in beiden Ansichten editierbar. Am Namensfeld hängen in **beiden**
 Ansichten zwei Knöpfe: 🎲 würfelt lokal, ✨ fragt die KI. Im Formular speisen
@@ -111,9 +121,9 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
 `withTrait`-Helfer in `schema.ts` (konvertiert `alter` in eine Zahl).
 
 **Zentrale Module in `lib/`:**
-- `schema.ts` – Zod-Schemas & Typen (`CharacterInput`, `CharacterTraits` mit
-  `TRAIT_LABELS`, `GeneratedCharacter`, `IMAGE_STYLES`). **Single source of
-  truth**, von Client und Server geteilt.
+- `schema.ts` – Zod-Schemas & Typen (`CharacterInput` mit `INPUT_LABELS`,
+  `CharacterTraits` mit `TRAIT_LABELS`, `GeneratedCharacter`, `IMAGE_STYLES`).
+  **Single source of truth**, von Client und Server geteilt.
 - `prompts.ts` – `buildTextPrompt` / `buildImagePrompt`. Der **Wunschname**
   (`input.name`, optional) wird hier ausgewertet: ein einzelnes Wort gilt als
   Vorname und wird um einen passenden Nachnamen ergänzt, ab zwei Wörtern gilt
@@ -296,6 +306,11 @@ lokal.
   gleich für **alle** Ebenen, welche sich schließt; die Vorlagen-Auswahl hat
   aus genau diesem Grund **keinen eigenen** Esc-Handler. Neue Zwischenebenen
   also dort einhängen, nicht mit einem weiteren Listener.
+  Die **Vorgaben-Ansicht** (`CharacterInputModal`, ebenfalls `z-70`) ist die
+  Ausnahme und hat einen eigenen, gewöhnlichen Handler: über ihr liegt nichts,
+  und sie ist mit der Bilder-Ansicht nie gleichzeitig offen (beide öffnen aus
+  der Detailansicht). Damit gibt es nichts, wovon der Handler abhängen könnte –
+  die Falle oben entsteht gar nicht erst.
 - Bilder liegen als Base64-Data-URLs direkt in SQLite. Für ein späteres
   Vercel-Deployment auf Postgres + Blob-Storage umstellen (Migrationsweg steht
   in der `README.md`).
