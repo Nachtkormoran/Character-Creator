@@ -56,7 +56,12 @@ Komponenten sprechen die Routen ausschließlich über die typisierten Helfer in
 `chat.completions.parse` + `zodResponseFormat` → strukturiertes
 `GeneratedCharacter`) → Anzeige Text + Merkmals-Tabelle → `POST
 /api/generate-image` (liefert Base64-Data-URL) → `POST /api/characters`
-(Prisma) speichern.
+(Prisma) speichern. **Nach dem Speichern schließt die Ergebnis-Ansicht**
+(zurück zum Formular, mit grünem Hinweis + Link zur Galerie). Das ist kein
+Komfort, sondern nötig: die Ansicht kennt keine Charakter-ID, jeder weitere
+Klick auf „Speichern" wäre ein **neues** `POST` und damit ein Duplikat. Der
+Knopf allein reicht als Schutz nicht – `setSaved(false)` macht ihn nach jedem
+neu erzeugten oder hochgeladenen Bild wieder scharf.
 
 **API-Routen:**
 - `POST /api/generate-text`, `POST /api/generate-image` – OpenAI (persistieren

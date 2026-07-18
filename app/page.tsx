@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { CharacterForm } from "./components/CharacterForm";
 import { CharacterResult } from "./components/CharacterResult";
@@ -38,6 +39,12 @@ export default function Home() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  /**
+   * Name des zuletzt gespeicherten Charakters – die Ergebnis-Ansicht schließt
+   * nach dem Speichern, und ohne diese Rückmeldung stünde der Nutzer wortlos
+   * wieder vor dem leeren Formular.
+   */
+  const [savedNotice, setSavedNotice] = useState<string | null>(null);
 
   const [groups, setGroups] = useState<StoredGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -56,6 +63,7 @@ export default function Home() {
     setImageData(null);
     setImageError(null);
     setSaved(false);
+    setSavedNotice(null);
     setInput(formInput);
     setView("result"); // sofort zur Ergebnis-Ansicht wechseln
     try {
@@ -77,6 +85,12 @@ export default function Home() {
 
   // Zurück zum Formular für einen neuen Charakter
   function handleNew() {
+    setSavedNotice(null);
+    resetToForm();
+  }
+
+  /** Ergebnis-Ansicht verlassen und alles Charakterbezogene verwerfen. */
+  function resetToForm() {
     setView("form");
     setCharacter(null);
     setInput(null);
@@ -119,6 +133,11 @@ export default function Home() {
         selectedGroupId,
       );
       setSaved(true);
+      // Ansicht schließen: sie bietet sonst weiter einen Speichern-Knopf an,
+      // und ein zweiter Klick legt einen zweiten Charakter an statt den
+      // vorhandenen zu aktualisieren.
+      resetToForm();
+      setSavedNotice(character.name);
     } catch (err) {
       setTextError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
     } finally {
@@ -139,6 +158,15 @@ export default function Home() {
             und auf Wunsch ein Portrait.
           </p>
         </div>
+
+        {savedNotice && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-green-600/30 bg-green-500/10 px-4 py-3 text-sm text-green-800 dark:text-green-300">
+            <span>„{savedNotice}“ wurde gespeichert.</span>
+            <Link href="/gallery" className="font-medium underline">
+              In der Galerie ansehen
+            </Link>
+          </div>
+        )}
 
         <CharacterForm onGenerate={handleGenerate} loading={textLoading} />
       </div>
