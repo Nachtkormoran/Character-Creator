@@ -80,7 +80,14 @@ export function CharacterForm({
   /** Zufallsname aus den lokalen Listen – kostenlos und ohne Wartezeit. */
   function rollName() {
     setNameError(null);
-    update("name", randomName(genre, form.gender));
+    update(
+      "name",
+      randomName({
+        gender: form.gender,
+        herkunft: form.ethnicity,
+        genre,
+      }),
+    );
   }
 
   /**

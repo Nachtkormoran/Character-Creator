@@ -102,7 +102,10 @@ einem Bild bekommt die Datei ihre Position angehängt (`Name_2.png`), sonst
 überschrieben sich die Downloads gegenseitig.
 
 **Editierbare Felder:** Name, Kurzbeschreibung, Beschreibung und alle Merkmale
-sind in beiden Ansichten editierbar. In der Erstellen-Ansicht wandern die
+sind in beiden Ansichten editierbar. Am Namensfeld hängen in **beiden**
+Ansichten zwei Knöpfe: 🎲 würfelt lokal, ✨ fragt die KI. Im Formular speisen
+sie sich aus den Vorgaben, in der Galerie aus der **Merkmalstabelle** (dort ist
+der Name schon vergeben, geändert wird nachträglich). In der Erstellen-Ansicht wandern die
 Änderungen in den Charakter-State und werden beim Speichern übernommen; in der
 Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über den
 `withTrait`-Helfer in `schema.ts` (konvertiert `alter` in eine Zahl).
@@ -122,7 +125,10 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   aber Tokens kosten. Die Route `generate-name` nutzt aus demselben Grund
   `chat.completions.create` mit `max_tokens` statt Structured Outputs – ein
   JSON-Schema für einen einzelnen String wäre reiner Aufschlag. Gemessen:
-  110 Token rein, 5 raus, rund **0,03 Cent pro Namen**. Der Bild-Prompt wird
+  110 Token rein, 5 raus, rund **0,03 Cent pro Namen**. Der Body ist
+  `{ input, traits? }`: die Merkmale kennt nur die Galerie, und sie haben im
+  Prompt **Vorrang** vor den Formular-Vorgaben (Geschlecht, Alter, Herkunft) –
+  sie beschreiben den fertigen Charakter, die Vorgaben nur den Wunsch. Der Bild-Prompt wird
   aus Optionen `{ includeTraits, visualDetails, extraPrompt }` + Kurzbeschreibung
   (Szenen-Kontext) + Stilbeschreibung zusammengesetzt. **Hier** wird der Bild-Look
   getunt. Neben `stilBeschreibung` gibt es `framingBeschreibung`: Der
@@ -179,7 +185,12 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
 - `names.ts` – Namensvorrat für den Würfel-Knopf: neun Kulturkreise à 200 Namen
   plus `GENRE_CULTURES` (Genre → Kulturkreise) und `randomName`. **Rein lokal,
   ohne API** – der Knopf lebt davon, dass man ihn mehrmals drückt, und das
-  verträgt keine Netzwerk-Wartezeit.
+  verträgt keine Netzwerk-Wartezeit. `randomName` bestimmt den Kulturkreis
+  nach Spezifität: **Herkunft (Freitext) → Genre-Id → Setting (Freitext) →
+  Gegenwart-Mix**. Die Galerie hat keine Genre-Id mehr, deshalb der Umweg über
+  das Setting. Die Stichwortlisten decken bewusst **nur ab, was die Namens-
+  listen hergeben** – für alles andere (z. B. „tibetisch") ist der KI-Knopf da;
+  eine falsche Zuordnung wäre schlechter als der neutrale Mix.
 - `image.ts` – clientseitige Bildhelfer: `fileToDataUrl` (Upload einlesen und
   herunterskalieren), `makeThumbnail` (640 px, WebP 0,85) und
   `fileToReferenceDataUrl` für Referenzbilder. Letzteres kodiert bewusst

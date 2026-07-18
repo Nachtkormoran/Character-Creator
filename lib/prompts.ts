@@ -1,4 +1,8 @@
-import type { CharacterInput, GeneratedCharacter } from "./schema";
+import type {
+  CharacterInput,
+  CharacterTraits,
+  GeneratedCharacter,
+} from "./schema";
 
 /** Hilfsfunktion: nur ausgefüllte Vorgaben in den Prompt aufnehmen. */
 function line(label: string, value?: string): string {
@@ -69,13 +73,26 @@ ${nameAnforderung}
  * existiert für das, was feste Listen nicht können – etwa eine im Freitext
  * angegebene Herkunft, für die es keine Liste gibt.
  */
-export function buildNamePrompt(input: CharacterInput): string {
+export function buildNamePrompt(
+  input: CharacterInput,
+  /**
+   * Merkmale eines bereits erzeugten Charakters (Galerie). Sie sind
+   * konkreter als die Formular-Vorgaben – „britisch" schlägt ein leeres
+   * Herkunftsfeld – und haben deshalb Vorrang.
+   */
+  traits?: CharacterTraits,
+): string {
   const hintergrund = (input.background || "").trim().slice(0, 200);
 
+  const geschlecht =
+    traits?.geschlecht || (input.gender === "egal" ? "" : input.gender);
+  const alter = traits ? String(traits.alter) : input.age;
+  const herkunft = traits?.herkunft || input.ethnicity;
+
   const vorgaben =
-    line("Geschlecht", input.gender === "egal" ? "" : input.gender) +
-    line("Alter", input.age) +
-    line("Herkunft/Ethnie", input.ethnicity) +
+    line("Geschlecht", geschlecht) +
+    line("Alter", alter) +
+    line("Herkunft/Ethnie", herkunft) +
     line("Setting/Genre", input.setting) +
     line("Beruf/Rolle", input.occupation) +
     line("Hintergrund", hintergrund);

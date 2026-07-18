@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
 import { getOpenAI, TEXT_MODEL } from "@/lib/openai";
 import { buildNamePrompt } from "@/lib/prompts";
-import { characterInputSchema } from "@/lib/schema";
+import { characterInputSchema, characterTraitsSchema } from "@/lib/schema";
+import { z } from "zod";
+
+/**
+ * Die Merkmale sind optional: das Erstellen-Formular kennt nur seine
+ * Vorgaben, die Galerie zusätzlich die fertige Merkmalstabelle.
+ */
+const bodySchema = z.object({
+  input: characterInputSchema,
+  traits: characterTraitsSchema.optional(),
+});
 
 export const runtime = "nodejs";
 
@@ -21,7 +31,7 @@ function cleanName(raw: string): string {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const parsed = characterInputSchema.safeParse(body);
+    const parsed = bodySchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Ungültige Eingaben.", details: parsed.error.flatten() },
@@ -42,7 +52,10 @@ export async function POST(request: Request) {
           content:
             "Du erfindest Namen für Charaktere. Du antwortest ausschließlich mit dem Namen selbst.",
         },
-        { role: "user", content: buildNamePrompt(parsed.data) },
+        {
+          role: "user",
+          content: buildNamePrompt(parsed.data.input, parsed.data.traits),
+        },
       ],
       // Hoch, damit wiederholtes Klicken auch wirklich verschiedene Namen
       // liefert – bei einer so kurzen Antwort ist das ungefährlich.

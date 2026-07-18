@@ -425,36 +425,109 @@ export const GENRE_CULTURES: Record<string, string[]> = {
   western: ["western"],
 };
 
-/** Kulturkreise, aus denen gewürfelt wird, wenn kein Genre passt. */
+/** Kulturkreise, aus denen gewürfelt wird, wenn nichts anderes passt. */
 const FALLBACK_CULTURES = GENRE_CULTURES.gegenwart;
+
+/**
+ * Stichwörter, mit denen eine im Freitext angegebene Herkunft einem
+ * Kulturkreis zugeordnet wird. Bewusst **nur, was die Listen wirklich
+ * abdecken** – „tibetisch" steht hier absichtlich nicht, dafür ist der
+ * KI-Knopf da. Eine falsche Zuordnung wäre schlechter als gar keine.
+ */
+const HERKUNFT_HINTS: Record<string, string[]> = {
+  deutsch: ["deutsch", "österreich", "schweiz", "bayer", "preuß", "sächsisch"],
+  britisch: [
+    "britisch", "englisch", "irisch", "schottisch", "walisisch",
+    "amerikanisch", "kanadisch", "australisch",
+  ],
+  nordisch: [
+    "nordisch", "skandinav", "schwed", "norweg", "dän", "isländ", "finn",
+    "wiking",
+  ],
+  slawisch: [
+    "slaw", "russ", "poln", "tschech", "ukrain", "serb", "kroat", "bulgar",
+    "slowak",
+  ],
+  romanisch: [
+    "italien", "spanisch", "portugies", "romanisch", "mexikan", "argentin",
+    "brasilian", "latein",
+  ],
+  japanisch: ["japan", "nippon"],
+};
+
+/** Dasselbe für ein frei formuliertes Setting (Galerie kennt keine Genre-Id). */
+const SETTING_HINTS: Record<string, string[]> = {
+  fantasy: ["fantasy", "magie", "elfen", "drachen", "schwert"],
+  western: ["western", "wilder westen", "prärie", "revolver", "saloon"],
+  steampunk: ["steampunk", "viktorian", "dampfmaschin"],
+  cyberpunk: ["cyberpunk", "neon", "megacity", "cyberware", "konzernmacht"],
+  historisch: ["historisch", "antike", "mittelalter", "jahrhundert", "neuzeit"],
+};
+
+function matchHints(text: string, hints: Record<string, string[]>): string | null {
+  const t = text.trim().toLowerCase();
+  if (!t) return null;
+  for (const [key, words] of Object.entries(hints)) {
+    if (words.some((w) => t.includes(w))) return key;
+  }
+  return null;
+}
 
 function pick<T>(list: readonly T[]): T {
   return list[Math.floor(Math.random() * list.length)];
 }
 
 /**
- * Würfelt einen vollständigen Namen (Vor- + Nachname) passend zu Genre und
- * Geschlecht. Bei „divers"/„egal" wird aus beiden Vornamenslisten gezogen.
+ * Würfelt einen vollständigen Namen (Vor- + Nachname).
+ *
+ * Der Kulturkreis wird in dieser Reihenfolge bestimmt – die spezifischste
+ * Angabe gewinnt:
+ *
+ * 1. `herkunft` (Freitext, z. B. „skandinavisch") – die konkreteste Aussage,
+ *    die es über einen Namen gibt.
+ * 2. `genre` – die exakte Vorlagen-Id aus `templates.ts` (nur das Formular
+ *    kennt sie).
+ * 3. `setting` (Freitext) – der Notnagel für gespeicherte Charaktere, die
+ *    keine Genre-Id mehr haben.
+ * 4. Sonst der bunte „Gegenwart"-Mix.
+ *
+ * Bei „divers"/„egal" wird aus beiden Vornamenslisten gezogen.
  *
  * Das Ergebnis ist bewusst zweiteilig: `buildTextPrompt` behandelt einen
  * Namen ab zwei Wörtern als vollständig und übernimmt ihn unverändert – ein
  * gewürfelter Name wird also genau so verwendet, wie er im Feld steht.
  */
-export function randomName(
-  genre: string,
-  gender: "weiblich" | "männlich" | "divers" | "egal",
-): string {
-  const ids = GENRE_CULTURES[genre] ?? FALLBACK_CULTURES;
+export function randomName(options: {
+  /**
+   * Freitext, damit sowohl die Auswahl im Formular („weiblich") als auch das
+   * Merkmal eines gespeicherten Charakters hineinpasst. Alles, was nicht
+   * eindeutig weiblich oder männlich ist, zieht aus beiden Listen.
+   */
+  gender: string;
+  herkunft?: string;
+  genre?: string;
+  setting?: string;
+}): string {
+  const { gender, herkunft = "", genre, setting = "" } = options;
+
+  const viaHerkunft = matchHints(herkunft, HERKUNFT_HINTS);
+  const viaSetting = matchHints(setting, SETTING_HINTS);
+  const ids = viaHerkunft
+    ? [viaHerkunft]
+    : (genre && GENRE_CULTURES[genre]) ||
+      (viaSetting && GENRE_CULTURES[viaSetting]) ||
+      FALLBACK_CULTURES;
+
   const cultureId = pick(ids);
   const culture =
     NAME_CULTURES.find((c) => c.id === cultureId) ?? NAME_CULTURES[0];
 
-  const pool =
-    gender === "weiblich"
-      ? culture.female
-      : gender === "männlich"
-        ? culture.male
-        : [...culture.female, ...culture.male];
+  const g = gender.trim().toLowerCase();
+  const pool = g.startsWith("weib")
+    ? culture.female
+    : g.startsWith("männ") || g.startsWith("mann")
+      ? culture.male
+      : [...culture.female, ...culture.male];
 
   return `${pick(pool)} ${pick(culture.surnames)}`;
 }

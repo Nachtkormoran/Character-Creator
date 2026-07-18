@@ -1,5 +1,10 @@
 import { makeThumbnail } from "./image";
-import type { CharacterInput, GeneratedCharacter, Settings } from "./schema";
+import type {
+  CharacterInput,
+  CharacterTraits,
+  GeneratedCharacter,
+  Settings,
+} from "./schema";
 import type { StoredCharacter, StoredGroup } from "./serialize";
 
 /**
@@ -38,9 +43,12 @@ export function generateText(input: CharacterInput) {
   );
 }
 
-/** Ein einzelner Namensvorschlag, passend zu den Formular-Vorgaben. */
-export function generateName(input: CharacterInput) {
-  return postJson<{ name: string }>("/api/generate-name", input);
+/**
+ * Ein einzelner Namensvorschlag. `traits` gibt es nur für bereits erzeugte
+ * Charaktere (Galerie) und hat im Prompt Vorrang vor den Vorgaben.
+ */
+export function generateName(input: CharacterInput, traits?: CharacterTraits) {
+  return postJson<{ name: string }>("/api/generate-name", { input, traits });
 }
 
 export function generateImage(

@@ -7,6 +7,7 @@ import {
   createGroup,
   deleteCharacter,
   deleteGroup,
+  generateName,
   getImage,
   listCharacters,
   listGroups,
@@ -14,6 +15,7 @@ import {
   updateCharacterGroup,
 } from "@/lib/client";
 import { downloadBlob, safeFileName } from "@/lib/download";
+import { randomName } from "@/lib/names";
 import {
   withTrait,
   type CharacterTraits,
@@ -479,6 +481,41 @@ function DetailModal({
   const [assigningGroup, setAssigningGroup] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [namingAI, setNamingAI] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  /**
+   * Nachträglich einen neuen Namen würfeln. Grundlage sind die **Merkmale**
+   * des fertigen Charakters (Geschlecht, Herkunft) – sie sind konkreter als
+   * die ursprünglichen Formular-Vorgaben. Eine Genre-Id gibt es hier nicht
+   * mehr, deshalb dient das gespeicherte Setting als Notnagel.
+   */
+  function rollName() {
+    setNameError(null);
+    setField(
+      "name",
+      randomName({
+        gender: edited.merkmale.geschlecht,
+        herkunft: edited.merkmale.herkunft,
+        setting: c.input.setting,
+      }),
+    );
+  }
+
+  /** Namensvorschlag der KI, unter Einbeziehung der Merkmalstabelle. */
+  async function suggestName() {
+    if (namingAI) return;
+    setNamingAI(true);
+    setNameError(null);
+    try {
+      const { name } = await generateName(c.input, edited.merkmale);
+      setField("name", name);
+    } catch (e) {
+      setNameError(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setNamingAI(false);
+    }
+  }
 
   async function exportPdf() {
     if (exporting) return;
@@ -553,12 +590,36 @@ function DetailModal({
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <input
-              value={edited.name}
-              onChange={(e) => setField("name", e.target.value)}
-              aria-label="Name des Charakters"
-              className="w-full min-w-0 rounded-md border border-transparent bg-transparent px-2 py-1 -mx-2 text-2xl font-semibold outline-none transition hover:border-black/15 focus:border-black/40 dark:hover:border-white/15 dark:focus:border-white/40"
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={edited.name}
+                onChange={(e) => setField("name", e.target.value)}
+                aria-label="Name des Charakters"
+                className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 -mx-2 text-2xl font-semibold outline-none transition hover:border-black/15 focus:border-black/40 dark:hover:border-white/15 dark:focus:border-white/40"
+              />
+              <button
+                type="button"
+                onClick={rollName}
+                title="Zufallsname passend zu Geschlecht und Herkunft aus der Merkmalstabelle – sofort und ohne KI"
+                className="shrink-0 rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+              >
+                🎲 Würfeln
+              </button>
+              <button
+                type="button"
+                onClick={suggestName}
+                disabled={namingAI}
+                title="Namensvorschlag der KI auf Basis der Merkmalstabelle"
+                className="shrink-0 rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              >
+                {namingAI ? "Denkt nach …" : "✨ Zu den Merkmalen"}
+              </button>
+            </div>
+            {nameError && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                {nameError}
+              </p>
+            )}
             <AutoTextarea
               value={edited.kurzbeschreibung}
               onChange={(value) => setField("kurzbeschreibung", value)}
