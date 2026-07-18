@@ -88,10 +88,17 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
 - `prompts.ts` – `buildTextPrompt` / `buildImagePrompt`. Der Bild-Prompt wird
   aus Optionen `{ includeTraits, visualDetails, extraPrompt }` + Kurzbeschreibung
   (Szenen-Kontext) + Stilbeschreibung zusammengesetzt. **Hier** wird der Bild-Look
-  getunt.
+  getunt. Neben `stilBeschreibung` gibt es `framingBeschreibung`: Der
+  Standard-Bildaufbau verlangt eine Umgebung mit Tiefenschärfe, „Skizze"
+  schließt sie ausdrücklich aus (nur dort weicht auch die Kontextzeile ab).
+  Bei einem neuen Stil also prüfen, ob der Standard-Bildaufbau passt.
 - `openai.ts` – serverseitiger OpenAI-Client + Modell-IDs aus der Env.
 - `imageProvider.ts` – `ImageProvider`-Interface abstrahiert das Bild-Backend
-  (aktuell OpenAI `gpt-image-1`); Austauschpunkt für z. B. Flux/Replicate.
+  (aktuell OpenAI); Austauschpunkt für z. B. Flux/Replicate. **Sind
+  `referenceImages` gesetzt, läuft die Erzeugung über `images.edit` statt
+  `images.generate`** – der Prompt geht dabei unverändert mit, die Vorlage
+  kommt hinzu. `gpt-image-2` unterstützt `images.edit` nicht und wird mit
+  einer verständlichen Meldung abgefangen.
 - `visualDetails.ts` – separater LLM-Aufruf, der aus dem langen Beschreibungstext
   nur bildrelevante Details extrahiert (bei `includeTextDetails`).
 - `prisma.ts` – Prisma-Client-Singleton **mit better-sqlite3 Driver-Adapter**.
@@ -122,8 +129,19 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
 - `templates.ts` – statische Genre-Vorlagen; belegen beim Auswählen im Formular
   per Merge das `setting`-Feld vor.
 - `image.ts` – clientseitige Bildhelfer: `fileToDataUrl` (Upload einlesen und
-  herunterskalieren) und `makeThumbnail` (640 px, WebP 0,85). Beide brauchen
-  Canvas, laufen also nur im Browser.
+  herunterskalieren), `makeThumbnail` (640 px, WebP 0,85) und
+  `fileToReferenceDataUrl` für Referenzbilder. Letzteres kodiert bewusst
+  **verlustfrei** (unverändert bzw. PNG bis 1536 px): das Modell liest die
+  Vorlage aus und kann JPEG-Artefakte als gewollte Bildmerkmale missdeuten.
+  Alle brauchen Canvas, laufen also nur im Browser.
+
+**Referenzbilder:** Optionale Stil-/Motivvorlage pro Generierung, in beiden
+Ansichten über `ReferenceImagePicker`. Sie gilt **nur für die Sitzung** und
+wird nicht am Charakter gespeichert. Beachte: OpenAI erzeugt keine
+stilisierten Bilder identifizierbarer realer Personen – deshalb ist das Feld
+als „Stil- und Motivvorlage" beschriftet, nicht als Ähnlichkeitsfunktion. Bei
+gesetzter Vorlage können die Merkmale aus der Tabelle mit dem Bild kollidieren
+(z. B. Haarfarbe); die UI weist darauf hin.
 
 **Nennenswerte Komponenten** (`app/components/`): `CharacterPdf.tsx` erzeugt den
 PDF-Export via `@react-pdf/renderer` (nur Browser, wird in der Galerie
@@ -138,6 +156,11 @@ lokal.
 
 ## Nicht-offensichtliche Fallstricke
 
+- **Altbestände und neue Merkmale:** Wird `characterTraitsSchema` um ein Feld
+  erweitert, fehlt es allen zuvor gespeicherten Charakteren – Bildgenerierung
+  und Bearbeiten scheitern dann mit „Ungültige Eingaben". `serialize.ts` füllt
+  fehlende Merkmale deshalb über `normalizeTraits` auf. Bei einer Erweiterung
+  trotzdem die Bestandsdaten nachziehen, damit die DB sauber bleibt.
 - **Structured Outputs + Zod:** `openai.chat.completions.parse` mit
   `zodResponseFormat` verwenden. **Kein** `z.number().int()` in Schemas, die an
   OpenAI gehen – `.int()` erzeugt `minimum`/`maximum`, was Structured Outputs

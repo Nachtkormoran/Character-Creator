@@ -59,11 +59,27 @@ export function buildImagePrompt(
       "Expressive painterly portrait, in the style of a fine-art oil / gouache painting. Clearly a hand-painted artwork with visible brush strokes, thick impasto texture, blended colors and an artistic, slightly loose rendering — NOT a photograph and not a clean digital render. Rich, harmonious color palette and warm painterly lighting. Contemporary, present-day clothing. The character is set within a fitting modern environment rendered in the same loose painterly manner, with soft atmospheric depth.",
     fotorealistisch:
       "Photorealistic portrait photograph. Shot on a full-frame camera, natural lighting, shallow depth of field, sharp focus, realistic skin texture and pores, high detail. Contemporary, present-day setting. Looks like a real photograph, not an illustration.",
+    skizze:
+      "Soft painted character study, like a digital sketch in gouache or matte oil. Muted, warm earthy palette (ochre, cream, olive, soft browns) with gentle, diffuse light and no dramatic contrast or color grading. Visible dry brush strokes and loose, sketchy edges — the painting fades out towards the borders and looks slightly unfinished, on a subtly textured paper-like surface. Calm, quiet, intimate mood. Clearly a hand-painted study, NOT a photograph and NOT polished concept art.",
   };
   const stil = stilBeschreibung[imageStyle] || stilBeschreibung.illustration;
 
+  // Bildaufbau je Stil. „Skizze" ist bewusst ohne Umgebung – das ist der Kern
+  // dieses Looks und würde sonst von der Standard-Vorgabe überschrieben.
+  const framingBeschreibung: Record<string, string> = {
+    skizze:
+      "Framing: head-and-shoulders bust portrait, centered, the character calmly facing the viewer. Plain, unadorned warm paper-toned background with soft painterly texture — NO scenery, NO room, NO environment and no depth of field. Only one person in the image, no text, no watermark.",
+  };
+  const framing =
+    framingBeschreibung[imageStyle] ||
+    "Framing: half-body / upper-body composition with a natural, candid pose (the character may look slightly off-camera). The fitting modern environment is visible behind them with depth of field. Only one person in the image, no text, no watermark.";
+
+  // Ohne Umgebung (Skizze) darf der Kontext nur Kleidung und Ausstrahlung
+  // steuern – sonst zieht er doch wieder einen Schauplatz ins Bild.
   const kontext = character.kurzbeschreibung
-    ? `\nScene context (use it to choose a fitting modern environment and outfit): ${character.kurzbeschreibung}\n`
+    ? imageStyle === "skizze"
+      ? `\nCharacter context (use it for clothing, expression and mood only, not for any background): ${character.kurzbeschreibung}\n`
+      : `\nScene context (use it to choose a fitting modern environment and outfit): ${character.kurzbeschreibung}\n`
     : "";
 
   const merkmaleBlock = includeTraits
@@ -96,5 +112,5 @@ Additional instructions from the user (important – incorporate these even if t
   return `Portrait of a single human character. ${stil}.
 ${kontext}${merkmaleBlock}${detailsBlock}${extraBlock}
 
-Framing: half-body / upper-body composition with a natural, candid pose (the character may look slightly off-camera). The fitting modern environment is visible behind them with depth of field. Only one person in the image, no text, no watermark.`;
+${framing}`;
 }

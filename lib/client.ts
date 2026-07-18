@@ -45,6 +45,7 @@ export function generateImage(
     includeTraits: boolean;
     includeTextDetails: boolean;
     extraPrompt?: string;
+    referenceImages?: string[];
   },
 ) {
   return postJson<{ imageData: string }>("/api/generate-image", {

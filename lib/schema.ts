@@ -20,6 +20,7 @@ export const IMAGE_STYLES = [
   { value: "illustration", label: "Illustration" },
   { value: "malerisch", label: "Malerisch" },
   { value: "fotorealistisch", label: "Fotorealistisch" },
+  { value: "skizze", label: "Skizze" },
 ] as const;
 
 export const DEFAULT_IMAGE_STYLE = "illustration";
@@ -174,6 +175,30 @@ export const characterTraitsSchema = z.object({
 });
 
 export type CharacterTraits = z.infer<typeof characterTraitsSchema>;
+
+/**
+ * Ergänzt fehlende Merkmale mit leeren Werten.
+ *
+ * Ältere Charaktere wurden gespeichert, bevor einzelne Merkmale (z. B.
+ * `persoenlichkeit`) eingeführt wurden. Ohne diese Auffüllung scheitert jede
+ * spätere Validierung gegen `characterTraitsSchema` – Bildgenerierung und
+ * Bearbeiten wären für solche Datensätze blockiert.
+ */
+export function normalizeTraits(raw: unknown): CharacterTraits {
+  const source = (raw ?? {}) as Record<string, unknown>;
+  const result = {} as Record<string, unknown>;
+
+  for (const key of Object.keys(TRAIT_LABELS) as Array<keyof CharacterTraits>) {
+    const value = source[key];
+    if (key === "alter") {
+      const n = typeof value === "number" ? value : parseInt(String(value), 10);
+      result[key] = Number.isFinite(n) ? n : 0;
+    } else {
+      result[key] = typeof value === "string" ? value : "";
+    }
+  }
+  return result as CharacterTraits;
+}
 
 /**
  * Wendet eine (String-)Änderung auf ein Merkmal an und liefert ein neues

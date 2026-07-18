@@ -53,7 +53,7 @@ export default function RootLayout({
                 href="/gallery"
                 className="text-foreground/70 transition-colors hover:text-foreground"
               >
-                Galerie
+                Charaktere
               </Link>
               <Link
                 href="/settings"

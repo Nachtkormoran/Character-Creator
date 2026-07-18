@@ -19,6 +19,13 @@ const bodySchema = z.object({
   includeTextDetails: z.boolean().default(false),
   // Zusätzlicher freier Text, der im Bild-Prompt berücksichtigt wird
   extraPrompt: z.string().max(1000).optional(),
+  // Stil-/Motivvorlagen als Data-URLs. Begrenzt, weil sie im Request-Body
+  // landen und base64 rund ein Drittel Overhead hat.
+  referenceImages: z
+    .array(z.string().max(12_000_000))
+    .max(4)
+    .optional()
+    .default([]),
 });
 
 export async function POST(request: Request) {
@@ -38,6 +45,7 @@ export async function POST(request: Request) {
       includeTraits,
       includeTextDetails,
       extraPrompt,
+      referenceImages,
     } = parsed.data;
 
     const visualDetails = includeTextDetails
@@ -52,11 +60,11 @@ export async function POST(request: Request) {
     // Modell und Qualität kommen aus den Einstellungen
     // (Default: gpt-image-1 / medium).
     const { imageModel, imageQuality } = await getSettings();
-    const imageData = await getImageProvider().generatePortrait(
-      prompt,
-      imageModel,
-      imageQuality,
-    );
+    const imageData = await getImageProvider().generatePortrait(prompt, {
+      model: imageModel,
+      quality: imageQuality,
+      referenceImages,
+    });
 
     return NextResponse.json({ imageData, imageModel, imageQuality });
   } catch (err) {

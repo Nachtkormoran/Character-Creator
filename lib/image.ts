@@ -67,6 +67,42 @@ export async function makeThumbnail(
     : canvas.toDataURL("image/jpeg", 0.85);
 }
 
+/** Obergrenze für Referenzbilder. Darüber skaliert die API ohnehin herunter. */
+export const REFERENCE_MAX_SIZE = 1536;
+
+/**
+ * Liest ein Referenzbild für die Bildgenerierung ein.
+ *
+ * Anders als `fileToDataUrl` wird **nicht** verlustbehaftet re-kodiert: das
+ * Modell liest die Vorlage aus, und JPEG-Artefakte kann es als gewollte
+ * Bildmerkmale missdeuten (Kompressionsraster als Hauttextur o. Ä.). Kleine
+ * Bilder werden unverändert durchgereicht, große verlustfrei als PNG
+ * verkleinert.
+ */
+export async function fileToReferenceDataUrl(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Bitte eine Bilddatei auswählen.");
+  }
+
+  const originalDataUrl = await readAsDataUrl(file);
+  const img = await loadImage(originalDataUrl);
+
+  if (Math.max(img.width, img.height) <= REFERENCE_MAX_SIZE) {
+    return originalDataUrl; // unverändert – keine zusätzlichen Artefakte
+  }
+
+  const scale = REFERENCE_MAX_SIZE / Math.max(img.width, img.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return originalDataUrl;
+
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/png"); // verlustfrei
+}
+
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

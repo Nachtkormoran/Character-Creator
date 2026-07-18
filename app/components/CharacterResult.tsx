@@ -11,6 +11,7 @@ import {
 } from "@/lib/schema";
 import type { StoredGroup } from "@/lib/serialize";
 import { AutoTextarea } from "./AutoTextarea";
+import { ReferenceImagePicker } from "./ReferenceImagePicker";
 import { ImageLightbox } from "./ImageLightbox";
 import { TraitsTable } from "./TraitsTable";
 
@@ -29,6 +30,8 @@ export function CharacterResult({
   onIncludeTextDetailsChange,
   extraPrompt,
   onExtraPromptChange,
+  referenceImage,
+  onReferenceImageChange,
   groups,
   groupId,
   onGroupChange,
@@ -51,6 +54,8 @@ export function CharacterResult({
   onIncludeTextDetailsChange: (value: boolean) => void;
   extraPrompt: string;
   onExtraPromptChange: (value: string) => void;
+  referenceImage: string | null;
+  onReferenceImageChange: (dataUrl: string | null) => void;
   groups: StoredGroup[];
   groupId: string | null;
   onGroupChange: (value: string | null) => void;
@@ -169,6 +174,12 @@ export function CharacterResult({
             )}
           </div>
 
+          <ReferenceImagePicker
+            value={referenceImage}
+            onChange={onReferenceImageChange}
+            disabled={busy}
+          />
+
           <label className="mt-3 flex flex-col gap-1.5">
             <span className="text-xs font-medium text-foreground/60">
               Zusätzliche Bild-Details (optional)
@@ -211,7 +222,15 @@ export function CharacterResult({
                 disabled={imageLoading}
                 className="mt-0.5"
               />
-              <span>Merkmalstabelle einbeziehen (inkl. Persönlichkeit)</span>
+              <span>
+                Merkmalstabelle einbeziehen (inkl. Persönlichkeit)
+                {referenceImage && includeTraits && (
+                  <span className="mt-0.5 block text-xs text-foreground/50">
+                    Kann mit der Vorlage kollidieren – bei Widersprüchen
+                    (z. B. Haarfarbe) ist das Ergebnis nicht vorhersagbar.
+                  </span>
+                )}
+              </span>
             </label>
             <label className="flex items-start gap-2 text-sm">
               <input
@@ -237,6 +256,13 @@ export function CharacterResult({
                 ? "Neues Portrait erzeugen"
                 : "Portrait erzeugen"}
           </button>
+
+
+          <div className="mt-4 border-t border-black/10 pt-3 dark:border-white/10">
+            <span className="text-xs font-medium text-foreground/60">
+              Stattdessen eigenes Bild verwenden
+            </span>
+          </div>
 
           <label
             className={`mt-2 block w-full cursor-pointer rounded-md border border-black/15 px-4 py-2 text-center text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06] ${
@@ -291,7 +317,7 @@ export function CharacterResult({
 
         {saved && (
           <span className="text-sm text-foreground/60">
-            In der Galerie verfügbar.
+            {`Unter „Charaktere" verfügbar.`}
           </span>
         )}
       </div>

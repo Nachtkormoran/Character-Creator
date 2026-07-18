@@ -26,6 +26,7 @@ import {
 import type { StoredCharacter, StoredGroup } from "@/lib/serialize";
 import { AutoTextarea } from "../components/AutoTextarea";
 import { ImageLightbox } from "../components/ImageLightbox";
+import { ReferenceImagePicker } from "../components/ReferenceImagePicker";
 import { TraitsTable } from "../components/TraitsTable";
 
 const controlClass =
@@ -245,7 +246,7 @@ export default function GalleryPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-semibold tracking-tight">Galerie</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Charaktere</h1>
         <Link
           href="/"
           className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
@@ -460,6 +461,8 @@ function DetailModal({
   const [includeTraits, setIncludeTraits] = useState(true);
   const [includeTextDetails, setIncludeTextDetails] = useState(false);
   const [extraPrompt, setExtraPrompt] = useState("");
+  // Vorlage gilt nur für diese Sitzung und wird nicht mitgespeichert.
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
@@ -590,6 +593,7 @@ function DetailModal({
         includeTraits,
         includeTextDetails,
         extraPrompt,
+        referenceImages: referenceImage ? [referenceImage] : [],
       });
       await onPersistImage(imageData);
       setFullImage(imageData);
@@ -729,6 +733,12 @@ function DetailModal({
               )}
             </div>
 
+            <ReferenceImagePicker
+              value={referenceImage}
+              onChange={setReferenceImage}
+              disabled={imageLoading}
+            />
+
             <label className="mt-3 flex flex-col gap-1.5">
               <span className="text-xs font-medium text-foreground/60">
                 Zusätzliche Bild-Details (optional)
@@ -771,7 +781,15 @@ function DetailModal({
                   disabled={imageLoading}
                   className="mt-0.5"
                 />
-                <span>Merkmalstabelle einbeziehen (inkl. Persönlichkeit)</span>
+                <span>
+                  Merkmalstabelle einbeziehen (inkl. Persönlichkeit)
+                  {referenceImage && includeTraits && (
+                    <span className="mt-0.5 block text-xs text-foreground/50">
+                      Kann mit der Vorlage kollidieren – bei Widersprüchen
+                      (z. B. Haarfarbe) ist das Ergebnis nicht vorhersagbar.
+                    </span>
+                  )}
+                </span>
               </label>
               <label className="flex items-start gap-2 text-sm">
                 <input
@@ -797,6 +815,12 @@ function DetailModal({
                   ? "Neues Bild erzeugen"
                   : "Bild erzeugen"}
             </button>
+
+            <div className="mt-4 border-t border-black/10 pt-3 dark:border-white/10">
+              <span className="text-xs font-medium text-foreground/60">
+                Stattdessen eigenes Bild verwenden
+              </span>
+            </div>
 
             <label
               className={`mt-2 block w-full cursor-pointer rounded-md border border-black/15 px-4 py-2 text-center text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06] ${

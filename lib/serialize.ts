@@ -1,9 +1,6 @@
 import type { Character, Group } from "@/app/generated/prisma/client";
-import type {
-  CharacterInput,
-  CharacterTraits,
-  GeneratedCharacter,
-} from "./schema";
+import { normalizeTraits } from "./schema";
+import type { CharacterInput, GeneratedCharacter } from "./schema";
 
 /** Client-Repräsentation eines gespeicherten Charakters. */
 export interface StoredCharacter {
@@ -34,7 +31,9 @@ export function serializeCharacter(
       name: row.name ?? "",
       kurzbeschreibung: row.shortDescription ?? "",
       beschreibung: row.description,
-      merkmale: JSON.parse(row.traits) as CharacterTraits,
+      // Altbestände können einzelne Merkmale nicht enthalten – auffüllen,
+      // sonst scheitert später jede Validierung gegen das Schema.
+      merkmale: normalizeTraits(JSON.parse(row.traits)),
     },
     imageData: row.imageData ?? null,
     thumbnail: row.thumbnail,

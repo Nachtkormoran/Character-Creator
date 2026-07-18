@@ -33,6 +33,8 @@ export default function Home() {
   const [includeTraits, setIncludeTraits] = useState(true);
   const [includeTextDetails, setIncludeTextDetails] = useState(false);
   const [extraPrompt, setExtraPrompt] = useState("");
+  // Vorlage gilt nur für die Sitzung und wird nicht mitgespeichert.
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -95,6 +97,7 @@ export default function Home() {
         includeTraits,
         includeTextDetails,
         extraPrompt,
+        referenceImages: referenceImage ? [referenceImage] : [],
       });
       setImageData(imageData);
       setSaved(false);
@@ -186,6 +189,8 @@ export default function Home() {
           onIncludeTextDetailsChange={setIncludeTextDetails}
           extraPrompt={extraPrompt}
           onExtraPromptChange={setExtraPrompt}
+          referenceImage={referenceImage}
+          onReferenceImageChange={setReferenceImage}
           groups={groups}
           groupId={selectedGroupId}
           onGroupChange={setSelectedGroupId}
