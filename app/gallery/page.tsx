@@ -7,26 +7,25 @@ import {
   createGroup,
   deleteCharacter,
   deleteGroup,
-  generateImage,
-  getCharacter,
+  getImage,
   listCharacters,
   listGroups,
   updateCharacterContent,
   updateCharacterGroup,
-  updateCharacterImage,
 } from "@/lib/client";
-import { fileToDataUrl } from "@/lib/image";
 import {
-  DEFAULT_IMAGE_STYLE,
-  IMAGE_STYLES,
   withTrait,
   type CharacterTraits,
   type GeneratedCharacter,
 } from "@/lib/schema";
-import type { StoredCharacter, StoredGroup } from "@/lib/serialize";
+import {
+  primaryImage,
+  type StoredCharacter,
+  type StoredGroup,
+} from "@/lib/serialize";
 import { AutoTextarea } from "../components/AutoTextarea";
+import { CharacterImagesModal } from "../components/CharacterImagesModal";
 import { ImageLightbox } from "../components/ImageLightbox";
-import { ReferenceImagePicker } from "../components/ReferenceImagePicker";
 import { TraitsTable } from "../components/TraitsTable";
 
 const controlClass =
@@ -188,10 +187,10 @@ export default function GalleryPage() {
     setSelected((s) => (s && s.id === id ? updated : s));
   }
 
-  async function handlePersistImage(id: string, imageData: string) {
-    const updated = await updateCharacterImage(id, imageData);
-    setCharacters((cs) => cs.map((x) => (x.id === id ? updated : x)));
-    setSelected((s) => (s && s.id === id ? updated : s));
+  /** Übernimmt einen vom Server zurückgegebenen Stand in beide Zustände. */
+  function applyUpdate(updated: StoredCharacter) {
+    setCharacters((cs) => cs.map((x) => (x.id === updated.id ? updated : x)));
+    setSelected((s) => (s && s.id === updated.id ? updated : s));
   }
 
   async function handleAssignGroup(id: string, groupId: string | null) {
@@ -376,9 +375,9 @@ export default function GalleryPage() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {visibleCharacters.map((c) => {
-          // Die Listen-Route liefert kein imageData – das Thumbnail ist hier
-          // die Anzeigequelle, der Fallback greift nur bei Altbestand.
-          const preview = c.thumbnail ?? c.imageData;
+          // Anzeigequelle ist das Thumbnail des Primärbilds; Originale liefert
+          // die Listen-Route bewusst nicht mit (je ~2 MB).
+          const preview = primaryImage(c)?.thumbnail;
           return (
           <button
             key={c.id}
@@ -422,9 +421,7 @@ export default function GalleryPage() {
           onSaveContent={(character) =>
             handleSaveContent(selected.id, character)
           }
-          onPersistImage={(imageData) =>
-            handlePersistImage(selected.id, imageData)
-          }
+          onCharacterUpdated={applyUpdate}
           onAssignGroup={(groupId) => handleAssignGroup(selected.id, groupId)}
         />
       )}
@@ -438,7 +435,7 @@ function DetailModal({
   onClose,
   onDelete,
   onSaveContent,
-  onPersistImage,
+  onCharacterUpdated,
   onAssignGroup,
 }: {
   character: StoredCharacter;
@@ -446,7 +443,7 @@ function DetailModal({
   onClose: () => void;
   onDelete: () => void;
   onSaveContent: (character: GeneratedCharacter) => Promise<void>;
-  onPersistImage: (imageData: string) => Promise<void>;
+  onCharacterUpdated: (updated: StoredCharacter) => void;
   onAssignGroup: (groupId: string | null) => Promise<void>;
 }) {
   // Editierbare Kopie der Charakter-Inhalte (Name, Kurzbeschreibung, Text,
@@ -455,29 +452,30 @@ function DetailModal({
   const [savingEdits, setSavingEdits] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  const [imageStyle, setImageStyle] = useState<string>(
-    c.input.imageStyle || DEFAULT_IMAGE_STYLE,
-  );
-  const [includeTraits, setIncludeTraits] = useState(true);
-  const [includeTextDetails, setIncludeTextDetails] = useState(false);
-  const [extraPrompt, setExtraPrompt] = useState("");
-  // Vorlage gilt nur für diese Sitzung und wird nicht mitgespeichert.
-  const [referenceImage, setReferenceImage] = useState<string | null>(null);
-  const [imageLoading, setImageLoading] = useState(false);
-  const [imageError, setImageError] = useState<string | null>(null);
+  // Alles rund um Bilder liegt in der eigenen Bilder-Ansicht.
+  const [imagesOpen, setImagesOpen] = useState(false);
 
-  // Originalbild kommt nicht aus der Liste (nur das Thumbnail) und wird für
-  // Vollbild und PDF einmalig nachgeladen.
-  const [fullImage, setFullImage] = useState<string | null>(c.imageData);
+  // Das Original des Primärbilds kommt aus keiner Listen-Antwort (nur das
+  // Thumbnail) und wird für Vollbild, Bild-Export und PDF nachgeladen.
+  const [fullImage, setFullImage] = useState<string | null>(null);
   const [loadingFull, setLoadingFull] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
+  const primary = primaryImage(c);
+  const primaryId = primary?.id ?? null;
+
+  // Wechselt das Primärbild, ist das zwischengespeicherte Original hinfällig.
+  const [cachedFor, setCachedFor] = useState<string | null>(null);
+  const cachedImage = cachedFor === primaryId ? fullImage : null;
+
   async function ensureFullImage(): Promise<string | null> {
-    if (fullImage) return fullImage;
+    if (!primaryId) return null;
+    if (cachedImage) return cachedImage;
     setLoadingFull(true);
     try {
-      const full = (await getCharacter(c.id)).imageData;
+      const full = await getImage(c.id, primaryId);
       setFullImage(full);
+      setCachedFor(primaryId);
       return full;
     } finally {
       setLoadingFull(false);
@@ -489,9 +487,9 @@ function DetailModal({
     if (full) setLightboxOpen(true);
   }
 
-  // Vorschau: Thumbnail, mit Fallback auf das Original (Altbestand bzw.
-  // gerade neu erzeugtes Bild).
-  const preview = c.thumbnail ?? fullImage;
+  // Anzeigequelle ist das Thumbnail des Primärbilds; der Rückfall auf das
+  // Original greift nur, wenn ein Bild ohne Thumbnail gespeichert wurde.
+  const preview = primary?.thumbnail ?? cachedImage;
   const [assigningGroup, setAssigningGroup] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingImage, setExportingImage] = useState(false);
@@ -581,43 +579,6 @@ function DetailModal({
       await onAssignGroup(groupId);
     } finally {
       setAssigningGroup(false);
-    }
-  }
-
-  async function regenerateImage() {
-    if (imageLoading) return;
-    setImageLoading(true);
-    setImageError(null);
-    try {
-      const { imageData } = await generateImage(edited, imageStyle, {
-        includeTraits,
-        includeTextDetails,
-        extraPrompt,
-        referenceImages: referenceImage ? [referenceImage] : [],
-      });
-      await onPersistImage(imageData);
-      setFullImage(imageData);
-    } catch (e) {
-      setImageError(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setImageLoading(false);
-    }
-  }
-
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || imageLoading) return;
-    setImageLoading(true);
-    setImageError(null);
-    try {
-      const dataUrl = await fileToDataUrl(file);
-      await onPersistImage(dataUrl);
-      setFullImage(dataUrl);
-    } catch (err) {
-      setImageError(err instanceof Error ? err.message : "Fehler beim Upload.");
-    } finally {
-      setImageLoading(false);
     }
   }
 
@@ -728,119 +689,24 @@ function DetailModal({
                 </button>
               ) : (
                 <div className="flex h-full items-center justify-center p-4 text-center text-sm text-foreground/40">
-                  {imageLoading ? "Bild wird erzeugt …" : "Kein Bild"}
+                  Kein Bild
                 </div>
               )}
             </div>
 
-            <ReferenceImagePicker
-              value={referenceImage}
-              onChange={setReferenceImage}
-              disabled={imageLoading}
-            />
-
-            <label className="mt-3 flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-foreground/60">
-                Zusätzliche Bild-Details (optional)
-              </span>
-              <textarea
-                value={extraPrompt}
-                onChange={(e) => setExtraPrompt(e.target.value)}
-                disabled={imageLoading}
-                rows={2}
-                maxLength={1000}
-                placeholder="Zusätzlich fürs Bild berücksichtigen – z. B. Attribute, die nicht in der Tabelle oder Beschreibung stehen (Kleidung, Pose, Requisiten, Hintergrund …)"
-                className="w-full resize-y rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
-              />
-            </label>
-
-            <label className="mt-3 flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-foreground/60">
-                Bild-Stil
-              </span>
-              <select
-                value={imageStyle}
-                onChange={(e) => setImageStyle(e.target.value)}
-                disabled={imageLoading}
-                className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
-              >
-                {IMAGE_STYLES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="mt-3 flex flex-col gap-2">
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={includeTraits}
-                  onChange={(e) => setIncludeTraits(e.target.checked)}
-                  disabled={imageLoading}
-                  className="mt-0.5"
-                />
-                <span>
-                  Merkmalstabelle einbeziehen (inkl. Persönlichkeit)
-                  {referenceImage && includeTraits && (
-                    <span className="mt-0.5 block text-xs text-foreground/50">
-                      Kann mit der Vorlage kollidieren – bei Widersprüchen
-                      (z. B. Haarfarbe) ist das Ergebnis nicht vorhersagbar.
-                    </span>
-                  )}
-                </span>
-              </label>
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={includeTextDetails}
-                  onChange={(e) => setIncludeTextDetails(e.target.checked)}
-                  disabled={imageLoading}
-                  className="mt-0.5"
-                />
-                <span>Visuelle Details aus Fließtext miteinbeziehen</span>
-              </label>
-            </div>
-
             <button
               type="button"
-              onClick={regenerateImage}
-              disabled={imageLoading}
-              className="mt-3 w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              onClick={() => setImagesOpen(true)}
+              className="mt-3 w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
             >
-              {imageLoading
-                ? "Erzeuge …"
-                : c.imageData
-                  ? "Neues Bild erzeugen"
-                  : "Bild erzeugen"}
+              {c.images.length > 0
+                ? `Bilder verwalten (${c.images.length})`
+                : "Bild erzeugen …"}
             </button>
+            <p className="mt-1.5 text-xs text-foreground/50">
+              Weitere Bilder erzeugen, hochladen und das primäre wählen.
+            </p>
 
-            <div className="mt-4 border-t border-black/10 pt-3 dark:border-white/10">
-              <span className="text-xs font-medium text-foreground/60">
-                Stattdessen eigenes Bild verwenden
-              </span>
-            </div>
-
-            <label
-              className={`mt-2 block w-full cursor-pointer rounded-md border border-black/15 px-4 py-2 text-center text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06] ${
-                imageLoading ? "pointer-events-none opacity-50" : ""
-              }`}
-            >
-              Bild hochladen
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleUpload}
-                disabled={imageLoading}
-              />
-            </label>
-            {imageError && (
-              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
-                {imageError}
-              </p>
-            )}
           </div>
         </div>
 
@@ -897,9 +763,18 @@ function DetailModal({
         </div>
       </div>
 
-      {lightboxOpen && fullImage && (
+      {imagesOpen && (
+        <CharacterImagesModal
+          character={c}
+          edited={edited}
+          onChange={onCharacterUpdated}
+          onClose={() => setImagesOpen(false)}
+        />
+      )}
+
+      {lightboxOpen && cachedImage && (
         <ImageLightbox
-          src={fullImage}
+          src={cachedImage}
           alt={c.character.name}
           onClose={() => setLightboxOpen(false)}
         />

@@ -36,8 +36,8 @@ export function ImageLightbox({
 
   return (
     <div
-      // z-60: liegt über dem Detail-Modal der Galerie (z-50).
-      className="fixed inset-0 z-60 flex flex-col items-center justify-center gap-3 bg-black/85 p-4 backdrop-blur-sm"
+      // z-80: oberste Ebene – über Detail-Modal (z-50) und Bilder-Ansicht (z-70).
+      className="fixed inset-0 z-80 flex flex-col items-center justify-center gap-3 bg-black/85 p-4 backdrop-blur-sm"
       // stopPropagation ist hier entscheidend: die Lightbox wird innerhalb des
       // Galerie-Modals gerendert, dessen Backdrop bei jedem Klick schließt.
       // Ohne das würde ein Klick zum Schließen der Lightbox auch die

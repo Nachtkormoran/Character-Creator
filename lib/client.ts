@@ -98,9 +98,8 @@ export async function listCharacters(): Promise<StoredCharacter[]> {
 }
 
 /**
- * Lädt einen einzelnen Charakter **inklusive** Originalbild. Die Listen-Route
- * liefert nur das Thumbnail, deshalb wird das Original hier bei Bedarf
- * nachgeholt (Vollbild-Ansicht, PDF-Export).
+ * Lädt einen einzelnen Charakter neu (samt Bild-Metadaten, aber **ohne** die
+ * Originale – die holt `getImage` einzeln).
  */
 export async function getCharacter(id: string): Promise<StoredCharacter> {
   const res = await fetch(`/api/characters/${id}`, { cache: "no-store" });
@@ -123,15 +122,20 @@ export async function updateCharacterName(
   return data.character as StoredCharacter;
 }
 
-export async function updateCharacterImage(
+// --- Bilder ---------------------------------------------------------------
+
+/**
+ * Hängt ein weiteres Bild an den Charakter. Es wird dabei zum Primärbild –
+ * ein gerade erzeugtes oder hochgeladenes Bild ist fast immer das gewünschte.
+ */
+export async function addCharacterImage(
   id: string,
   imageData: string,
 ): Promise<StoredCharacter> {
-  const res = await fetch(`/api/characters/${id}`, {
-    method: "PATCH",
+  const res = await fetch(`/api/characters/${id}/images`, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    // Thumbnail immer mitschreiben, sonst zeigt die Galerie nach einem
-    // Bildwechsel weiter die alte Vorschau.
+    // Thumbnail immer mitschreiben, sonst hätte das neue Bild keine Vorschau.
     body: JSON.stringify({
       imageData,
       thumbnail: await safeThumbnail(imageData),
@@ -140,6 +144,48 @@ export async function updateCharacterImage(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Bild speichern fehlgeschlagen.");
   return data.character as StoredCharacter;
+}
+
+export async function setPrimaryImage(
+  id: string,
+  imageId: string,
+): Promise<StoredCharacter> {
+  const res = await fetch(`/api/characters/${id}/images/${imageId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isPrimary: true }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Auswahl fehlgeschlagen.");
+  return data.character as StoredCharacter;
+}
+
+export async function deleteCharacterImage(
+  id: string,
+  imageId: string,
+): Promise<StoredCharacter> {
+  const res = await fetch(`/api/characters/${id}/images/${imageId}`, {
+    method: "DELETE",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Löschen fehlgeschlagen.");
+  return data.character as StoredCharacter;
+}
+
+/**
+ * Holt das Original eines Bildes (~2 MB). Keine der Listen-Routen liefert es
+ * mit; Vollbild, Bild-Export und PDF laden es hierüber nach.
+ */
+export async function getImage(
+  id: string,
+  imageId: string,
+): Promise<string> {
+  const res = await fetch(`/api/characters/${id}/images/${imageId}`, {
+    cache: "no-store",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Bild laden fehlgeschlagen.");
+  return data.imageData as string;
 }
 
 export async function updateCharacterGroup(
@@ -187,6 +233,7 @@ export async function deleteCharacter(id: string): Promise<void> {
 
 export interface ImportResult {
   characters: number;
+  images: number;
   groups: number;
   settings: number;
   safetyCopy: string;

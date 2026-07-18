@@ -4,7 +4,7 @@ Sammlung von Vorschlägen für nützliche oder interessante Ergänzungen rund um
 die Charaktererstellung. Gegliedert nach Themenbereichen; Top-Empfehlungen
 sind mit ⭐ markiert.
 
-Stand: 18.07.2026 (abends).
+Stand: 18.07.2026 (nach der Mehrbild-Umstellung).
 
 ## Terminsache
 
@@ -19,15 +19,13 @@ Stand: 18.07.2026 (abends).
 
 Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
 
-1. **Mehrere Bilder pro Charakter** – statt eines Portraits eine kleine
-   Bildergalerie, eines als Hauptbild markierbar. Upload-, Ersetzen-,
-   Thumbnail- und Referenzbild-Logik stehen inzwischen alle; es fehlt im Kern
-   das Datenmodell (eigenes `Image`-Modell statt `imageData`/`thumbnail` →
-   Prisma-Migration).
-2. **Text nachträglich anpassen / neu erzeugen** – der einzige Teil der
+1. **Text nachträglich anpassen / neu erzeugen** – der einzige Teil der
    KI-Ausgabe, der sich noch nicht überarbeiten lässt.
-3. **Kosten wirklich messen statt schätzen** – s. u., kleiner Aufwand mit
+2. **Kosten wirklich messen statt schätzen** – s. u., kleiner Aufwand mit
    sofort sichtbarem Nutzen.
+3. **Bilder vergleichen** – jetzt, wo es mehrere pro Charakter gibt: zwei
+   Bilder nebeneinander statt nacheinander im Vollbild. Klein, aber genau der
+   Moment, in dem man sich fürs Primärbild entscheidet.
 
 ## Inhaltliche Tiefe (Text / Merkmale)
 
@@ -46,7 +44,12 @@ Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
 
 ## Bilder
 
-- ⭐ **Mehrere Bilder pro Charakter** – s. Top-3.
+- ⭐ **Bilder vergleichen** – s. Top-3.
+- **Bilder sortieren / beschriften** – die Bilder-Ansicht zeigt sie nach Datum,
+  neueste zuerst. Eine eigene Reihenfolge oder eine kurze Notiz je Bild („mit
+  Narbe", „Variante Winter") würde bei mehr als einer Handvoll helfen.
+- **Bild in einen anderen Charakter verschieben / kopieren** – heute hängt ein
+  Bild fest an dem Charakter, für den es erzeugt wurde.
 - **Mehrere Referenzbilder gleichzeitig** – die API erlaubt bis zu 16, die
   Oberfläche bietet bisher eines. Provider und Route nehmen bereits ein Array
   entgegen.
@@ -101,6 +104,10 @@ Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
 
 ## Umgesetzt
 
+- **Mehrere Bilder pro Charakter** – eigenes `CharacterImage`-Modell, eines
+  davon primär. Die Bilder-Ansicht liegt als eigene Ebene über der
+  Detailansicht und trägt die gesamte Bild-Bedienung; neu erzeugte oder
+  hochgeladene Bilder werden automatisch primär.
 - **Suche & Sortierung** – Volltext über Name, Texte und Merkmale
   (diakritika-tolerant, UND-verknüpft), Sortierung nach Datum und Name.
 - **Referenzbild** – Stil-/Motivvorlage pro Generierung, läuft über

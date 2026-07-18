@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { serializeCharacter } from "@/lib/serialize";
+import { loadCharacter, loadCharacters } from "@/lib/characterImages";
 import {
   characterInputSchema,
   generatedCharacterSchema,
@@ -19,19 +19,16 @@ const saveSchema = z.object({
 
 // Alle gespeicherten Charaktere (neueste zuerst).
 //
-// **Ohne** `imageData`: die Originale sind je ~2 MB und würden die Antwort auf
-// zweistellige Megabyte treiben. Für die Anzeige genügt `thumbnail`; das
-// Original holt die Detailansicht bei Bedarf über
-// `GET /api/characters/[id]` nach (Vollbild, PDF-Export).
+// Die Bilder kommen **ohne** `imageData` mit: die Originale sind je ~2 MB und
+// würden die Antwort auf zweistellige Megabyte treiben. Für die Anzeige genügt
+// das Thumbnail des Primärbilds; ein Original holt die Oberfläche bei Bedarf
+// einzeln über `GET /api/characters/[id]/images/[imageId]` nach.
 export async function GET() {
-  const rows = await prisma.character.findMany({
-    orderBy: { createdAt: "desc" },
-    omit: { imageData: true },
-  });
-  return NextResponse.json({ characters: rows.map(serializeCharacter) });
+  return NextResponse.json({ characters: await loadCharacters() });
 }
 
-// Neuen Charakter speichern.
+// Neuen Charakter speichern. Ein mitgegebenes Bild wird sein erstes und
+// zugleich primäres Bild.
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -51,13 +48,20 @@ export async function POST(request: Request) {
         shortDescription: character.kurzbeschreibung,
         description: character.beschreibung,
         traits: JSON.stringify(character.merkmale),
-        imageData: imageData ?? null,
-        thumbnail: thumbnail ?? null,
         groupId: groupId ?? null,
+        images: imageData
+          ? {
+              create: {
+                imageData,
+                thumbnail: thumbnail ?? null,
+                isPrimary: true,
+              },
+            }
+          : undefined,
       },
     });
 
-    return NextResponse.json({ character: serializeCharacter(row) });
+    return NextResponse.json({ character: await loadCharacter(row.id) });
   } catch (err) {
     console.error("save character error:", err);
     const message = err instanceof Error ? err.message : "Unbekannter Fehler.";

@@ -62,18 +62,35 @@ Komponenten sprechen die Routen ausschließlich über die typisierten Helfer in
 - `POST /api/generate-text`, `POST /api/generate-image` – OpenAI (persistieren
   nichts).
 - `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional
-  `groupId` und `thumbnail`). **Die Liste liefert bewusst kein `imageData`**
-  (`omit`), sonst wären es mehrere MB pro Aufruf; für die Anzeige genügt
-  `thumbnail`, das Original holt die Detailansicht per
-  `GET /api/characters/[id]` nach.
+  `groupId`, `imageData` und `thumbnail`; ein mitgegebenes Bild wird das erste
+  und primäre). **Keine Route liefert `imageData` in einer Liste** (`omit`),
+  sonst wären es mehrere MB pro Aufruf; für die Anzeige genügt das Thumbnail
+  des Primärbilds.
 - `GET|PATCH|DELETE /api/characters/[id]` – **PATCH ist ein Teil-Update**
-  (`.partial()`): jedes von `name`, `imageData`, `groupId`, `shortDescription`,
+  (`.partial()`): jedes von `name`, `groupId`, `shortDescription`,
   `description`, `traits` kann einzeln geändert werden. Alle nachträglichen
-  Bearbeitungen in der Galerie laufen darüber.
+  Text-Bearbeitungen in der Galerie laufen darüber. **Bilder nicht** – die
+  haben eigene Routen.
+- `POST /api/characters/[id]/images` – Bild hinzufügen (wird standardmäßig zum
+  Primärbild).
+- `GET|PATCH|DELETE /api/characters/[id]/images/[imageId]` – **GET ist der
+  einzige Weg an ein Original** (Vollbild, Bild-Export, PDF holen es hier);
+  PATCH `{ isPrimary: true }` wählt das Primärbild; DELETE löscht das Bild.
+  Alle drei schreibenden Routen geben den vollständigen, aktualisierten
+  Charakter zurück, damit der Client seinen Zustand einfach ersetzen kann.
 - `GET|POST /api/groups`, `DELETE /api/groups/[id]` – Gruppen/Projekte.
 - `GET|PATCH /api/settings` – App-Einstellungen (`imageModel`, `imageQuality`).
 - `GET|POST /api/backup` – Datenbank sichern / wiederherstellen. **POST
   ersetzt den gesamten Bestand** (Bestätigung passiert in der UI).
+
+**Mehrere Bilder pro Charakter:** Ein Charakter hat beliebig viele Bilder
+(`CharacterImage`), genau eines ist `isPrimary` und wird überall groß gezeigt
+(Karte, Detailansicht, PDF, Export). Die Bilder-Ansicht ist bewusst **nicht**
+Teil der Detailansicht, sondern eine eigene Ebene darüber
+(`CharacterImagesModal`, `z-70`); die gesamte Bild-Bedienung (Stil,
+Zusatz-Details, Merkmale/Textdetails-Checkboxen, Referenzbild, Erzeugen,
+Hochladen) liegt dort und **nur** dort. Die Detailansicht zeigt nur das
+Primärbild plus den Knopf „Bilder verwalten (n)".
 
 **Editierbare Felder:** Name, Kurzbeschreibung, Beschreibung und alle Merkmale
 sind in beiden Ansichten editierbar. In der Erstellen-Ansicht wandern die
@@ -102,7 +119,16 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
 - `visualDetails.ts` – separater LLM-Aufruf, der aus dem langen Beschreibungstext
   nur bildrelevante Details extrahiert (bei `includeTextDetails`).
 - `prisma.ts` – Prisma-Client-Singleton **mit better-sqlite3 Driver-Adapter**.
-- `serialize.ts` – DB-Zeile ↔ Client-Form (`StoredCharacter`, `StoredGroup`).
+- `characterImages.ts` – **alle** serverseitigen Bild-Operationen
+  (`loadCharacter(s)`, `addImage`, `setPrimaryImage`, `deleteImage`). Sie liegen
+  zusammen, weil sie eine Regel halten müssen, die die DB nicht erzwingt:
+  **genau ein Bild pro Charakter ist `isPrimary`**. Jede Änderung läuft in einer
+  Transaktion, die zuerst alle anderen Markierungen entfernt. Löschen des
+  Primärbilds lässt das neueste verbliebene nachrücken.
+- `serialize.ts` – DB-Zeile ↔ Client-Form (`StoredCharacter`, `StoredImage`,
+  `StoredGroup`). `primaryImage(c)` leitet das anzuzeigende Bild ab – bewusst
+  abgeleitet statt als eigenes Feld mitgeschickt, sonst läge das Thumbnail des
+  Primärbilds doppelt in jeder Antwort (Listen-Antwort: 465 KB statt 914 KB).
 - `client.ts` – **einziger** Weg, wie Client-Komponenten die API ansprechen
   (typisierte fetch-Helfer für Generierung, CRUD, Umbenennen, Bild/Inhalt
   aktualisieren, Gruppen).
@@ -113,7 +139,9 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   Verbindung, ein Dateitausch im Betrieb würde sie ins Leere laufen lassen.
   Gelesen wird die hochgeladene Datei über einen **zweiten PrismaClient** mit
   `$queryRawUnsafe('SELECT *')`, damit auch ältere Schema-Stände mit fehlenden
-  Spalten funktionieren. Vor dem Überschreiben entsteht eine `*.bak`-Kopie
+  Spalten funktionieren. Fehlt die Tabelle `CharacterImage` (Sicherung von vor
+  der Mehrbild-Umstellung), wird aus `Character.imageData` je ein Primärbild
+  gebaut – sonst verlören alte Sicherungen ihre Portraits. Vor dem Überschreiben entsteht eine `*.bak`-Kopie
   neben `dev.db` (in `.gitignore`).
 - `settings.ts` – serverseitiger Zugriff auf die `Setting`-Tabelle
   (Key-Value: `imageModel`, `imageQuality`). **Vorrang: gespeicherter Wert →
@@ -149,8 +177,10 @@ PDF-Export via `@react-pdf/renderer` (nur Browser, wird in der Galerie
 mitwachsende Textarea für die editierbaren Textfelder.
 
 **Datenmodell** (`prisma/schema.prisma`): `Character` (Felder `input` und
-`traits` als **JSON-Strings**, `imageData` als Base64-Data-URL, `thumbnail`
-als verkleinerte Fassung davon, optionale `groupId`), `Group` (`onDelete: SetNull` – beim Löschen der Gruppe bleiben
+`traits` als **JSON-Strings**, optionale `groupId`), `CharacterImage`
+(`imageData` als Base64-Data-URL, `thumbnail` als verkleinerte Fassung davon,
+`isPrimary`; `onDelete: Cascade` – Bilder gehen mit dem Charakter),
+`Group` (`onDelete: SetNull` – beim Löschen der Gruppe bleiben
 Charaktere erhalten) und `Setting` (Key-Value für App-Einstellungen). SQLite
 lokal.
 
@@ -171,12 +201,22 @@ lokal.
 - Der generierte Prisma-Client liegt in `app/generated/prisma`; Typen aus
   `@/app/generated/prisma/client` importieren. Nach Schema-Änderungen
   `npx prisma generate` **und Dev-Server neu starten**.
-- **Zwei Bildgrößen pro Charakter:** `imageData` ist das Original (1024×1024,
+- **Zwei Bildgrößen pro Bild:** `imageData` ist das Original (1024×1024,
   ~2 MB Base64), `thumbnail` die 640-px-WebP-Fassung (~40 KB). **Anzeige immer
-  aus `thumbnail`** (Fallback auf `imageData` für Altbestand), **Vollbild und
-  PDF aus `imageData`**. Das Thumbnail entsteht clientseitig in `lib/client.ts`
-  (`saveCharacter`, `updateCharacterImage`), damit keine Aufrufstelle es
-  vergessen kann; schlägt es fehl, wird ohne gespeichert.
+  aus `thumbnail`**, **Vollbild, Bild-Export und PDF aus `imageData`** – und
+  das kommt ausschließlich über `getImage(id, imageId)`. Das Thumbnail entsteht
+  clientseitig in `lib/client.ts` (`saveCharacter`, `addCharacterImage`), damit
+  keine Aufrufstelle es vergessen kann; schlägt es fehl, wird ohne gespeichert.
+- **Modale Ebenen und Esc/Klick:** Detailansicht (`z-50`) → Bilder-Ansicht
+  (`z-70`) → Vollbild (`z-80`). Die inneren Ebenen werden **im DOM der
+  äußeren** gerendert, deren Backdrop bei jedem Klick schließt – jede innere
+  Ebene braucht daher `stopPropagation` auf ihrem eigenen Backdrop und
+  Schließen-Knopf, sonst reißt ein Klick alles mit. Für Esc reicht das nicht:
+  Ein Handler, der vom Offen-Zustand der Ebene darüber abhängt und deshalb neu
+  registriert wird, hängt sich **während derselben Ereignisausbreitung** wieder
+  ein und bekommt denselben Tastendruck ab (beide Ebenen schließen auf einmal).
+  Deshalb hängt der Esc-Handler der Bilder-Ansicht **einmalig, in der
+  Capture-Phase** und fragt den Zustand über eine Ref ab.
 - Bilder liegen als Base64-Data-URLs direkt in SQLite. Für ein späteres
   Vercel-Deployment auf Postgres + Blob-Storage umstellen (Migrationsweg steht
   in der `README.md`).

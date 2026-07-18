@@ -1,6 +1,38 @@
-import type { Character, Group } from "@/app/generated/prisma/client";
+import type {
+  Character,
+  CharacterImage,
+  Group,
+} from "@/app/generated/prisma/client";
 import { normalizeTraits } from "./schema";
 import type { CharacterInput, GeneratedCharacter } from "./schema";
+
+/** Client-Repräsentation eines einzelnen Bildes. */
+export interface StoredImage {
+  id: string;
+  createdAt: string;
+  /**
+   * Das Original. `null`, wenn die Route es aus Größengründen nicht mitliefert
+   * (~2 MB pro Bild); dann per `getImage` einzeln nachladen.
+   */
+  imageData: string | null;
+  thumbnail: string | null;
+  isPrimary: boolean;
+}
+
+/** Bild-Zeile, bei der `imageData` fehlen darf. */
+type ImageRow = Omit<CharacterImage, "imageData" | "characterId"> & {
+  imageData?: string | null;
+};
+
+export function serializeImage(row: ImageRow): StoredImage {
+  return {
+    id: row.id,
+    createdAt: row.createdAt.toISOString(),
+    imageData: row.imageData ?? null,
+    thumbnail: row.thumbnail,
+    isPrimary: row.isPrimary,
+  };
+}
 
 /** Client-Repräsentation eines gespeicherten Charakters. */
 export interface StoredCharacter {
@@ -8,20 +40,40 @@ export interface StoredCharacter {
   createdAt: string;
   input: CharacterInput;
   character: GeneratedCharacter;
-  imageData: string | null;
-  /** Verkleinerte Fassung für Listen-/Detailanzeige; null bei Altbestand. */
-  thumbnail: string | null;
   groupId: string | null;
+  /**
+   * Alle Bilder, neueste zuerst – **ohne** `imageData`. Die Originale sind je
+   * ~2 MB; das Original holt sich die Anzeige bei Bedarf einzeln über
+   * `GET /api/characters/[id]/images/[imageId]`.
+   */
+  images: StoredImage[];
+}
+
+/**
+ * Das anzuzeigende Bild eines Charakters.
+ *
+ * Bewusst hier abgeleitet statt als eigenes Feld mitzuschicken: sonst läge das
+ * Thumbnail des Primärbilds doppelt in jeder Antwort (einmal separat, einmal
+ * in `images`) und die Listen-Antwort wäre doppelt so groß.
+ *
+ * Dass genau ein Bild `isPrimary` trägt, stellt die API sicher. Sollte die
+ * Markierung doch einmal fehlen (importierte Sicherung), fällt die Wahl auf das
+ * neueste Bild, damit nie eine leere Anzeige entsteht.
+ */
+export function primaryImage(c: {
+  images: StoredImage[];
+}): StoredImage | null {
+  return c.images.find((i) => i.isPrimary) ?? c.images[0] ?? null;
 }
 
 /**
  * Wandelt eine DB-Zeile in die vom Frontend genutzte Struktur um.
  *
- * `imageData` kann fehlen: die Listen-Route lädt es aus Größengründen nicht
- * mit. In dem Fall ist es `null` und wird bei Bedarf einzeln nachgeladen.
+ * Die Bilder müssen mitgeladen sein (`include: { images: … }`); fehlen sie,
+ * bleibt die Liste leer.
  */
 export function serializeCharacter(
-  row: Omit<Character, "imageData"> & { imageData?: string | null },
+  row: Character & { images?: ImageRow[] },
 ): StoredCharacter {
   return {
     id: row.id,
@@ -35,9 +87,8 @@ export function serializeCharacter(
       // sonst scheitert später jede Validierung gegen das Schema.
       merkmale: normalizeTraits(JSON.parse(row.traits)),
     },
-    imageData: row.imageData ?? null,
-    thumbnail: row.thumbnail,
     groupId: row.groupId,
+    images: (row.images ?? []).map(serializeImage),
   };
 }
 

@@ -57,12 +57,32 @@ model Character {
   // (SQLite kennt keinen nativen JSON-Typ, daher als String gespeichert)
   traits      String
 
-  // Portrait als Data-URL (base64). Optional, da das Bild separat/später
-  // erzeugt werden kann.
-  imageData   String?
+  // Beliebig viele Bilder; genau eines davon ist das Primärbild.
+  images      CharacterImage[]
+}
 
-  // Verkleinerte Fassung (640 px, WebP) als Data-URL – nur für die Anzeige in
-  // Galerie und Detailansicht. Das Original bleibt für Vollbild und PDF.
-  // Optional, damit Charaktere ohne Thumbnail weiter funktionieren.
+// Ein einzelnes Bild eines Charakters (erzeugt oder hochgeladen).
+//
+// Ein Charakter kann mehrere Bilder haben; das mit `isPrimary` markierte wird
+// überall groß angezeigt (Karte, Detailansicht, PDF). Dass es **genau eines**
+// gibt, garantiert die Datenbank nicht – das stellt die API sicher (jedes
+// Setzen läuft in einer Transaktion, die zuerst alle anderen zurücksetzt).
+// Zur Sicherheit fällt die Auswahl beim Lesen auf das neueste Bild zurück.
+model CharacterImage {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  // Das Original als Data-URL (base64), ~2 MB.
+  imageData   String
+
+  // Verkleinerte Fassung (640 px, WebP) als Data-URL – nur für die Anzeige.
+  // Optional, damit Bilder ohne Thumbnail weiter funktionieren.
   thumbnail   String?
+
+  isPrimary   Boolean  @default(false)
+
+  @@index([characterId])
 }

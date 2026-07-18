@@ -251,8 +251,9 @@ function BackupSection() {
     try {
       const r = await importDatabase(file);
       setMessage(
-        `Eingespielt: ${r.characters} Charaktere, ${r.groups} Gruppen, ` +
-          `${r.settings} Einstellungen. Sicherheitskopie: ${r.safetyCopy}`,
+        `Eingespielt: ${r.characters} Charaktere, ${r.images} Bilder, ` +
+          `${r.groups} Gruppen, ${r.settings} Einstellungen. ` +
+          `Sicherheitskopie: ${r.safetyCopy}`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import fehlgeschlagen.");

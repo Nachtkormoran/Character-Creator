@@ -46,6 +46,7 @@ export async function exportDatabase(): Promise<Buffer> {
 
 export interface ImportResult {
   characters: number;
+  images: number;
   groups: number;
   settings: number;
   /** Pfad der Sicherheitskopie, die vor dem Überschreiben angelegt wurde. */
@@ -82,6 +83,7 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
     let characters: Array<Record<string, unknown>>;
     let groups: Array<Record<string, unknown>>;
     let settings: Array<Record<string, unknown>>;
+    let images: Array<Record<string, unknown>>;
     try {
       const tableRows = await source.$queryRawUnsafe<Array<{ name: string }>>(
         "SELECT name FROM sqlite_master WHERE type='table'",
@@ -97,6 +99,23 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
       characters = await source.$queryRawUnsafe("SELECT * FROM Character");
       groups = await source.$queryRawUnsafe('SELECT * FROM "Group"');
       settings = await source.$queryRawUnsafe("SELECT * FROM Setting");
+
+      // Sicherungen von vor der Mehrbild-Umstellung haben keine
+      // `CharacterImage`-Tabelle: dort steckt das Portrait noch in
+      // `Character.imageData`. Daraus wird hier je ein Primärbild gebaut,
+      // damit ältere Sicherungen ihre Bilder behalten.
+      images = tables.has("CharacterImage")
+        ? await source.$queryRawUnsafe("SELECT * FROM CharacterImage")
+        : characters
+            .filter((c) => c.imageData)
+            .map((c) => ({
+              id: randomUUID(),
+              createdAt: c.createdAt,
+              characterId: c.id,
+              imageData: c.imageData,
+              thumbnail: c.thumbnail ?? null,
+              isPrimary: true,
+            }));
     } finally {
       await source.$disconnect();
     }
@@ -137,8 +156,19 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
             shortDescription: (c.shortDescription as string | null) ?? null,
             description: c.description as string,
             traits: c.traits as string,
-            imageData: (c.imageData as string | null) ?? null,
-            thumbnail: (c.thumbnail as string | null) ?? null,
+          },
+        }),
+      ),
+      // Bilder nach den Charakteren – sie verweisen per characterId darauf.
+      ...images.map((i) =>
+        prisma.characterImage.create({
+          data: {
+            id: i.id as string,
+            createdAt: new Date(i.createdAt as string | number),
+            characterId: i.characterId as string,
+            imageData: i.imageData as string,
+            thumbnail: (i.thumbnail as string | null) ?? null,
+            isPrimary: Boolean(i.isPrimary),
           },
         }),
       ),
@@ -155,6 +185,7 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
 
     return {
       characters: characters.length,
+      images: images.length,
       groups: groups.length,
       settings: settings.length,
       safetyCopy: path.basename(safetyCopy),
