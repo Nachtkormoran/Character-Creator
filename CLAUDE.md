@@ -145,6 +145,11 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   Standard-Bildaufbau verlangt eine Umgebung mit Tiefenschärfe, „Skizze"
   schließt sie ausdrücklich aus (nur dort weicht auch die Kontextzeile ab).
   Bei einem neuen Stil also prüfen, ob der Standard-Bildaufbau passt.
+  Der `merkmaleBlock` zählt die Merkmale **einzeln** auf statt über
+  `TRAIT_LABELS` zu laufen. Deshalb landet ein neues Merkmal nicht automatisch
+  im Bild-Prompt – `interessen` steht bewusst nicht drin (Hobbys sind kein
+  Aussehen). Soll ein neues Merkmal ins Bild wirken, muss es hier ergänzt
+  werden.
 - `openai.ts` – serverseitiger OpenAI-Client + Modell-IDs aus der Env.
 - `imageProvider.ts` – `ImageProvider`-Interface abstrahiert das Bild-Backend
   (aktuell OpenAI); Austauschpunkt für z. B. Flux/Replicate. **Sind

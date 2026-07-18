@@ -177,6 +177,11 @@ export const characterTraitsSchema = z.object({
     .describe(
       "3–5 zentrale Persönlichkeitsmerkmale / Charaktereigenschaften, kommagetrennt, z. B. 'warmherzig, neugierig, durchsetzungsstark'",
     ),
+  interessen: z
+    .string()
+    .describe(
+      "2–5 Interessen, Hobbys oder Freizeitbeschäftigungen, kommagetrennt, passend zu Beruf, Herkunft und Wesen des Charakters, z. B. 'Bergwandern, Schallplatten sammeln, Schach'",
+    ),
 });
 
 export type CharacterTraits = z.infer<typeof characterTraitsSchema>;
@@ -235,6 +240,7 @@ export const TRAIT_LABELS: Record<keyof CharacterTraits, string> = {
   herkunft: "Herkunft",
   besondereMerkmale: "Besondere Merkmale",
   persoenlichkeit: "Persönlichkeit",
+  interessen: "Interessen und Hobbies",
 };
 
 /**
