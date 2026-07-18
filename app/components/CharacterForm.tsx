@@ -3,11 +3,8 @@
 import { useState } from "react";
 import { generateName } from "@/lib/client";
 import { randomName } from "@/lib/names";
-import {
-  randomAppearance,
-  randomBackground,
-  randomPersonality,
-} from "@/lib/inspiration";
+import { randomAppearance, randomPersonality } from "@/lib/inspiration";
+import { randomBackground } from "@/lib/backgrounds";
 import { randomProfession } from "@/lib/professions";
 import { DEFAULT_IMAGE_STYLE, GENDERS, type CharacterInput } from "@/lib/schema";
 import {
@@ -311,10 +308,10 @@ export function CharacterForm({
             placeholder="z. B. wuchs in einem Fischerdorf auf, verlor früh die Eltern …"
           />
           <DiceButton
-            onClick={() => update("background", randomBackground())}
+            onClick={() => update("background", randomBackground(genre))}
             disabled={loading}
             label="Hintergrund würfeln"
-            title="Ein bis zwei zufällige prägende Ereignisse"
+            title="Ein bis drei zufällige prägende Ereignisse, passend zur Genre-Vorlage"
           />
         </div>
       </Field>

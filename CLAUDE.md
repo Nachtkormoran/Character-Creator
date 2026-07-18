@@ -182,13 +182,13 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   (Stand-Datum in `IMAGE_PRICES_AS_OF`, ohne Gewähr) und beeinflusst nichts.
 - `templates.ts` – statische Genre-Vorlagen; belegen beim Auswählen im Formular
   per Merge das `setting`-Feld vor.
-- `inspiration.ts` – Bausteine für die Würfel an „Aussehen",
-  „Persönlichkeit" und „Hintergrund"; `pickSome` zieht mehrere **ohne
-  Wiederholung**. Hier gibt es bewusst **keine Genre-Markierung** wie bei den
-  Berufen: die Einträge sind so formuliert, dass sie überall passen (Körper und
-  Auftreten statt Kleidungsstücke, Lebensereignisse statt setting-gebundener
-  Stationen). Aussehen und Hintergrund verbinden mit **Semikolon**, weil ihre
-  Einträge selbst Kommas enthalten („silbergraues Haar, mit Stolz getragen").
+- `inspiration.ts` – Bausteine für die Würfel an „Aussehen" und
+  „Persönlichkeit"; `pickSome` zieht mehrere **ohne Wiederholung** (auch von
+  `backgrounds.ts` genutzt, deshalb exportiert). Nach **Genre** ist hier
+  bewusst nichts getrennt: die Einträge sind so formuliert, dass sie überall
+  passen (Körper und Auftreten statt konkreter Kleidungsstücke). Das Aussehen
+  verbindet mit **Semikolon**, weil seine Einträge selbst Kommas enthalten
+  („silbergraues Haar, mit Stolz getragen").
   **Das Aussehen hat drei Listen zu je 100:** `FEMALE_APPEARANCE`,
   `MALE_APPEARANCE` und `NEUTRAL_APPEARANCE`. `randomAppearance(gender)` zieht
   2–3 geschlechtsspezifische plus 1–2 neutrale Merkmale. Das Geschlecht ist
@@ -199,6 +199,17 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   widersprüchlicher. In `NEUTRAL_APPEARANCE` gehört deshalb nur, was an jedem
   Charakter funktioniert (Augen, Haut, Narben, Gewohnheiten, Mitgeführtes) –
   **kein** Haarschnitt und kein Schnitt der Kleidung.
+- `backgrounds.ts` – Hintergründe für den Würfel am Feld „Hintergrund":
+  **sechs Listen zu je 100**, eine pro Genre-Id aus `templates.ts`
+  (`BACKGROUNDS_BY_GENRE`). `randomBackground(genre)` zieht **1–3** Einträge,
+  mit Semikolon verbunden. Anders als bei den Berufen wird **nicht** markiert,
+  sondern getrennt: ein Beruf passt in mehrere Genres, ein Lebenslauf nicht –
+  eine Kindheit im Fabrikviertel und eine im fensterlosen Wohnblock meinen
+  dieselbe Armut in Worten, die sich nicht austauschen lassen. Ohne bekanntes
+  Genre fällt die Wahl auf „Gegenwart"; über die Listen wird **nie gemischt**
+  (ein Konzernvertrag neben einem gebrochenen Lehnseid wären zwei Charaktere).
+  Die Einträge sind subjektlose Verbalphrasen („floh aus der Heimat"), damit
+  sie sich aneinanderreihen lassen und kein Geschlecht festlegen.
 - `professions.ts` – 300 Berufe für den Würfel am Feld „Beruf / Rolle", jeder
   mit den Genres markiert, in die er passt (`randomProfession(genre)` filtert
   danach). Die Markierung ist der Zweck der Struktur: eine flache Liste würde
