@@ -33,6 +33,40 @@ export async function fileToDataUrl(
   return canvas.toDataURL("image/jpeg", 0.9);
 }
 
+/** Längste Kante des Vorschaubilds. Deckt die größte Anzeigestelle
+ *  (278 CSS-px in der Ergebnisansicht) auch bei doppelter Pixeldichte ab. */
+export const THUMBNAIL_SIZE = 640;
+
+/**
+ * Erzeugt aus einer Bild-Data-URL eine verkleinerte Fassung für die Anzeige in
+ * Galerie und Detailansicht. Das Original bleibt unangetastet und wird für die
+ * Vollbild-Ansicht und den PDF-Export weiterverwendet.
+ *
+ * Läuft nur im Browser (Canvas). WebP mit Qualität 0,85; fällt auf JPEG
+ * zurück, falls WebP nicht unterstützt wird.
+ */
+export async function makeThumbnail(
+  dataUrl: string,
+  maxSize = THUMBNAIL_SIZE,
+): Promise<string> {
+  const img = await loadImage(dataUrl);
+
+  const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(img.width * scale));
+  canvas.height = Math.max(1, Math.round(img.height * scale));
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return dataUrl;
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const webp = canvas.toDataURL("image/webp", 0.85);
+  // Browser ohne WebP-Unterstützung liefern stillschweigend ein PNG zurück.
+  return webp.startsWith("data:image/webp")
+    ? webp
+    : canvas.toDataURL("image/jpeg", 0.85);
+}
+
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

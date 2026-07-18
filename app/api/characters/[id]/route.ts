@@ -12,6 +12,7 @@ const patchSchema = z
   .object({
     name: z.string().trim().min(1, "Der Name darf nicht leer sein.").max(120),
     imageData: z.string().nullable(),
+    thumbnail: z.string().nullable(),
     groupId: z.string().nullable(),
     shortDescription: z.string().max(500),
     description: z.string().max(10000),
@@ -51,6 +52,7 @@ export async function PATCH(request: Request, { params }: Context) {
     const data: {
       name?: string;
       imageData?: string | null;
+      thumbnail?: string | null;
       groupId?: string | null;
       shortDescription?: string;
       description?: string;
@@ -58,6 +60,7 @@ export async function PATCH(request: Request, { params }: Context) {
     } = {};
     if (p.name !== undefined) data.name = p.name;
     if (p.imageData !== undefined) data.imageData = p.imageData;
+    if (p.thumbnail !== undefined) data.thumbnail = p.thumbnail;
     if (p.groupId !== undefined) data.groupId = p.groupId;
     if (p.shortDescription !== undefined)
       data.shortDescription = p.shortDescription;

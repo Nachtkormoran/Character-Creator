@@ -13,13 +13,20 @@ const saveSchema = z.object({
   input: characterInputSchema,
   character: generatedCharacterSchema,
   imageData: z.string().nullable().optional(),
+  thumbnail: z.string().nullable().optional(),
   groupId: z.string().nullable().optional(),
 });
 
 // Alle gespeicherten Charaktere (neueste zuerst).
+//
+// **Ohne** `imageData`: die Originale sind je ~2 MB und würden die Antwort auf
+// zweistellige Megabyte treiben. Für die Anzeige genügt `thumbnail`; das
+// Original holt die Detailansicht bei Bedarf über
+// `GET /api/characters/[id]` nach (Vollbild, PDF-Export).
 export async function GET() {
   const rows = await prisma.character.findMany({
     orderBy: { createdAt: "desc" },
+    omit: { imageData: true },
   });
   return NextResponse.json({ characters: rows.map(serializeCharacter) });
 }
@@ -36,7 +43,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { input, character, imageData, groupId } = parsed.data;
+    const { input, character, imageData, thumbnail, groupId } = parsed.data;
     const row = await prisma.character.create({
       data: {
         name: character.name,
@@ -45,6 +52,7 @@ export async function POST(request: Request) {
         description: character.beschreibung,
         traits: JSON.stringify(character.merkmale),
         imageData: imageData ?? null,
+        thumbnail: thumbnail ?? null,
         groupId: groupId ?? null,
       },
     });

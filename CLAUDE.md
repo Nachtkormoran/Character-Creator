@@ -61,7 +61,11 @@ Komponenten sprechen die Routen ausschließlich über die typisierten Helfer in
 **API-Routen:**
 - `POST /api/generate-text`, `POST /api/generate-image` – OpenAI (persistieren
   nichts).
-- `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional `groupId`).
+- `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional
+  `groupId` und `thumbnail`). **Die Liste liefert bewusst kein `imageData`**
+  (`omit`), sonst wären es mehrere MB pro Aufruf; für die Anzeige genügt
+  `thumbnail`, das Original holt die Detailansicht per
+  `GET /api/characters/[id]` nach.
 - `GET|PATCH|DELETE /api/characters/[id]` – **PATCH ist ein Teil-Update**
   (`.partial()`): jedes von `name`, `imageData`, `groupId`, `shortDescription`,
   `description`, `traits` kann einzeln geändert werden. Alle nachträglichen
@@ -106,8 +110,9 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   (Stand-Datum in `IMAGE_PRICES_AS_OF`, ohne Gewähr) und beeinflusst nichts.
 - `templates.ts` – statische Genre-Vorlagen; belegen beim Auswählen im Formular
   per Merge das `setting`-Feld vor.
-- `image.ts` – `fileToDataUrl` (clientseitig): Bild-Upload einlesen,
-  herunterskalieren, als Data-URL zurückgeben (gleiche Form wie generierte Bilder).
+- `image.ts` – clientseitige Bildhelfer: `fileToDataUrl` (Upload einlesen und
+  herunterskalieren) und `makeThumbnail` (640 px, WebP 0,85). Beide brauchen
+  Canvas, laufen also nur im Browser.
 
 **Nennenswerte Komponenten** (`app/components/`): `CharacterPdf.tsx` erzeugt den
 PDF-Export via `@react-pdf/renderer` (nur Browser, wird in der Galerie
@@ -115,8 +120,8 @@ PDF-Export via `@react-pdf/renderer` (nur Browser, wird in der Galerie
 mitwachsende Textarea für die editierbaren Textfelder.
 
 **Datenmodell** (`prisma/schema.prisma`): `Character` (Felder `input` und
-`traits` als **JSON-Strings**, `imageData` als Base64-Data-URL, optionale
-`groupId`), `Group` (`onDelete: SetNull` – beim Löschen der Gruppe bleiben
+`traits` als **JSON-Strings**, `imageData` als Base64-Data-URL, `thumbnail`
+als verkleinerte Fassung davon, optionale `groupId`), `Group` (`onDelete: SetNull` – beim Löschen der Gruppe bleiben
 Charaktere erhalten) und `Setting` (Key-Value für App-Einstellungen). SQLite
 lokal.
 
@@ -132,10 +137,15 @@ lokal.
 - Der generierte Prisma-Client liegt in `app/generated/prisma`; Typen aus
   `@/app/generated/prisma/client` importieren. Nach Schema-Änderungen
   `npx prisma generate` **und Dev-Server neu starten**.
-- Bilder werden als Base64-Data-URLs direkt in SQLite gespeichert → Antworten von
-  `GET /api/characters` können mehrere MB groß sein. Lokal ok; für ein späteres
-  Vercel-Deployment auf Postgres + Blob-Storage umstellen (Migrationsweg steht in
-  der `README.md`).
+- **Zwei Bildgrößen pro Charakter:** `imageData` ist das Original (1024×1024,
+  ~2 MB Base64), `thumbnail` die 640-px-WebP-Fassung (~40 KB). **Anzeige immer
+  aus `thumbnail`** (Fallback auf `imageData` für Altbestand), **Vollbild und
+  PDF aus `imageData`**. Das Thumbnail entsteht clientseitig in `lib/client.ts`
+  (`saveCharacter`, `updateCharacterImage`), damit keine Aufrufstelle es
+  vergessen kann; schlägt es fehl, wird ohne gespeichert.
+- Bilder liegen als Base64-Data-URLs direkt in SQLite. Für ein späteres
+  Vercel-Deployment auf Postgres + Blob-Storage umstellen (Migrationsweg steht
+  in der `README.md`).
 - **Dark Mode ist klassenbasiert:** `app/globals.css` definiert
   `@custom-variant dark (&:where(.dark, .dark *))`, d. h. `dark:`-Utilities
   hängen an der Klasse `.dark` am `<html>` – **nicht** an

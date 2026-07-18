@@ -12,11 +12,20 @@ export interface StoredCharacter {
   input: CharacterInput;
   character: GeneratedCharacter;
   imageData: string | null;
+  /** Verkleinerte Fassung für Listen-/Detailanzeige; null bei Altbestand. */
+  thumbnail: string | null;
   groupId: string | null;
 }
 
-/** Wandelt eine DB-Zeile in die vom Frontend genutzte Struktur um. */
-export function serializeCharacter(row: Character): StoredCharacter {
+/**
+ * Wandelt eine DB-Zeile in die vom Frontend genutzte Struktur um.
+ *
+ * `imageData` kann fehlen: die Listen-Route lädt es aus Größengründen nicht
+ * mit. In dem Fall ist es `null` und wird bei Bedarf einzeln nachgeladen.
+ */
+export function serializeCharacter(
+  row: Omit<Character, "imageData"> & { imageData?: string | null },
+): StoredCharacter {
   return {
     id: row.id,
     createdAt: row.createdAt.toISOString(),
@@ -27,7 +36,8 @@ export function serializeCharacter(row: Character): StoredCharacter {
       beschreibung: row.description,
       merkmale: JSON.parse(row.traits) as CharacterTraits,
     },
-    imageData: row.imageData,
+    imageData: row.imageData ?? null,
+    thumbnail: row.thumbnail,
     groupId: row.groupId,
   };
 }

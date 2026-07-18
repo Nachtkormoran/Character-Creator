@@ -8,6 +8,7 @@ import {
   deleteCharacter,
   deleteGroup,
   generateImage,
+  getCharacter,
   listCharacters,
   listGroups,
   updateCharacterContent,
@@ -63,6 +64,29 @@ function searchableText(c: StoredCharacter): string {
       ...Object.values(merkmale).map(String),
     ].join(" "),
   );
+}
+
+/** Löst den Download eines Blobs als Datei aus. */
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Dateiendung aus dem MIME-Typ einer Data-URL. Generierte Bilder sind PNG,
+ * Uploads können JPEG sein – die Endung muss zum Inhalt passen.
+ */
+function imageExtension(dataUrl: string): string {
+  const mime = dataUrl.slice(5, dataUrl.indexOf(";"));
+  if (mime === "image/jpeg") return "jpg";
+  const subtype = mime.split("/")[1];
+  return subtype && /^[a-z0-9]+$/.test(subtype) ? subtype : "png";
 }
 
 /** Erzeugt einen dateisystem-tauglichen Namen für den PDF-Download. */
@@ -350,16 +374,20 @@ export default function GalleryPage() {
       )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {visibleCharacters.map((c) => (
+        {visibleCharacters.map((c) => {
+          // Die Listen-Route liefert kein imageData – das Thumbnail ist hier
+          // die Anzeigequelle, der Fallback greift nur bei Altbestand.
+          const preview = c.thumbnail ?? c.imageData;
+          return (
           <button
             key={c.id}
             onClick={() => setSelected(c)}
             className="group flex flex-col overflow-hidden rounded-xl border border-black/10 bg-white text-left transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
           >
             <div className="relative aspect-square w-full bg-black/[0.03] dark:bg-white/[0.03]">
-              {c.imageData ? (
+              {preview ? (
                 <Image
-                  src={c.imageData}
+                  src={preview}
                   alt={c.character.name}
                   fill
                   sizes="(max-width: 640px) 50vw, 25vw"
@@ -379,7 +407,8 @@ export default function GalleryPage() {
               </span>
             </div>
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {selected && (
@@ -434,9 +463,35 @@ function DetailModal({
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
+  // Originalbild kommt nicht aus der Liste (nur das Thumbnail) und wird für
+  // Vollbild und PDF einmalig nachgeladen.
+  const [fullImage, setFullImage] = useState<string | null>(c.imageData);
+  const [loadingFull, setLoadingFull] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  async function ensureFullImage(): Promise<string | null> {
+    if (fullImage) return fullImage;
+    setLoadingFull(true);
+    try {
+      const full = (await getCharacter(c.id)).imageData;
+      setFullImage(full);
+      return full;
+    } finally {
+      setLoadingFull(false);
+    }
+  }
+
+  async function openLightbox() {
+    const full = await ensureFullImage();
+    if (full) setLightboxOpen(true);
+  }
+
+  // Vorschau: Thumbnail, mit Fallback auf das Original (Altbestand bzw.
+  // gerade neu erzeugtes Bild).
+  const preview = c.thumbnail ?? fullImage;
   const [assigningGroup, setAssigningGroup] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingImage, setExportingImage] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   async function exportPdf() {
@@ -448,27 +503,46 @@ function DetailModal({
         "../components/CharacterPdf"
       );
       const groupName = groups.find((g) => g.id === c.groupId)?.name ?? null;
+      const imageData = await ensureFullImage();
       const blob = await renderCharacterPdfBlob({
         name: edited.name,
         kurzbeschreibung: edited.kurzbeschreibung,
         beschreibung: edited.beschreibung,
         merkmale: edited.merkmale,
-        imageData: c.imageData,
+        imageData,
         groupName,
         createdAt: c.createdAt,
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${pdfFileName(edited.name)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${pdfFileName(edited.name)}.pdf`);
     } catch (e) {
       setExportError(e instanceof Error ? e.message : "Export fehlgeschlagen.");
     } finally {
       setExporting(false);
+    }
+  }
+
+  /**
+   * Lädt das Portrait als Bilddatei herunter – immer das Original in voller
+   * Auflösung, nicht das Thumbnail. Das Original wird dafür bei Bedarf
+   * nachgeladen.
+   */
+  async function exportImage() {
+    if (exportingImage) return;
+    setExportingImage(true);
+    setExportError(null);
+    try {
+      const imageData = await ensureFullImage();
+      if (!imageData) throw new Error("Für diesen Charakter gibt es kein Bild.");
+      // fetch() kann Data-URLs direkt in einen Blob wandeln.
+      const blob = await (await fetch(imageData)).blob();
+      downloadBlob(
+        blob,
+        `${pdfFileName(edited.name)}.${imageExtension(imageData)}`,
+      );
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Export fehlgeschlagen.");
+    } finally {
+      setExportingImage(false);
     }
   }
 
@@ -518,6 +592,7 @@ function DetailModal({
         extraPrompt,
       });
       await onPersistImage(imageData);
+      setFullImage(imageData);
     } catch (e) {
       setImageError(e instanceof Error ? e.message : "Fehler.");
     } finally {
@@ -534,6 +609,7 @@ function DetailModal({
     try {
       const dataUrl = await fileToDataUrl(file);
       await onPersistImage(dataUrl);
+      setFullImage(dataUrl);
     } catch (err) {
       setImageError(err instanceof Error ? err.message : "Fehler beim Upload.");
     } finally {
@@ -629,15 +705,16 @@ function DetailModal({
           </div>
           <div className="order-1 md:order-2">
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.03]">
-              {c.imageData ? (
+              {preview ? (
                 <button
                   type="button"
-                  onClick={() => setLightboxOpen(true)}
+                  onClick={openLightbox}
+                  disabled={loadingFull}
                   aria-label="Bild in voller Größe anzeigen"
                   className="group absolute inset-0 cursor-zoom-in"
                 >
                   <Image
-                    src={c.imageData}
+                    src={preview}
                     alt={c.character.name}
                     fill
                     sizes="240px"
@@ -764,6 +841,16 @@ function DetailModal({
             <span className="text-xs text-foreground/50">
               {new Date(c.createdAt).toLocaleDateString("de-DE")}
             </span>
+            {preview && (
+              <button
+                onClick={exportImage}
+                disabled={exportingImage}
+                title="Portrait in voller Auflösung herunterladen"
+                className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              >
+                {exportingImage ? "Lade Bild …" : "Bild exportieren"}
+              </button>
+            )}
             <button
               onClick={exportPdf}
               disabled={exporting}
@@ -786,9 +873,9 @@ function DetailModal({
         </div>
       </div>
 
-      {lightboxOpen && c.imageData && (
+      {lightboxOpen && fullImage && (
         <ImageLightbox
-          src={c.imageData}
+          src={fullImage}
           alt={c.character.name}
           onClose={() => setLightboxOpen(false)}
         />

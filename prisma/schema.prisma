@@ -60,4 +60,9 @@ model Character {
   // Portrait als Data-URL (base64). Optional, da das Bild separat/später
   // erzeugt werden kann.
   imageData   String?
+
+  // Verkleinerte Fassung (640 px, WebP) als Data-URL – nur für die Anzeige in
+  // Galerie und Detailansicht. Das Original bleibt für Vollbild und PDF.
+  // Optional, damit Charaktere ohne Thumbnail weiter funktionieren.
+  thumbnail   String?
 }
