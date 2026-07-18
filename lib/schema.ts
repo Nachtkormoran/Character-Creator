@@ -169,6 +169,16 @@ export const characterTraitsSchema = z.object({
   augenfarbe: z.string().describe("Augenfarbe"),
   hautton: z.string().describe("Hautton / Teint"),
   herkunft: z.string().describe("Herkunft / Ethnie"),
+  wohnort: z
+    .string()
+    .describe(
+      "Aktueller Wohnort – Stadt bzw. Ort, ggf. mit Land, z. B. 'Lissabon' oder 'kleines Dorf in Nordnorwegen'",
+    ),
+  beruf: z
+    .string()
+    .describe(
+      "Ausgeübter Beruf oder Rolle, z. B. 'Bibliothekarin', 'Bootsbauer', 'Studentin der Philosophie'",
+    ),
   besondereMerkmale: z
     .string()
     .describe("Auffällige/besondere Merkmale, z. B. Narben, Tattoos, Brille"),
@@ -238,6 +248,8 @@ export const TRAIT_LABELS: Record<keyof CharacterTraits, string> = {
   augenfarbe: "Augenfarbe",
   hautton: "Hautton",
   herkunft: "Herkunft",
+  wohnort: "Wohnort",
+  beruf: "Beruf",
   besondereMerkmale: "Besondere Merkmale",
   persoenlichkeit: "Persönlichkeit",
   interessen: "Interessen und Hobbies",
