@@ -182,7 +182,7 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   (Stand-Datum in `IMAGE_PRICES_AS_OF`, ohne Gewähr) und beeinflusst nichts.
 - `templates.ts` – statische Genre-Vorlagen; belegen beim Auswählen im Formular
   per Merge das `setting`-Feld vor.
-- `professions.ts` – 200 Berufe für den Würfel am Feld „Beruf / Rolle", jeder
+- `professions.ts` – 300 Berufe für den Würfel am Feld „Beruf / Rolle", jeder
   mit den Genres markiert, in die er passt (`randomProfession(genre)` filtert
   danach). Die Markierung ist der Zweck der Struktur: eine flache Liste würde
   einen „Netrunner" ins Mittelalter würfeln. Ohne Treffer steht die ganze Liste

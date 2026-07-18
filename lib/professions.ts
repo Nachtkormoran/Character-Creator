@@ -1,7 +1,7 @@
 /**
  * Berufsvorrat für den Würfel-Knopf am Feld „Beruf / Rolle".
  *
- * **Eine** Liste mit 200 Einträgen, jeder mit den Genres markiert, in die er
+ * **Eine** Liste mit 300 Einträgen, jeder mit den Genres markiert, in die er
  * passt. Die Markierung ist der Kern der Sache: eine flache Liste würde einen
  * „Netrunner" ins Mittelalter und einen „Hufschmied" in die Cyberpunk-Megacity
  * würfeln. Viele Berufe passen in mehrere Genres (ein Schmied taugt für
@@ -257,6 +257,132 @@ export const PROFESSIONS: Profession[] = [
   { name: "Kapitän", genres: [H, F, S, W] },
   { name: "Steuermann", genres: [H, F, S] },
   { name: "Leuchtturmwärter", genres: [G, H, S] },
+
+  // ======================================================================
+  // Nachtrag Gegenwart: 100 weitere heutige Berufe. Alle tragen `G`; wo ein
+  // Beruf darüber hinaus in ein anderes Genre passt, steht es dabei (das
+  // hilft besonders Cyberpunk, dem sonst schmalsten Genre).
+  // ======================================================================
+
+  // Gesundheit ------------------------------------------------------------
+  { name: "Zahnarzt", genres: [G] },
+  { name: "Physiotherapeut", genres: [G] },
+  { name: "Kinderarzt", genres: [G] },
+  { name: "Psychiater", genres: [G, C] },
+  { name: "Augenoptiker", genres: [G] },
+  { name: "Radiologe", genres: [G] },
+  { name: "Ergotherapeut", genres: [G] },
+  { name: "Logopäde", genres: [G] },
+  { name: "Ernährungsberater", genres: [G] },
+  { name: "Altenpfleger", genres: [G] },
+  { name: "Rettungsschwimmer", genres: [G] },
+  { name: "Pathologe", genres: [G, C] },
+
+  // Bildung & Wissenschaft ------------------------------------------------
+  { name: "Erzieher", genres: [G] },
+  { name: "Nachhilfelehrer", genres: [G] },
+  { name: "Meeresbiologe", genres: [G, S] },
+  { name: "Astrophysiker", genres: [G, C] },
+  { name: "Meteorologe", genres: [G, S] },
+  { name: "Geologe", genres: [G, S, W] },
+  { name: "Chemielaborant", genres: [G, S] },
+  { name: "Statistiker", genres: [G, C] },
+  { name: "Historiker", genres: [G, H, S] },
+  { name: "Sprachwissenschaftler", genres: [G, H] },
+
+  // IT & Digitales --------------------------------------------------------
+  { name: "Penetrationstester", genres: [G, C] },
+  { name: "Systemadministrator", genres: [G, C] },
+  { name: "Datenbankadministrator", genres: [G, C] },
+  { name: "UX-Designer", genres: [G, C] },
+  { name: "Produktmanager", genres: [G, C] },
+  { name: "Spieleentwickler", genres: [G, C] },
+  { name: "Spieletester", genres: [G, C] },
+  { name: "Streamer", genres: [G, C] },
+  { name: "Podcaster", genres: [G, C] },
+  { name: "Social-Media-Manager", genres: [G, C] },
+
+  // Medien & Kreatives ----------------------------------------------------
+  { name: "Grafikdesigner", genres: [G, C] },
+  { name: "Illustrator", genres: [G, S] },
+  { name: "Kameramann", genres: [G, C] },
+  { name: "Cutter", genres: [G, C] },
+  { name: "Tontechniker", genres: [G, C] },
+  { name: "Synchronsprecher", genres: [G] },
+  { name: "Regisseur", genres: [G] },
+  { name: "Drehbuchautor", genres: [G] },
+  { name: "Lektor", genres: [G, H] },
+  { name: "Werbetexter", genres: [G, C] },
+
+  // Handwerk & Industrie --------------------------------------------------
+  { name: "Dachdecker", genres: [G, H] },
+  { name: "Maurer", genres: [G, H, S, W] },
+  { name: "Fliesenleger", genres: [G] },
+  { name: "Schlosser", genres: [G, H, S] },
+  { name: "Anlagenmechaniker", genres: [G, S] },
+  { name: "Feinmechaniker", genres: [G, S] },
+  { name: "Schweißer", genres: [G, S] },
+  { name: "Industriemechaniker", genres: [G, S] },
+  { name: "Werkzeugmacher", genres: [G, S, H] },
+  { name: "Glaser", genres: [G, H, S] },
+  { name: "Raumausstatter", genres: [G] },
+  { name: "Schornsteinfeger", genres: [G, H, S] },
+
+  // Verkehr & Logistik ----------------------------------------------------
+  { name: "Fluglotse", genres: [G] },
+  { name: "Flugbegleiter", genres: [G] },
+  { name: "Busfahrer", genres: [G] },
+  { name: "Taxifahrer", genres: [G, C] },
+  { name: "Fernfahrer", genres: [G] },
+  { name: "Zugbegleiter", genres: [G, S] },
+  { name: "Kranführer", genres: [G, C] },
+  { name: "Hafenarbeiter", genres: [G, H, S] },
+  { name: "Staplerfahrer", genres: [G] },
+  { name: "Paketzusteller", genres: [G, C] },
+
+  // Handel & Wirtschaft ---------------------------------------------------
+  { name: "Einzelhandelskaufmann", genres: [G] },
+  { name: "Immobilienmakler", genres: [G, C] },
+  { name: "Versicherungsmakler", genres: [G] },
+  { name: "Steuerberater", genres: [G] },
+  { name: "Wirtschaftsprüfer", genres: [G, C] },
+  { name: "Unternehmensberater", genres: [G, C] },
+  { name: "Einkäufer", genres: [G] },
+  { name: "Filialleiter", genres: [G] },
+  { name: "Marktforscher", genres: [G, C] },
+  { name: "Investmentbanker", genres: [G, C] },
+
+  // Gastronomie & Tourismus -----------------------------------------------
+  { name: "Konditor", genres: [G, H, S] },
+  { name: "Sommelier", genres: [G, H] },
+  { name: "Barista", genres: [G] },
+  { name: "Hotelmanager", genres: [G, S] },
+  { name: "Reiseleiter", genres: [G] },
+  { name: "Bergführer", genres: [G, H] },
+  { name: "Skilehrer", genres: [G] },
+  { name: "Tauchlehrer", genres: [G] },
+
+  // Öffentlicher Dienst & Soziales ----------------------------------------
+  { name: "Sozialarbeiter", genres: [G] },
+  { name: "Bewährungshelfer", genres: [G] },
+  { name: "Standesbeamter", genres: [G, H] },
+  { name: "Zollbeamter", genres: [G] },
+  { name: "Bürgermeister", genres: [G, H, W, F] },
+  { name: "Politiker", genres: [G, C] },
+  { name: "Diplomat", genres: [G, H, S, C] },
+  { name: "Berufssoldat", genres: [G, C] },
+  { name: "Grenzbeamter", genres: [G, C] },
+  { name: "Rettungshundeführer", genres: [G] },
+
+  // Sport, Tier & Umwelt --------------------------------------------------
+  { name: "Profisportler", genres: [G] },
+  { name: "Fitnesstrainer", genres: [G, C] },
+  { name: "Yogalehrer", genres: [G] },
+  { name: "Schiedsrichter", genres: [G] },
+  { name: "Sportkommentator", genres: [G, C] },
+  { name: "Tierpfleger", genres: [G, H] },
+  { name: "Baumpfleger", genres: [G] },
+  { name: "Umweltgutachter", genres: [G] },
 ];
 
 /**
