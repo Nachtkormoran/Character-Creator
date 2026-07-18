@@ -585,7 +585,7 @@ function DetailModal({
       onClick={onClose}
     >
       <div
-        className="my-8 w-full max-w-3xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
+        className="my-8 w-full max-w-5xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
@@ -665,13 +665,6 @@ function DetailModal({
           </div>
         )}
 
-        <div className="mb-6">
-          <h3 className="mb-2 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
-            Merkmale
-          </h3>
-          <TraitsTable traits={edited.merkmale} onChange={setTrait} />
-        </div>
-
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_240px]">
           <div className="order-2 md:order-1">
             <div className="mb-2 flex items-baseline justify-between gap-2">
@@ -729,6 +722,13 @@ function DetailModal({
             </p>
 
           </div>
+        </div>
+
+        <div className="mt-6">
+          <h3 className="mb-2 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+            Merkmale
+          </h3>
+          <TraitsTable traits={edited.merkmale} onChange={setTrait} compact />
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4 dark:border-white/10">
