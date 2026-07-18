@@ -184,6 +184,38 @@ export async function deleteCharacter(id: string): Promise<void> {
 
 // --- Gruppen -------------------------------------------------------------
 
+export interface ImportResult {
+  characters: number;
+  groups: number;
+  settings: number;
+  safetyCopy: string;
+}
+
+/** Lädt die komplette Datenbank als Datei herunter. */
+export async function exportDatabase(): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetch("/api/backup", { cache: "no-store" });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.error || "Export fehlgeschlagen.");
+  }
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  return {
+    blob: await res.blob(),
+    filename: match?.[1] ?? "charakter-creator.db",
+  };
+}
+
+/** **Ersetzt** den gesamten Datenbestand durch den der Datei. */
+export async function importDatabase(file: File): Promise<ImportResult> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/backup", { method: "POST", body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Import fehlgeschlagen.");
+  return data.result as ImportResult;
+}
+
 export async function listGroups(): Promise<StoredGroup[]> {
   const res = await fetch("/api/groups", { cache: "no-store" });
   const data = await res.json().catch(() => ({}));

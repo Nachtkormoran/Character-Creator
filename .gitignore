@@ -46,6 +46,8 @@ next-env.d.ts
 *.db
 *.db-journal
 *.db-wal
+# Sicherheitskopien, die der Import vor dem Überschreiben anlegt
+*.bak
 
 /Reference Pics
 

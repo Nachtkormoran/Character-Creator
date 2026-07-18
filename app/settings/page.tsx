@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSettings, updateSettings } from "@/lib/client";
+import {
+  exportDatabase,
+  getSettings,
+  importDatabase,
+  updateSettings,
+} from "@/lib/client";
 import {
   IMAGE_MODELS,
   IMAGE_PRICES_AS_OF,
@@ -186,6 +191,128 @@ export default function SettingsPage() {
           </p>
         </section>
       )}
+
+      <BackupSection />
     </div>
+  );
+}
+
+function BackupSection() {
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { blob, filename } = await exportDatabase();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setMessage(
+        `Sicherung heruntergeladen (${(blob.size / 1024 / 1024).toFixed(1)} MB).`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export fehlgeschlagen.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // erlaubt erneutes Wählen derselben Datei
+    if (!file || importing) return;
+
+    // Der Import löscht den gesamten Bestand – hier ist eine Rückfrage Pflicht.
+    if (
+      !confirm(
+        `„${file.name}" einspielen?\n\n` +
+          "ACHTUNG: Alle aktuellen Charaktere, Gruppen und Einstellungen werden " +
+          "dabei gelöscht und durch den Inhalt der Datei ersetzt.\n\n" +
+          "Vorher wird automatisch eine Sicherheitskopie des jetzigen Standes " +
+          "neben der Datenbank abgelegt.",
+      )
+    )
+      return;
+
+    setImporting(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const r = await importDatabase(file);
+      setMessage(
+        `Eingespielt: ${r.characters} Charaktere, ${r.groups} Gruppen, ` +
+          `${r.settings} Einstellungen. Sicherheitskopie: ${r.safetyCopy}`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Import fehlgeschlagen.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return (
+    <section className="flex flex-col gap-4 rounded-lg border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+      <div>
+        <h2 className="font-medium">Sicherung</h2>
+        <p className="text-sm text-foreground/60">
+          Die gesamte Datenbank – Charaktere samt Bildern, Gruppen und
+          Einstellungen – als Datei sichern oder wieder einspielen.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={exporting || importing}
+          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+        >
+          {exporting ? "Erstelle Sicherung …" : "Datenbank exportieren"}
+        </button>
+
+        <label
+          className={`rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition dark:border-white/15 ${
+            importing || exporting
+              ? "cursor-not-allowed opacity-50"
+              : "cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+          }`}
+        >
+          {importing ? "Spiele ein …" : "Datenbank importieren"}
+          <input
+            type="file"
+            accept=".db,application/octet-stream"
+            className="hidden"
+            onChange={handleImport}
+            disabled={importing || exporting}
+          />
+        </label>
+      </div>
+
+      <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
+        Der Import <strong>ersetzt den gesamten Bestand</strong>. Vorher wird
+        automatisch eine Sicherheitskopie des aktuellen Standes neben der
+        Datenbank abgelegt.
+      </p>
+
+      {message && (
+        <p className="text-sm text-foreground/70">{message}</p>
+      )}
+      {error && (
+        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+          {error}
+        </p>
+      )}
+    </section>
   );
 }

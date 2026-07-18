@@ -72,6 +72,8 @@ Komponenten sprechen die Routen ausschließlich über die typisierten Helfer in
   Bearbeitungen in der Galerie laufen darüber.
 - `GET|POST /api/groups`, `DELETE /api/groups/[id]` – Gruppen/Projekte.
 - `GET|PATCH /api/settings` – App-Einstellungen (`imageModel`, `imageQuality`).
+- `GET|POST /api/backup` – Datenbank sichern / wiederherstellen. **POST
+  ersetzt den gesamten Bestand** (Bestätigung passiert in der UI).
 
 **Editierbare Felder:** Name, Kurzbeschreibung, Beschreibung und alle Merkmale
 sind in beiden Ansichten editierbar. In der Erstellen-Ansicht wandern die
@@ -97,6 +99,15 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
 - `client.ts` – **einziger** Weg, wie Client-Komponenten die API ansprechen
   (typisierte fetch-Helfer für Generierung, CRUD, Umbenennen, Bild/Inhalt
   aktualisieren, Gruppen).
+- `backup.ts` – Export/Import der SQLite-Datei. Export per **`VACUUM INTO`**
+  (konsistenter Snapshot; ein blankes Kopieren der Datei kann bei parallelen
+  Schreibzugriffen unvollständig sein). Import kopiert **Zeilen** in einer
+  Transaktion statt die Datei auszutauschen – Prisma hält eine offene
+  Verbindung, ein Dateitausch im Betrieb würde sie ins Leere laufen lassen.
+  Gelesen wird die hochgeladene Datei über einen **zweiten PrismaClient** mit
+  `$queryRawUnsafe('SELECT *')`, damit auch ältere Schema-Stände mit fehlenden
+  Spalten funktionieren. Vor dem Überschreiben entsteht eine `*.bak`-Kopie
+  neben `dev.db` (in `.gitignore`).
 - `settings.ts` – serverseitiger Zugriff auf die `Setting`-Tabelle
   (Key-Value: `imageModel`, `imageQuality`). **Vorrang: gespeicherter Wert →
   Env → Default (`gpt-image-1` / `medium`).** Gespeicherte Werte stammen aus
