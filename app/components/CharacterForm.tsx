@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { generateName } from "@/lib/client";
 import { randomName } from "@/lib/names";
+import { randomProfession } from "@/lib/professions";
 import { DEFAULT_IMAGE_STYLE, GENDERS, type CharacterInput } from "@/lib/schema";
 import {
   DEFAULT_GENRE,
@@ -237,12 +238,24 @@ export function CharacterForm({
         </Field>
 
         <Field label="Beruf / Rolle">
-          <input
-            className={inputClass}
-            value={form.occupation}
-            onChange={(e) => update("occupation", e.target.value)}
-            placeholder="z. B. Söldnerin, Ärztin, Detektiv"
-          />
+          <div className="flex items-center gap-2">
+            <input
+              className={`${inputClass} min-w-0 flex-1`}
+              value={form.occupation}
+              onChange={(e) => update("occupation", e.target.value)}
+              placeholder="z. B. Söldnerin, Ärztin, Detektiv"
+            />
+            <button
+              type="button"
+              onClick={() => update("occupation", randomProfession(genre))}
+              disabled={loading}
+              title="Zufälliger Beruf, passend zur Genre-Vorlage"
+              aria-label="Beruf würfeln"
+              className="shrink-0 rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              🎲
+            </button>
+          </div>
         </Field>
       </div>
 

@@ -182,6 +182,12 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   (Stand-Datum in `IMAGE_PRICES_AS_OF`, ohne Gewähr) und beeinflusst nichts.
 - `templates.ts` – statische Genre-Vorlagen; belegen beim Auswählen im Formular
   per Merge das `setting`-Feld vor.
+- `professions.ts` – 200 Berufe für den Würfel am Feld „Beruf / Rolle", jeder
+  mit den Genres markiert, in die er passt (`randomProfession(genre)` filtert
+  danach). Die Markierung ist der Zweck der Struktur: eine flache Liste würde
+  einen „Netrunner" ins Mittelalter würfeln. Ohne Treffer steht die ganze Liste
+  zur Auswahl. Berufe stehen in der Grundform, das Textmodell passt sie ans
+  Geschlecht an.
 - `names.ts` – Namensvorrat für den Würfel-Knopf: neun Kulturkreise à 200 Namen
   plus `GENRE_CULTURES` (Genre → Kulturkreise) und `randomName`. **Rein lokal,
   ohne API** – der Knopf lebt davon, dass man ihn mehrmals drückt, und das
