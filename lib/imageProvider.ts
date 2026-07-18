@@ -1,4 +1,5 @@
 import { getOpenAI, IMAGE_MODEL } from "./openai";
+import { DEFAULT_IMAGE_QUALITY, type ImageQuality } from "./schema";
 
 /**
  * Abstraktion für die Bildgenerierung.
@@ -8,19 +9,31 @@ import { getOpenAI, IMAGE_MODEL } from "./openai";
  * ergänzen, ohne den restlichen Code anzupassen.
  */
 export interface ImageProvider {
-  /** Erzeugt ein Portrait und liefert es als Data-URL (base64) zurück. */
-  generatePortrait(prompt: string): Promise<string>;
+  /**
+   * Erzeugt ein Portrait und liefert es als Data-URL (base64) zurück.
+   * `model` und `quality` kommen aus den Einstellungen (s. `lib/settings.ts`);
+   * ohne Angabe gilt die Env-/Default-Vorbelegung.
+   */
+  generatePortrait(
+    prompt: string,
+    model?: string,
+    quality?: ImageQuality,
+  ): Promise<string>;
 }
 
 class OpenAIImageProvider implements ImageProvider {
-  async generatePortrait(prompt: string): Promise<string> {
+  async generatePortrait(
+    prompt: string,
+    model?: string,
+    quality: ImageQuality = DEFAULT_IMAGE_QUALITY,
+  ): Promise<string> {
     const openai = getOpenAI();
 
     const result = await openai.images.generate({
-      model: IMAGE_MODEL,
+      model: model || IMAGE_MODEL,
       prompt,
       size: "1024x1024",
-      quality: "medium",
+      quality,
     });
 
     const b64 = result.data?.[0]?.b64_json;

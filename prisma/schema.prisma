@@ -14,6 +14,15 @@ datasource db {
   provider = "sqlite"
 }
 
+// Einfacher Key-Value-Speicher für App-Einstellungen (z. B. das gewählte
+// Bildmodell). Bewusst generisch, damit weitere Einstellungen ohne Migration
+// dazukommen können.
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 // Gruppe / Projekt, dem Charaktere zugeordnet werden können
 // (z. B. verschiedene Buch- oder Spieleprojekte).
 model Group {

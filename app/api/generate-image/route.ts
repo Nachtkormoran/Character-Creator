@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getImageProvider } from "@/lib/imageProvider";
 import { buildImagePrompt } from "@/lib/prompts";
 import { DEFAULT_IMAGE_STYLE, generatedCharacterSchema } from "@/lib/schema";
+import { getSettings } from "@/lib/settings";
 import { extractVisualDetails } from "@/lib/visualDetails";
 import { z } from "zod";
 
@@ -48,9 +49,16 @@ export async function POST(request: Request) {
       visualDetails,
       extraPrompt,
     });
-    const imageData = await getImageProvider().generatePortrait(prompt);
+    // Modell und Qualität kommen aus den Einstellungen
+    // (Default: gpt-image-1 / medium).
+    const { imageModel, imageQuality } = await getSettings();
+    const imageData = await getImageProvider().generatePortrait(
+      prompt,
+      imageModel,
+      imageQuality,
+    );
 
-    return NextResponse.json({ imageData });
+    return NextResponse.json({ imageData, imageModel, imageQuality });
   } catch (err) {
     console.error("generate-image error:", err);
     const message =

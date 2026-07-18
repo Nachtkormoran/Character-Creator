@@ -24,6 +24,7 @@ import {
 } from "@/lib/schema";
 import type { StoredCharacter, StoredGroup } from "@/lib/serialize";
 import { AutoTextarea } from "../components/AutoTextarea";
+import { ImageLightbox } from "../components/ImageLightbox";
 import { TraitsTable } from "../components/TraitsTable";
 
 const controlClass =
@@ -433,6 +434,7 @@ function DetailModal({
   const [imageLoading, setImageLoading] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
 
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [assigningGroup, setAssigningGroup] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -628,14 +630,21 @@ function DetailModal({
           <div className="order-1 md:order-2">
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.03]">
               {c.imageData ? (
-                <Image
-                  src={c.imageData}
-                  alt={c.character.name}
-                  fill
-                  sizes="240px"
-                  className="object-cover"
-                  unoptimized
-                />
+                <button
+                  type="button"
+                  onClick={() => setLightboxOpen(true)}
+                  aria-label="Bild in voller Größe anzeigen"
+                  className="group absolute inset-0 cursor-zoom-in"
+                >
+                  <Image
+                    src={c.imageData}
+                    alt={c.character.name}
+                    fill
+                    sizes="240px"
+                    className="object-cover transition group-hover:opacity-90"
+                    unoptimized
+                  />
+                </button>
               ) : (
                 <div className="flex h-full items-center justify-center p-4 text-center text-sm text-foreground/40">
                   {imageLoading ? "Bild wird erzeugt …" : "Kein Bild"}
@@ -776,6 +785,14 @@ function DetailModal({
           )}
         </div>
       </div>
+
+      {lightboxOpen && c.imageData && (
+        <ImageLightbox
+          src={c.imageData}
+          alt={c.character.name}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </div>
   );
 }

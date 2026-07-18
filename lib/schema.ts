@@ -24,6 +24,104 @@ export const IMAGE_STYLES = [
 
 export const DEFAULT_IMAGE_STYLE = "illustration";
 
+// ---------------------------------------------------------------------------
+// Bildmodelle (Einstellungen)
+// ---------------------------------------------------------------------------
+
+/**
+ * Auswählbare Bildmodelle. Bewusst eine Allowlist: die Auswahl kommt aus dem
+ * Browser und darf nicht zu einem beliebigen Modellnamen führen.
+ */
+export const IMAGE_MODELS = [
+  {
+    value: "gpt-image-1",
+    label: "gpt-image-1",
+    hint: "Bisheriges Modell – erzeugt den gewohnten Look. Wird am 23.10.2026 eingestellt.",
+  },
+  {
+    value: "gpt-image-1-mini",
+    label: "gpt-image-1-mini",
+    hint: "Abgespeckte Variante desselben Modells – deutlich günstiger.",
+  },
+  {
+    value: "gpt-image-1.5",
+    label: "gpt-image-1.5",
+    hint: "Nachfolger von gpt-image-1, anderes Bildergebnis.",
+  },
+  {
+    value: "gpt-image-2",
+    label: "gpt-image-2",
+    hint: "Neueste Generation, in der niedrigen Stufe sehr günstig.",
+  },
+] as const;
+
+export type ImageModel = (typeof IMAGE_MODELS)[number]["value"];
+
+/** Default bleibt gpt-image-1, damit sich am gewohnten Ergebnis nichts ändert. */
+export const DEFAULT_IMAGE_MODEL: ImageModel = "gpt-image-1";
+
+export const imageModelSchema = z.enum(
+  IMAGE_MODELS.map((m) => m.value) as [ImageModel, ...ImageModel[]],
+);
+
+/** Qualitätsstufen, die die OpenAI-Bild-API kennt. */
+export const IMAGE_QUALITIES = [
+  { value: "low", label: "Niedrig" },
+  { value: "medium", label: "Mittel" },
+  { value: "high", label: "Hoch" },
+] as const;
+
+export type ImageQuality = (typeof IMAGE_QUALITIES)[number]["value"];
+
+/** Default bleibt `medium` – die bisher fest verdrahtete Stufe. */
+export const DEFAULT_IMAGE_QUALITY: ImageQuality = "medium";
+
+export const imageQualitySchema = z.enum(
+  IMAGE_QUALITIES.map((q) => q.value) as [ImageQuality, ...ImageQuality[]],
+);
+
+/**
+ * Ungefähre Kosten pro Bild in USD bei 1024×1024.
+ *
+ * Stand 18.07.2026, aus öffentlichen Preisvergleichen – **ohne Gewähr**.
+ * `null` = kein belastbarer Wert gefunden; die Quellen widersprechen sich vor
+ * allem in der `high`-Stufe. Nur zur Einordnung, nicht zur Abrechnung.
+ */
+export const IMAGE_PRICES_USD: Record<
+  ImageModel,
+  Record<ImageQuality, number | null>
+> = {
+  "gpt-image-1": { low: 0.011, medium: 0.042, high: 0.167 },
+  "gpt-image-1-mini": { low: 0.005, medium: 0.011, high: 0.036 },
+  "gpt-image-1.5": { low: 0.009, medium: 0.034, high: 0.2 },
+  "gpt-image-2": { low: 0.006, medium: 0.053, high: 0.211 },
+};
+
+export const IMAGE_PRICES_AS_OF = "18.07.2026";
+
+/**
+ * Was der Client schicken darf – hier greift die Allowlist.
+ */
+export const settingsPatchSchema = z.object({
+  imageModel: imageModelSchema,
+  imageQuality: imageQualitySchema,
+});
+
+/**
+ * Was der Server zurückgibt. Bewusst `string` und nicht `ImageModel`: ein über
+ * `OPENAI_IMAGE_MODEL` gesetztes Modell ist serverseitige Konfiguration und
+ * wird respektiert, auch wenn es nicht in der Auswahlliste steht.
+ */
+export interface Settings {
+  imageModel: string;
+  imageQuality: ImageQuality;
+}
+
+/** Steht das Modell in der Auswahlliste (oder kommt es aus der Env)? */
+export function isKnownImageModel(value: string): value is ImageModel {
+  return IMAGE_MODELS.some((m) => m.value === value);
+}
+
 export const characterInputSchema = z.object({
   // Grundlegende Vorgaben
   gender: z.enum(GENDERS).default("egal"),

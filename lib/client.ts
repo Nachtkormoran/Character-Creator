@@ -1,4 +1,4 @@
-import type { CharacterInput, GeneratedCharacter } from "./schema";
+import type { CharacterInput, GeneratedCharacter, Settings } from "./schema";
 import type { StoredCharacter, StoredGroup } from "./serialize";
 
 /** Kleiner Wrapper um fetch, der Fehlermeldungen des Backends durchreicht. */
@@ -36,6 +36,26 @@ export function generateImage(
     imageStyle,
     ...options,
   });
+}
+
+export async function getSettings(): Promise<Settings> {
+  const res = await fetch("/api/settings", { cache: "no-store" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Laden fehlgeschlagen.");
+  return data.settings as Settings;
+}
+
+export async function updateSettings(
+  patch: Partial<Settings>,
+): Promise<Settings> {
+  const res = await fetch("/api/settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Speichern fehlgeschlagen.");
+  return data.settings as Settings;
 }
 
 export function saveCharacter(

@@ -43,8 +43,8 @@ npx prisma generate    # Prisma-Client neu generieren (nach Schema-Änderungen)
 Next.js 16 **App Router**, React 19, TypeScript, Tailwind v4 (rein CSS-basiert
 über `@import "tailwindcss"` in `app/globals.css`, **keine** `tailwind.config`).
 
-Zwei Seiten: `/` (Erstellen; Client-Komponente mit Umschaltung Formular-/
-Ergebnis-Ansicht) und `/gallery`.
+Drei Seiten: `/` (Erstellen; Client-Komponente mit Umschaltung Formular-/
+Ergebnis-Ansicht), `/gallery` und `/settings`.
 
 **Server/Client-Trennung:** Sämtlicher OpenAI- und DB-Zugriff liegt in den
 API-Routen unter `app/api/*` (Node-Runtime). Der OpenAI-Key wird nur
@@ -67,6 +67,7 @@ Komponenten sprechen die Routen ausschließlich über die typisierten Helfer in
   `description`, `traits` kann einzeln geändert werden. Alle nachträglichen
   Bearbeitungen in der Galerie laufen darüber.
 - `GET|POST /api/groups`, `DELETE /api/groups/[id]` – Gruppen/Projekte.
+- `GET|PATCH /api/settings` – App-Einstellungen (`imageModel`, `imageQuality`).
 
 **Editierbare Felder:** Name, Kurzbeschreibung, Beschreibung und alle Merkmale
 sind in beiden Ansichten editierbar. In der Erstellen-Ansicht wandern die
@@ -92,6 +93,17 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
 - `client.ts` – **einziger** Weg, wie Client-Komponenten die API ansprechen
   (typisierte fetch-Helfer für Generierung, CRUD, Umbenennen, Bild/Inhalt
   aktualisieren, Gruppen).
+- `settings.ts` – serverseitiger Zugriff auf die `Setting`-Tabelle
+  (Key-Value: `imageModel`, `imageQuality`). **Vorrang: gespeicherter Wert →
+  Env → Default (`gpt-image-1` / `medium`).** Gespeicherte Werte stammen aus
+  dem Browser und werden gegen die Allowlists `IMAGE_MODELS` / `IMAGE_QUALITIES`
+  geprüft. Beim **Modell** wird der Env-Wert (`OPENAI_IMAGE_MODEL`) als
+  vertrauenswürdige Server-Konfiguration **ungeprüft** durchgereicht
+  (Escape-Hatch für nicht gelistete Modelle); bei der **Qualität** nicht – die
+  API kennt nur `low|medium|high`. Weil die Tabelle Key-Value ist, brauchen
+  neue Einstellungen **keine Migration**.
+  Die Preistabelle `IMAGE_PRICES_USD` in `schema.ts` ist nur eine Anzeige-Hilfe
+  (Stand-Datum in `IMAGE_PRICES_AS_OF`, ohne Gewähr) und beeinflusst nichts.
 - `templates.ts` – statische Genre-Vorlagen; belegen beim Auswählen im Formular
   per Merge das `setting`-Feld vor.
 - `image.ts` – `fileToDataUrl` (clientseitig): Bild-Upload einlesen,
@@ -104,8 +116,9 @@ mitwachsende Textarea für die editierbaren Textfelder.
 
 **Datenmodell** (`prisma/schema.prisma`): `Character` (Felder `input` und
 `traits` als **JSON-Strings**, `imageData` als Base64-Data-URL, optionale
-`groupId`) und `Group` (`onDelete: SetNull` – beim Löschen der Gruppe bleiben
-Charaktere erhalten). SQLite lokal.
+`groupId`), `Group` (`onDelete: SetNull` – beim Löschen der Gruppe bleiben
+Charaktere erhalten) und `Setting` (Key-Value für App-Einstellungen). SQLite
+lokal.
 
 ## Nicht-offensichtliche Fallstricke
 

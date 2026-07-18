@@ -11,6 +11,7 @@ import {
 } from "@/lib/schema";
 import type { StoredGroup } from "@/lib/serialize";
 import { AutoTextarea } from "./AutoTextarea";
+import { ImageLightbox } from "./ImageLightbox";
 import { TraitsTable } from "./TraitsTable";
 
 export function CharacterResult({
@@ -62,6 +63,7 @@ export function CharacterResult({
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -141,14 +143,21 @@ export function CharacterResult({
         <div className="order-1 md:order-2">
           <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.03]">
             {imageData ? (
-              <Image
-                src={imageData}
-                alt={`Portrait von ${character.name}`}
-                fill
-                sizes="280px"
-                className="object-cover"
-                unoptimized
-              />
+              <button
+                type="button"
+                onClick={() => setLightboxOpen(true)}
+                aria-label="Portrait in voller Größe anzeigen"
+                className="group absolute inset-0 cursor-zoom-in"
+              >
+                <Image
+                  src={imageData}
+                  alt={`Portrait von ${character.name}`}
+                  fill
+                  sizes="280px"
+                  className="object-cover transition group-hover:opacity-90"
+                  unoptimized
+                />
+              </button>
             ) : (
               <div className="flex h-full items-center justify-center p-4 text-center text-sm text-foreground/40">
                 {imageLoading
@@ -286,6 +295,14 @@ export function CharacterResult({
           </span>
         )}
       </div>
+
+      {lightboxOpen && imageData && (
+        <ImageLightbox
+          src={imageData}
+          alt={`Portrait von ${character.name}`}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </div>
   );
 }

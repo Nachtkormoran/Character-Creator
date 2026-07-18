@@ -55,6 +55,12 @@ export default function RootLayout({
               >
                 Galerie
               </Link>
+              <Link
+                href="/settings"
+                className="text-foreground/70 transition-colors hover:text-foreground"
+              >
+                Einstellungen
+              </Link>
               <ThemeToggle />
             </nav>
           </div>
