@@ -182,6 +182,13 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   (Stand-Datum in `IMAGE_PRICES_AS_OF`, ohne Gewähr) und beeinflusst nichts.
 - `templates.ts` – statische Genre-Vorlagen; belegen beim Auswählen im Formular
   per Merge das `setting`-Feld vor.
+- `inspiration.ts` – je 100 Bausteine für die Würfel an „Aussehen",
+  „Persönlichkeit" und „Hintergrund"; `pickSome` zieht mehrere **ohne
+  Wiederholung**. Hier gibt es bewusst **keine Genre-Markierung** wie bei den
+  Berufen: die Einträge sind so formuliert, dass sie überall passen (Körper und
+  Auftreten statt Kleidungsstücke, Lebensereignisse statt setting-gebundener
+  Stationen). Der Hintergrund verbindet mit **Semikolon**, weil seine Einträge
+  selbst Kommas enthalten.
 - `professions.ts` – 300 Berufe für den Würfel am Feld „Beruf / Rolle", jeder
   mit den Genres markiert, in die er passt (`randomProfession(genre)` filtert
   danach). Die Markierung ist der Zweck der Struktur: eine flache Liste würde

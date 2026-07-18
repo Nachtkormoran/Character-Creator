@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { generateName } from "@/lib/client";
 import { randomName } from "@/lib/names";
+import {
+  randomAppearance,
+  randomBackground,
+  randomPersonality,
+} from "@/lib/inspiration";
 import { randomProfession } from "@/lib/professions";
 import { DEFAULT_IMAGE_STYLE, GENDERS, type CharacterInput } from "@/lib/schema";
 import {
@@ -42,6 +47,32 @@ function Field({
       {children}
       {hint && <span className="text-xs text-foreground/50">{hint}</span>}
     </label>
+  );
+}
+
+/** Der Würfel neben einem Feld. Ersetzt dessen Inhalt durch einen Zufallswert. */
+function DiceButton({
+  onClick,
+  disabled,
+  label,
+  title,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  label: string;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={title}
+      className="shrink-0 rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+    >
+      🎲
+    </button>
   );
 }
 
@@ -210,21 +241,37 @@ export function CharacterForm({
       </div>
 
       <Field label="Aussehen" hint="Haare, Augen, Statur, Kleidung, Auffälligkeiten …">
-        <textarea
-          className={`${inputClass} min-h-20 resize-y`}
-          value={form.appearance}
-          onChange={(e) => update("appearance", e.target.value)}
-          placeholder="z. B. lange rote Haare, Sommersprossen, schlank, trägt eine abgewetzte Lederjacke"
-        />
+        <div className="flex items-start gap-2">
+          <textarea
+            className={`${inputClass} min-h-20 min-w-0 flex-1 resize-y`}
+            value={form.appearance}
+            onChange={(e) => update("appearance", e.target.value)}
+            placeholder="z. B. lange rote Haare, Sommersprossen, schlank, trägt eine abgewetzte Lederjacke"
+          />
+          <DiceButton
+            onClick={() => update("appearance", randomAppearance())}
+            disabled={loading}
+            label="Aussehen würfeln"
+            title="Drei bis vier zufällige Merkmale zum Aussehen"
+          />
+        </div>
       </Field>
 
       <Field label="Persönlichkeit">
-        <textarea
-          className={`${inputClass} min-h-16 resize-y`}
-          value={form.personality}
-          onChange={(e) => update("personality", e.target.value)}
-          placeholder="z. B. sarkastisch, loyal, misstrauisch gegenüber Autorität"
-        />
+        <div className="flex items-start gap-2">
+          <textarea
+            className={`${inputClass} min-h-16 min-w-0 flex-1 resize-y`}
+            value={form.personality}
+            onChange={(e) => update("personality", e.target.value)}
+            placeholder="z. B. sarkastisch, loyal, misstrauisch gegenüber Autorität"
+          />
+          <DiceButton
+            onClick={() => update("personality", randomPersonality())}
+            disabled={loading}
+            label="Persönlichkeit würfeln"
+            title="Drei bis vier zufällige Wesenszüge"
+          />
+        </div>
       </Field>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -245,27 +292,31 @@ export function CharacterForm({
               onChange={(e) => update("occupation", e.target.value)}
               placeholder="z. B. Söldnerin, Ärztin, Detektiv"
             />
-            <button
-              type="button"
+            <DiceButton
               onClick={() => update("occupation", randomProfession(genre))}
               disabled={loading}
+              label="Beruf würfeln"
               title="Zufälliger Beruf, passend zur Genre-Vorlage"
-              aria-label="Beruf würfeln"
-              className="shrink-0 rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
-            >
-              🎲
-            </button>
+            />
           </div>
         </Field>
       </div>
 
       <Field label="Hintergrund" hint="Herkunftsgeschichte, prägende Ereignisse, Ziele">
-        <textarea
-          className={`${inputClass} min-h-20 resize-y`}
-          value={form.background}
-          onChange={(e) => update("background", e.target.value)}
-          placeholder="z. B. wuchs in einem Fischerdorf auf, verlor früh die Eltern …"
-        />
+        <div className="flex items-start gap-2">
+          <textarea
+            className={`${inputClass} min-h-20 min-w-0 flex-1 resize-y`}
+            value={form.background}
+            onChange={(e) => update("background", e.target.value)}
+            placeholder="z. B. wuchs in einem Fischerdorf auf, verlor früh die Eltern …"
+          />
+          <DiceButton
+            onClick={() => update("background", randomBackground())}
+            disabled={loading}
+            label="Hintergrund würfeln"
+            title="Ein bis zwei zufällige prägende Ereignisse"
+          />
+        </div>
       </Field>
 
       <Field label="Weitere Wünsche">
