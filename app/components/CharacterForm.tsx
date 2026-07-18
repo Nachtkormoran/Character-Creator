@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { generateName } from "@/lib/client";
+import { randomName } from "@/lib/names";
 import { DEFAULT_IMAGE_STYLE, GENDERS, type CharacterInput } from "@/lib/schema";
 import {
   DEFAULT_GENRE,
@@ -51,6 +53,8 @@ export function CharacterForm({
 }) {
   const [form, setForm] = useState<CharacterInput>(EMPTY);
   const [genre, setGenre] = useState<string>(DEFAULT_GENRE);
+  const [namingAI, setNamingAI] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   function update<K extends keyof CharacterInput>(
     key: K,
@@ -70,6 +74,32 @@ export function CharacterForm({
   function reset() {
     setForm(EMPTY);
     setGenre(DEFAULT_GENRE);
+    setNameError(null);
+  }
+
+  /** Zufallsname aus den lokalen Listen – kostenlos und ohne Wartezeit. */
+  function rollName() {
+    setNameError(null);
+    update("name", randomName(genre, form.gender));
+  }
+
+  /**
+   * Namensvorschlag vom Modell. Anders als der Würfel wertet er die
+   * Freitextfelder aus (Herkunft, Setting, Beruf, Hintergrund) und trifft
+   * daher auch Vorgaben, für die es keine Liste gibt.
+   */
+  async function suggestName() {
+    if (namingAI) return;
+    setNamingAI(true);
+    setNameError(null);
+    try {
+      const { name } = await generateName(form);
+      update("name", name);
+    } catch (err) {
+      setNameError(err instanceof Error ? err.message : "Fehler.");
+    } finally {
+      setNamingAI(false);
+    }
   }
 
   return (
@@ -101,13 +131,38 @@ export function CharacterForm({
         label="Name"
         hint="Nur ein Vorname? Dann wird ein passender Nachname ergänzt. Frei lassen für einen erfundenen Namen."
       >
-        <input
-          className={inputClass}
-          value={form.name}
-          onChange={(e) => update("name", e.target.value)}
-          placeholder="z. B. „Mira“ oder „Mira Sandoval“"
-          maxLength={120}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            className={`${inputClass} min-w-48 flex-1`}
+            value={form.name}
+            onChange={(e) => update("name", e.target.value)}
+            placeholder="z. B. „Mira“ oder „Mira Sandoval“"
+            maxLength={120}
+          />
+          <button
+            type="button"
+            onClick={rollName}
+            disabled={loading}
+            title="Zufallsname passend zur Genre-Vorlage – sofort und ohne KI"
+            className="shrink-0 rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+          >
+            🎲 Würfeln
+          </button>
+          <button
+            type="button"
+            onClick={suggestName}
+            disabled={loading || namingAI}
+            title="Namensvorschlag der KI, passend zu Herkunft, Setting, Beruf und Hintergrund"
+            className="shrink-0 rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+          >
+            {namingAI ? "Denkt nach …" : "✨ Zu den Angaben"}
+          </button>
+        </div>
+        {nameError && (
+          <span className="text-xs text-red-600 dark:text-red-400">
+            {nameError}
+          </span>
+        )}
       </Field>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

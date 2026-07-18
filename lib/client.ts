@@ -38,6 +38,11 @@ export function generateText(input: CharacterInput) {
   );
 }
 
+/** Ein einzelner Namensvorschlag, passend zu den Formular-Vorgaben. */
+export function generateName(input: CharacterInput) {
+  return postJson<{ name: string }>("/api/generate-name", input);
+}
+
 export function generateImage(
   character: GeneratedCharacter,
   imageStyle: string,

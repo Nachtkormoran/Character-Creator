@@ -56,6 +56,37 @@ ${nameAnforderung}
 }
 
 /**
+ * Baut den Prompt für einen einzelnen Namensvorschlag.
+ *
+ * Bewusst **sehr knapp**: hier zählt jedes Token, und für einen Namen sind
+ * die meisten Formularfelder ohne Belang. Aussehen, Persönlichkeit und
+ * „Weitere Wünsche" fließen deshalb gar nicht ein – sie machen den Prompt
+ * teurer, ohne den Namen zu verbessern. Der Hintergrund wird gekürzt
+ * mitgegeben, weil er oft das Entscheidende zum Nachnamen enthält
+ * („Adelsfamilie aus Bath").
+ *
+ * Der lokale Würfel in `names.ts` deckt den Normalfall ab; dieser Prompt
+ * existiert für das, was feste Listen nicht können – etwa eine im Freitext
+ * angegebene Herkunft, für die es keine Liste gibt.
+ */
+export function buildNamePrompt(input: CharacterInput): string {
+  const hintergrund = (input.background || "").trim().slice(0, 200);
+
+  const vorgaben =
+    line("Geschlecht", input.gender === "egal" ? "" : input.gender) +
+    line("Alter", input.age) +
+    line("Herkunft/Ethnie", input.ethnicity) +
+    line("Setting/Genre", input.setting) +
+    line("Beruf/Rolle", input.occupation) +
+    line("Hintergrund", hintergrund);
+
+  return `Erfinde einen vollständigen Namen (Vorname und Nachname) für einen Charakter mit diesen Vorgaben:
+
+${vorgaben || "- (keine Vorgaben – wähle frei)\n"}
+Antworte mit nichts als dem Namen, ohne Anführungszeichen und ohne Erklärung.`;
+}
+
+/**
  * Baut den Prompt für die Bildgenerierung aus den generierten Merkmalen.
  */
 export function buildImagePrompt(

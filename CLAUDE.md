@@ -64,8 +64,8 @@ Knopf allein reicht als Schutz nicht – `setSaved(false)` macht ihn nach jedem
 neu erzeugten oder hochgeladenen Bild wieder scharf.
 
 **API-Routen:**
-- `POST /api/generate-text`, `POST /api/generate-image` – OpenAI (persistieren
-  nichts).
+- `POST /api/generate-text`, `POST /api/generate-image`,
+  `POST /api/generate-name` – OpenAI (persistieren nichts).
 - `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional
   `groupId`, `imageData` und `thumbnail`; ein mitgegebenes Bild wird das erste
   und primäre). **Keine Route liefert `imageData` in einer Liste** (`omit`),
@@ -116,7 +116,13 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   Vorname und wird um einen passenden Nachnamen ergänzt, ab zwei Wörtern gilt
   der Name als vollständig und bleibt unverändert. Die Namens-Anforderung
   **ersetzt** dabei die freie Namenswahl in der Anforderungsliste – beide
-  nebeneinander wären widersprüchlich. Der Bild-Prompt wird
+  nebeneinander wären widersprüchlich. `buildNamePrompt` ist der Prompt für
+  den KI-Namensknopf und bewusst **sehr knapp**: Aussehen, Persönlichkeit und
+  „Weitere Wünsche" fließen nicht ein, weil sie den Namen nicht verbessern,
+  aber Tokens kosten. Die Route `generate-name` nutzt aus demselben Grund
+  `chat.completions.create` mit `max_tokens` statt Structured Outputs – ein
+  JSON-Schema für einen einzelnen String wäre reiner Aufschlag. Gemessen:
+  110 Token rein, 5 raus, rund **0,03 Cent pro Namen**. Der Bild-Prompt wird
   aus Optionen `{ includeTraits, visualDetails, extraPrompt }` + Kurzbeschreibung
   (Szenen-Kontext) + Stilbeschreibung zusammengesetzt. **Hier** wird der Bild-Look
   getunt. Neben `stilBeschreibung` gibt es `framingBeschreibung`: Der
@@ -170,6 +176,10 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   (Stand-Datum in `IMAGE_PRICES_AS_OF`, ohne Gewähr) und beeinflusst nichts.
 - `templates.ts` – statische Genre-Vorlagen; belegen beim Auswählen im Formular
   per Merge das `setting`-Feld vor.
+- `names.ts` – Namensvorrat für den Würfel-Knopf: neun Kulturkreise à 200 Namen
+  plus `GENRE_CULTURES` (Genre → Kulturkreise) und `randomName`. **Rein lokal,
+  ohne API** – der Knopf lebt davon, dass man ihn mehrmals drückt, und das
+  verträgt keine Netzwerk-Wartezeit.
 - `image.ts` – clientseitige Bildhelfer: `fileToDataUrl` (Upload einlesen und
   herunterskalieren), `makeThumbnail` (640 px, WebP 0,85) und
   `fileToReferenceDataUrl` für Referenzbilder. Letzteres kodiert bewusst
