@@ -94,8 +94,12 @@ neu erzeugten oder hochgeladenen Bild wieder scharf.
 Teil der Detailansicht, sondern eine eigene Ebene darüber
 (`CharacterImagesModal`, `z-70`); die gesamte Bild-Bedienung (Stil,
 Zusatz-Details, Merkmale/Textdetails-Checkboxen, Referenzbild, Erzeugen,
-Hochladen) liegt dort und **nur** dort. Die Detailansicht zeigt nur das
-Primärbild plus den Knopf „Bilder verwalten (n)".
+Hochladen, **Exportieren**) liegt dort und **nur** dort. Die Detailansicht
+zeigt nur das Primärbild plus den Knopf „Bilder verwalten (n)"; ihr
+verbliebener Export-Knopf ist der fürs **PDF**. Der Bild-Export sitzt an der
+einzelnen Kachel, damit jedes Bild einzeln herunterladbar ist – bei mehr als
+einem Bild bekommt die Datei ihre Position angehängt (`Name_2.png`), sonst
+überschrieben sich die Downloads gegenseitig.
 
 **Editierbare Felder:** Name, Kurzbeschreibung, Beschreibung und alle Merkmale
 sind in beiden Ansichten editierbar. In der Erstellen-Ansicht wandern die
@@ -172,6 +176,9 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   **verlustfrei** (unverändert bzw. PNG bis 1536 px): das Modell liest die
   Vorlage aus und kann JPEG-Artefakte als gewollte Bildmerkmale missdeuten.
   Alle brauchen Canvas, laufen also nur im Browser.
+- `download.ts` – clientseitige Download-Helfer (`downloadBlob`,
+  `imageExtension`, `safeFileName`, `downloadImage`). Geteilt, weil sowohl der
+  PDF-Export in der Galerie als auch der Bild-Export je Kachel sie braucht.
 
 **Referenzbilder:** Optionale Stil-/Motivvorlage pro Generierung, in beiden
 Ansichten über `ReferenceImagePicker`. Sie gilt **nur für die Sitzung** und

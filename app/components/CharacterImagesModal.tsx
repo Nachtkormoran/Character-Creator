@@ -9,6 +9,7 @@ import {
   getImage,
   setPrimaryImage,
 } from "@/lib/client";
+import { downloadImage, safeFileName } from "@/lib/download";
 import { fileToDataUrl } from "@/lib/image";
 import {
   DEFAULT_IMAGE_STYLE,
@@ -56,6 +57,8 @@ export function CharacterImagesModal({
   const [ownPicker, setOwnPickerState] = useState(false);
   /** Id des Bildes, dessen Original gerade als Vorlage geladen wird. */
   const [ownLoadingId, setOwnLoadingId] = useState<string | null>(null);
+  /** Id des Bildes, dessen Original gerade für den Download geladen wird. */
+  const [exportingId, setExportingId] = useState<string | null>(null);
 
   // Spiegeln den Zustand für den Esc-Handler unten mit – Begründung dort.
   const lightboxRef = useRef(false);
@@ -154,6 +157,31 @@ export function CharacterImagesModal({
     }
   }
 
+  /**
+   * Ein einzelnes Bild als Datei herunterladen – immer das **Original** über
+   * `getImage`, nicht das Thumbnail der Kachel. Bei mehreren Bildern bekommt
+   * jede Datei ihre Position angehängt, sonst überschrieben sich die Downloads
+   * im Zielordner gegenseitig.
+   */
+  async function exportImage(imageId: string) {
+    if (exportingId) return;
+    setExportingId(imageId);
+    setError(null);
+    try {
+      const dataUrl = await getImage(c.id, imageId);
+      const index = c.images.findIndex((i) => i.id === imageId);
+      const base = safeFileName(edited.name);
+      await downloadImage(
+        dataUrl,
+        c.images.length > 1 ? `${base}_${index + 1}` : base,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export fehlgeschlagen.");
+    } finally {
+      setExportingId(null);
+    }
+  }
+
   /** Original nachladen und im Vollbild zeigen. */
   async function openFull(imageId: string) {
     setLoadingId(imageId);
@@ -249,14 +277,23 @@ export function CharacterImagesModal({
                   <span className="text-xs text-foreground/50">
                     {new Date(img.createdAt).toLocaleDateString("de-DE")}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => run(() => setPrimaryImage(c.id, img.id))}
+                    disabled={busy || img.isPrimary}
+                    className="w-full rounded-md border border-black/15 px-2 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                  >
+                    {img.isPrimary ? "Primär ✓" : "Als primär"}
+                  </button>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => run(() => setPrimaryImage(c.id, img.id))}
-                      disabled={busy || img.isPrimary}
+                      onClick={() => exportImage(img.id)}
+                      disabled={exportingId !== null}
+                      title="Dieses Bild in voller Auflösung herunterladen"
                       className="flex-1 rounded-md border border-black/15 px-2 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
                     >
-                      {img.isPrimary ? "Primär ✓" : "Als primär"}
+                      {exportingId === img.id ? "Lade …" : "Exportieren"}
                     </button>
                     <button
                       type="button"

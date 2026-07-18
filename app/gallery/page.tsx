@@ -13,6 +13,7 @@ import {
   updateCharacterContent,
   updateCharacterGroup,
 } from "@/lib/client";
+import { downloadBlob, safeFileName } from "@/lib/download";
 import {
   withTrait,
   type CharacterTraits,
@@ -64,38 +65,6 @@ function searchableText(c: StoredCharacter): string {
       ...Object.values(merkmale).map(String),
     ].join(" "),
   );
-}
-
-/** Löst den Download eines Blobs als Datei aus. */
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-/**
- * Dateiendung aus dem MIME-Typ einer Data-URL. Generierte Bilder sind PNG,
- * Uploads können JPEG sein – die Endung muss zum Inhalt passen.
- */
-function imageExtension(dataUrl: string): string {
-  const mime = dataUrl.slice(5, dataUrl.indexOf(";"));
-  if (mime === "image/jpeg") return "jpg";
-  const subtype = mime.split("/")[1];
-  return subtype && /^[a-z0-9]+$/.test(subtype) ? subtype : "png";
-}
-
-/** Erzeugt einen dateisystem-tauglichen Namen für den PDF-Download. */
-function pdfFileName(name: string): string {
-  const clean = name
-    .trim()
-    .replace(/[^\p{L}\p{N}]+/gu, "_")
-    .replace(/^_+|_+$/g, "");
-  return clean || "charakter";
 }
 
 export default function GalleryPage() {
@@ -509,7 +478,6 @@ function DetailModal({
   const preview = primary?.thumbnail ?? cachedImage;
   const [assigningGroup, setAssigningGroup] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportingImage, setExportingImage] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
   async function exportPdf() {
@@ -531,36 +499,11 @@ function DetailModal({
         groupName,
         createdAt: c.createdAt,
       });
-      downloadBlob(blob, `${pdfFileName(edited.name)}.pdf`);
+      downloadBlob(blob, `${safeFileName(edited.name)}.pdf`);
     } catch (e) {
       setExportError(e instanceof Error ? e.message : "Export fehlgeschlagen.");
     } finally {
       setExporting(false);
-    }
-  }
-
-  /**
-   * Lädt das Portrait als Bilddatei herunter – immer das Original in voller
-   * Auflösung, nicht das Thumbnail. Das Original wird dafür bei Bedarf
-   * nachgeladen.
-   */
-  async function exportImage() {
-    if (exportingImage) return;
-    setExportingImage(true);
-    setExportError(null);
-    try {
-      const imageData = await ensureFullImage();
-      if (!imageData) throw new Error("Für diesen Charakter gibt es kein Bild.");
-      // fetch() kann Data-URLs direkt in einen Blob wandeln.
-      const blob = await (await fetch(imageData)).blob();
-      downloadBlob(
-        blob,
-        `${pdfFileName(edited.name)}.${imageExtension(imageData)}`,
-      );
-    } catch (e) {
-      setExportError(e instanceof Error ? e.message : "Export fehlgeschlagen.");
-    } finally {
-      setExportingImage(false);
     }
   }
 
@@ -748,16 +691,6 @@ function DetailModal({
             <span className="text-xs text-foreground/50">
               {new Date(c.createdAt).toLocaleDateString("de-DE")}
             </span>
-            {preview && (
-              <button
-                onClick={exportImage}
-                disabled={exportingImage}
-                title="Portrait in voller Auflösung herunterladen"
-                className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
-              >
-                {exportingImage ? "Lade Bild …" : "Bild exportieren"}
-              </button>
-            )}
             <button
               onClick={exportPdf}
               disabled={exporting}
