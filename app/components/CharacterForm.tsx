@@ -217,6 +217,15 @@ export function CharacterForm({
         />
       </Field>
 
+      <Field label="Persönlichkeit">
+        <textarea
+          className={`${inputClass} min-h-16 resize-y`}
+          value={form.personality}
+          onChange={(e) => update("personality", e.target.value)}
+          placeholder="z. B. sarkastisch, loyal, misstrauisch gegenüber Autorität"
+        />
+      </Field>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Setting / Genre">
           <input
@@ -243,15 +252,6 @@ export function CharacterForm({
           value={form.background}
           onChange={(e) => update("background", e.target.value)}
           placeholder="z. B. wuchs in einem Fischerdorf auf, verlor früh die Eltern …"
-        />
-      </Field>
-
-      <Field label="Persönlichkeit">
-        <textarea
-          className={`${inputClass} min-h-16 resize-y`}
-          value={form.personality}
-          onChange={(e) => update("personality", e.target.value)}
-          placeholder="z. B. sarkastisch, loyal, misstrauisch gegenüber Autorität"
         />
       </Field>
 
