@@ -1,8 +1,19 @@
 @import "tailwindcss";
 
+/* Dark Mode wird über die Klasse `.dark` am <html> gesteuert (ThemeToggle),
+   nicht über prefers-color-scheme – sonst wäre er nicht umschaltbar. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f7f7f8;
   --foreground: #1a1a1e;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0d0d10;
+  --foreground: #ececee;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -12,11 +23,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0d0d10;
-    --foreground: #ececee;
-  }
+/* Das native Clear-Icon von type="search" (nur WebKit/Blink) ausblenden –
+   die Suche bringt einen eigenen, in allen Browsern gleichen Button mit. */
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 body {

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import ThemeToggle from "./components/ThemeToggle";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,7 +30,11 @@ export default function RootLayout({
     <html
       lang="de"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <header className="border-b border-black/10 dark:border-white/10">
           <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
@@ -49,6 +55,7 @@ export default function RootLayout({
               >
                 Galerie
               </Link>
+              <ThemeToggle />
             </nav>
           </div>
         </header>

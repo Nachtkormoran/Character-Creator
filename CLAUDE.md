@@ -58,6 +58,22 @@ Komponenten sprechen die Routen ausschließlich über die typisierten Helfer in
 /api/generate-image` (liefert Base64-Data-URL) → `POST /api/characters`
 (Prisma) speichern.
 
+**API-Routen:**
+- `POST /api/generate-text`, `POST /api/generate-image` – OpenAI (persistieren
+  nichts).
+- `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional `groupId`).
+- `GET|PATCH|DELETE /api/characters/[id]` – **PATCH ist ein Teil-Update**
+  (`.partial()`): jedes von `name`, `imageData`, `groupId`, `shortDescription`,
+  `description`, `traits` kann einzeln geändert werden. Alle nachträglichen
+  Bearbeitungen in der Galerie laufen darüber.
+- `GET|POST /api/groups`, `DELETE /api/groups/[id]` – Gruppen/Projekte.
+
+**Editierbare Felder:** Name, Kurzbeschreibung, Beschreibung und alle Merkmale
+sind in beiden Ansichten editierbar. In der Erstellen-Ansicht wandern die
+Änderungen in den Charakter-State und werden beim Speichern übernommen; in der
+Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über den
+`withTrait`-Helfer in `schema.ts` (konvertiert `alter` in eine Zahl).
+
 **Zentrale Module in `lib/`:**
 - `schema.ts` – Zod-Schemas & Typen (`CharacterInput`, `CharacterTraits` mit
   `TRAIT_LABELS`, `GeneratedCharacter`, `IMAGE_STYLES`). **Single source of
@@ -73,6 +89,18 @@ Komponenten sprechen die Routen ausschließlich über die typisierten Helfer in
   nur bildrelevante Details extrahiert (bei `includeTextDetails`).
 - `prisma.ts` – Prisma-Client-Singleton **mit better-sqlite3 Driver-Adapter**.
 - `serialize.ts` – DB-Zeile ↔ Client-Form (`StoredCharacter`, `StoredGroup`).
+- `client.ts` – **einziger** Weg, wie Client-Komponenten die API ansprechen
+  (typisierte fetch-Helfer für Generierung, CRUD, Umbenennen, Bild/Inhalt
+  aktualisieren, Gruppen).
+- `templates.ts` – statische Genre-Vorlagen; belegen beim Auswählen im Formular
+  per Merge das `setting`-Feld vor.
+- `image.ts` – `fileToDataUrl` (clientseitig): Bild-Upload einlesen,
+  herunterskalieren, als Data-URL zurückgeben (gleiche Form wie generierte Bilder).
+
+**Nennenswerte Komponenten** (`app/components/`): `CharacterPdf.tsx` erzeugt den
+PDF-Export via `@react-pdf/renderer` (nur Browser, wird in der Galerie
+**dynamisch** importiert); `AutoTextarea.tsx` ist eine randlose, mit dem Inhalt
+mitwachsende Textarea für die editierbaren Textfelder.
 
 **Datenmodell** (`prisma/schema.prisma`): `Character` (Felder `input` und
 `traits` als **JSON-Strings**, `imageData` als Base64-Data-URL, optionale
@@ -95,7 +123,17 @@ Charaktere erhalten). SQLite lokal.
   `GET /api/characters` können mehrere MB groß sein. Lokal ok; für ein späteres
   Vercel-Deployment auf Postgres + Blob-Storage umstellen (Migrationsweg steht in
   der `README.md`).
+- **Dark Mode ist klassenbasiert:** `app/globals.css` definiert
+  `@custom-variant dark (&:where(.dark, .dark *))`, d. h. `dark:`-Utilities
+  hängen an der Klasse `.dark` am `<html>` – **nicht** an
+  `prefers-color-scheme`. Gesetzt wird sie vom blockierenden Inline-Skript
+  (`THEME_INIT_SCRIPT` in `lib/theme.ts`, im `<head>` des Root-Layouts, gegen
+  Theme-Flash) und danach vom `ThemeToggle` (Hell/Dunkel/System, Wahl in
+  `localStorage`). `<html>` trägt deshalb `suppressHydrationWarning`.
 - Pfad-Alias `@/*` zeigt auf den Repo-Root.
+- `@react-pdf/renderer` ist **browser-only** und wird deshalb nur im Klick-Handler
+  **dynamisch** importiert (`await import(".../CharacterPdf")`), nicht statisch –
+  sonst bläht es das Bundle auf bzw. bricht serverseitig.
 - Diese Next.js-Version (16) hat Breaking Changes ggü. älterem Wissen – siehe
   `AGENTS.md` (oben importiert): vor Next-spezifischem Code die Doku unter
   `node_modules/next/dist/docs/` konsultieren.

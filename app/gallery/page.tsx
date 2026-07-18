@@ -29,6 +29,41 @@ import { TraitsTable } from "../components/TraitsTable";
 const controlClass =
   "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
 
+type SortKey = "newest" | "oldest" | "name-asc" | "name-desc";
+
+const SORT_LABELS: Record<SortKey, string> = {
+  newest: "Neueste zuerst",
+  oldest: "Älteste zuerst",
+  "name-asc": "Name A–Z",
+  "name-desc": "Name Z–A",
+};
+
+/**
+ * Kleinschreibung ohne Diakritika, damit „muller" auch „Müller" findet,
+ * „grosse" auch „große" und „osullivan" auch „O'Sullivan".
+ */
+function normalize(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/ß/g, "ss")
+    .replace(/['’‘´`]/g, "")
+    .toLowerCase();
+}
+
+/** Durchsuchbarer Text eines Charakters: Name, beide Texte und alle Merkmale. */
+function searchableText(c: StoredCharacter): string {
+  const { name, kurzbeschreibung, beschreibung, merkmale } = c.character;
+  return normalize(
+    [
+      name,
+      kurzbeschreibung,
+      beschreibung,
+      ...Object.values(merkmale).map(String),
+    ].join(" "),
+  );
+}
+
 /** Erzeugt einen dateisystem-tauglichen Namen für den PDF-Download. */
 function pdfFileName(name: string): string {
   const clean = name
@@ -47,6 +82,8 @@ export default function GalleryPage() {
 
   // Filter: "all" | "none" | groupId
   const [filter, setFilter] = useState<string>("all");
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("newest");
   const [newGroupName, setNewGroupName] = useState("");
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
@@ -69,11 +106,43 @@ export default function GalleryPage() {
   }, [characters]);
   const noneCount = characters.filter((c) => !c.groupId).length;
 
-  const visibleCharacters = characters.filter((c) => {
-    if (filter === "all") return true;
-    if (filter === "none") return c.groupId === null;
-    return c.groupId === filter;
-  });
+  // Suchtext je Charakter einmal vorberechnen – die Beschreibungen sind lang.
+  const searchIndex = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of characters) m.set(c.id, searchableText(c));
+    return m;
+  }, [characters]);
+
+  const visibleCharacters = useMemo(() => {
+    // Mehrere Suchbegriffe werden UND-verknüpft.
+    const terms = normalize(query).split(/\s+/).filter(Boolean);
+
+    const matching = characters.filter((c) => {
+      const inGroup =
+        filter === "all"
+          ? true
+          : filter === "none"
+            ? c.groupId === null
+            : c.groupId === filter;
+      if (!inGroup) return false;
+      if (terms.length === 0) return true;
+      const haystack = searchIndex.get(c.id) ?? "";
+      return terms.every((t) => haystack.includes(t));
+    });
+
+    return matching.sort((a, b) => {
+      switch (sort) {
+        case "oldest":
+          return a.createdAt.localeCompare(b.createdAt);
+        case "name-asc":
+          return a.character.name.localeCompare(b.character.name, "de");
+        case "name-desc":
+          return b.character.name.localeCompare(a.character.name, "de");
+        default:
+          return b.createdAt.localeCompare(a.createdAt);
+      }
+    });
+  }, [characters, filter, query, sort, searchIndex]);
 
   async function handleDelete(id: string) {
     if (!confirm("Diesen Charakter wirklich löschen?")) return;
@@ -179,6 +248,42 @@ export default function GalleryPage() {
           </select>
         </label>
 
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-foreground/60">Sortieren:</span>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortKey)}
+            className={controlClass}
+          >
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+              <option key={key} value={key}>
+                {SORT_LABELS[key]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="relative flex items-center">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Suchen (Name, Text, Merkmale) …"
+            aria-label="Charaktere durchsuchen"
+            className={`${controlClass} w-64`}
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Suche zurücksetzen"
+              className="absolute right-2 text-foreground/40 transition hover:text-foreground"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
         {filter !== "all" && filter !== "none" && (
           <button
             type="button"
@@ -231,8 +336,16 @@ export default function GalleryPage() {
 
       {!loading && !error && characters.length > 0 && visibleCharacters.length === 0 && (
         <div className="rounded-xl border border-dashed border-black/15 p-10 text-center text-foreground/60 dark:border-white/15">
-          Keine Charaktere in dieser Auswahl.
+          {query.trim()
+            ? `Keine Treffer für „${query.trim()}" in dieser Auswahl.`
+            : "Keine Charaktere in dieser Auswahl."}
         </div>
+      )}
+
+      {!loading && !error && query.trim() && visibleCharacters.length > 0 && (
+        <p className="text-sm text-foreground/60">
+          {`${visibleCharacters.length} Treffer für „${query.trim()}"`}
+        </p>
       )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
