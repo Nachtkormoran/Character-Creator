@@ -165,7 +165,11 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
 
 **Referenzbilder:** Optionale Stil-/Motivvorlage pro Generierung, in beiden
 Ansichten über `ReferenceImagePicker`. Sie gilt **nur für die Sitzung** und
-wird nicht am Charakter gespeichert. Beachte: OpenAI erzeugt keine
+wird nicht am Charakter gespeichert. Zwei Quellen: eine Datei vom Rechner oder
+(nur in der Bilder-Ansicht, über die Zusatz-Schaltfläche `onChooseOwn`) ein
+**anderes Bild desselben Charakters**. Letzteres holt bewusst das **Original**
+über `getImage`, nicht das Thumbnail der Kachel – aus demselben Grund, aus dem
+`fileToReferenceDataUrl` verlustfrei kodiert. Beachte: OpenAI erzeugt keine
 stilisierten Bilder identifizierbarer realer Personen – deshalb ist das Feld
 als „Stil- und Motivvorlage" beschriftet, nicht als Ähnlichkeitsfunktion. Bei
 gesetzter Vorlage können die Merkmale aus der Tabelle mit dem Bild kollidieren
@@ -208,7 +212,7 @@ lokal.
   clientseitig in `lib/client.ts` (`saveCharacter`, `addCharacterImage`), damit
   keine Aufrufstelle es vergessen kann; schlägt es fehl, wird ohne gespeichert.
 - **Modale Ebenen und Esc/Klick:** Detailansicht (`z-50`) → Bilder-Ansicht
-  (`z-70`) → Vollbild (`z-80`). Die inneren Ebenen werden **im DOM der
+  (`z-70`) → Vorlagen-Auswahl (`z-75`) → Vollbild (`z-80`). Die inneren Ebenen werden **im DOM der
   äußeren** gerendert, deren Backdrop bei jedem Klick schließt – jede innere
   Ebene braucht daher `stopPropagation` auf ihrem eigenen Backdrop und
   Schließen-Knopf, sonst reißt ein Klick alles mit. Für Esc reicht das nicht:
@@ -216,7 +220,10 @@ lokal.
   registriert wird, hängt sich **während derselben Ereignisausbreitung** wieder
   ein und bekommt denselben Tastendruck ab (beide Ebenen schließen auf einmal).
   Deshalb hängt der Esc-Handler der Bilder-Ansicht **einmalig, in der
-  Capture-Phase** und fragt den Zustand über eine Ref ab.
+  Capture-Phase** und fragt den Zustand über Refs ab. Er entscheidet dort
+  gleich für **alle** Ebenen, welche sich schließt; die Vorlagen-Auswahl hat
+  aus genau diesem Grund **keinen eigenen** Esc-Handler. Neue Zwischenebenen
+  also dort einhängen, nicht mit einem weiteren Listener.
 - Bilder liegen als Base64-Data-URLs direkt in SQLite. Für ein späteres
   Vercel-Deployment auf Postgres + Blob-Storage umstellen (Migrationsweg steht
   in der `README.md`).

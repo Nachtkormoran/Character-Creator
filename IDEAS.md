@@ -111,7 +111,9 @@ Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
 - **Suche & Sortierung** – Volltext über Name, Texte und Merkmale
   (diakritika-tolerant, UND-verknüpft), Sortierung nach Datum und Name.
 - **Referenzbild** – Stil-/Motivvorlage pro Generierung, läuft über
-  `images.edit`. Gilt nur für die Sitzung.
+  `images.edit`. Gilt nur für die Sitzung. Wahlweise eine Datei oder ein
+  anderes Bild desselben Charakters (eigene Schaltfläche in der
+  Bilder-Ansicht).
 - **Einstellungsbereich** – Bildmodell × Qualitätsstufe als Auswahlmatrix mit
   Preisangaben.
 - **Datenbank-Sicherung** – Export und Import der kompletten SQLite-Datei.

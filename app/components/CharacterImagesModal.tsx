@@ -52,35 +52,50 @@ export function CharacterImagesModal({
   /** Id des Bildes, dessen Original gerade fürs Vollbild geladen wird. */
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [lightbox, setLightboxState] = useState<string | null>(null);
+  /** Auswahl einer Vorlage unter den eigenen Bildern des Charakters. */
+  const [ownPicker, setOwnPickerState] = useState(false);
+  /** Id des Bildes, dessen Original gerade als Vorlage geladen wird. */
+  const [ownLoadingId, setOwnLoadingId] = useState<string | null>(null);
 
-  // Spiegelt `lightbox` für den Esc-Handler unten mit – siehe Begründung dort.
+  // Spiegeln den Zustand für den Esc-Handler unten mit – Begründung dort.
   const lightboxRef = useRef(false);
   const setLightbox = useCallback((value: string | null) => {
     lightboxRef.current = value !== null;
     setLightboxState(value);
   }, []);
+  const ownPickerRef = useRef(false);
+  const setOwnPicker = useCallback((value: boolean) => {
+    ownPickerRef.current = value;
+    setOwnPickerState(value);
+  }, []);
 
   /**
-   * Esc schließt die Bilder-Ansicht – aber nur, wenn kein Vollbild offen ist;
-   * dort hat Esc Vorrang, sonst verschwänden beide Ebenen auf einen Tastendruck.
+   * Esc schließt die oberste offene Ebene: Vollbild, sonst Vorlagen-Auswahl,
+   * sonst die Bilder-Ansicht selbst. Sonst verschwänden mehrere Ebenen auf
+   * einen Tastendruck.
    *
-   * Der Listener hängt **einmalig und in der Capture-Phase** und fragt den
-   * Zustand über eine Ref ab. Beides ist nötig:
+   * Der Listener hängt **einmalig und in der Capture-Phase** und fragt die
+   * Zustände über Refs ab. Beides ist nötig:
    *
-   * - Würde er vom Vollbild-Zustand abhängen und neu registriert, käme er zu
+   * - Würde er von den Zuständen abhängen und neu registriert, käme er zu
    *   früh zurück: das Vollbild schließt sich in seinem eigenen Handler, React
    *   hängt diesen Listener daraufhin noch *während derselben* Ausbreitung
    *   wieder ein, und er bekäme denselben Tastendruck ab.
    * - Capture läuft vor dem Handler des Vollbilds (window-capture vor
    *   document-bubble), sieht also verlässlich den Zustand *vor* dem Ereignis.
+   *
+   * Die Vorlagen-Auswahl hat deshalb bewusst **keinen eigenen** Listener,
+   * sondern wird hier mitbehandelt – ein zweiter liefe in genau die Falle.
    */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !lightboxRef.current) onClose();
+      if (e.key !== "Escape" || lightboxRef.current) return;
+      if (ownPickerRef.current) setOwnPicker(false);
+      else onClose();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  }, [onClose, setOwnPicker]);
 
   async function run(action: () => Promise<StoredCharacter>) {
     if (busy) return;
@@ -116,6 +131,27 @@ export function CharacterImagesModal({
   function handleDelete(imageId: string) {
     if (!confirm("Dieses Bild wirklich löschen?")) return;
     run(() => deleteCharacterImage(c.id, imageId));
+  }
+
+  /**
+   * Ein eigenes Bild als Vorlage übernehmen.
+   *
+   * Bewusst das **Original** über `getImage`, nicht das Thumbnail aus der
+   * Kachel: das ist eine verlustbehaftete 640-px-WebP-Fassung, und das Modell
+   * liest die Vorlage aus – Kompressionsartefakte deutet es als gewollte
+   * Bildmerkmale (dieselbe Überlegung wie in `fileToReferenceDataUrl`).
+   */
+  async function chooseAsReference(imageId: string) {
+    setOwnLoadingId(imageId);
+    setError(null);
+    try {
+      setReferenceImage(await getImage(c.id, imageId));
+      setOwnPicker(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Bild laden fehlgeschlagen.");
+    } finally {
+      setOwnLoadingId(null);
+    }
   }
 
   /** Original nachladen und im Vollbild zeigen. */
@@ -268,6 +304,10 @@ export function CharacterImagesModal({
                 value={referenceImage}
                 onChange={setReferenceImage}
                 disabled={busy}
+                // Nur anbieten, wenn es überhaupt etwas zu wählen gibt.
+                onChooseOwn={
+                  c.images.length > 0 ? () => setOwnPicker(true) : undefined
+                }
               />
 
               <div className="flex flex-col gap-2">
@@ -353,6 +393,79 @@ export function CharacterImagesModal({
           )}
         </div>
       </div>
+
+      {/* Vorlagen-Auswahl unter den eigenen Bildern ---------------------- */}
+      {ownPicker && (
+        <div
+          className="fixed inset-0 z-75 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm"
+          // Wie beim Backdrop der Bilder-Ansicht: ohne stopPropagation risse ein
+          // Klick hier die Ebenen darunter mit.
+          onClick={(e) => {
+            e.stopPropagation();
+            setOwnPicker(false);
+          }}
+        >
+          <div
+            className="my-8 w-full max-w-2xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-1 flex items-start justify-between gap-4">
+              <h3 className="text-lg font-semibold tracking-tight">
+                Bild als Vorlage wählen
+              </h3>
+              <button
+                type="button"
+                onClick={() => setOwnPicker(false)}
+                className="shrink-0 rounded-md px-2 py-1 text-foreground/60 transition hover:bg-black/5 dark:hover:bg-white/10"
+                aria-label="Auswahl schließen"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-foreground/60">
+              Das gewählte Bild fließt als Stil- und Motivvorlage in die nächste
+              Erzeugung ein.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {c.images.map((img) => (
+                <button
+                  key={img.id}
+                  type="button"
+                  onClick={() => chooseAsReference(img.id)}
+                  disabled={ownLoadingId !== null}
+                  className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] transition hover:border-foreground/50 disabled:opacity-60 dark:border-white/10 dark:bg-white/[0.03]"
+                >
+                  {img.thumbnail ? (
+                    <Image
+                      src={img.thumbnail}
+                      alt=""
+                      fill
+                      sizes="(max-width: 640px) 50vw, 25vw"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <span className="flex h-full items-center justify-center text-3xl opacity-30">
+                      🧑
+                    </span>
+                  )}
+                  {img.isPrimary && (
+                    <span className="absolute top-1.5 left-1.5 rounded bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background">
+                      Primär
+                    </span>
+                  )}
+                  {ownLoadingId === img.id && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs text-white">
+                      Lade …
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {lightbox && (
         <ImageLightbox

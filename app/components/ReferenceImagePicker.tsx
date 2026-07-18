@@ -15,10 +15,17 @@ export function ReferenceImagePicker({
   value,
   onChange,
   disabled = false,
+  onChooseOwn,
 }: {
   value: string | null;
   onChange: (dataUrl: string | null) => void;
   disabled?: boolean;
+  /**
+   * Öffnet die Auswahl unter den eigenen Bildern des Charakters. Nur gesetzt,
+   * wo es die überhaupt schon gibt – in der Erstellen-Ansicht ist der Charakter
+   * noch nicht gespeichert und hat folglich keine.
+   */
+  onChooseOwn?: () => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,22 +73,35 @@ export function ReferenceImagePicker({
           </button>
         </div>
       ) : (
-        <label
-          className={`rounded-md border border-dashed border-black/20 px-3 py-2 text-center text-sm text-foreground/60 transition dark:border-white/20 ${
-            disabled || loading
-              ? "cursor-not-allowed opacity-50"
-              : "cursor-pointer hover:border-black/40 hover:text-foreground dark:hover:border-white/40"
-          }`}
-        >
-          {loading ? "Lade …" : "Vorlage wählen …"}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFile}
-            disabled={disabled || loading}
-          />
-        </label>
+        <div className="flex flex-col gap-1.5 sm:flex-row">
+          <label
+            className={`flex-1 rounded-md border border-dashed border-black/20 px-3 py-2 text-center text-sm text-foreground/60 transition dark:border-white/20 ${
+              disabled || loading
+                ? "cursor-not-allowed opacity-50"
+                : "cursor-pointer hover:border-black/40 hover:text-foreground dark:hover:border-white/40"
+            }`}
+          >
+            {loading ? "Lade …" : "Datei wählen …"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFile}
+              disabled={disabled || loading}
+            />
+          </label>
+
+          {onChooseOwn && (
+            <button
+              type="button"
+              onClick={onChooseOwn}
+              disabled={disabled || loading}
+              className="flex-1 rounded-md border border-dashed border-black/20 px-3 py-2 text-center text-sm text-foreground/60 transition hover:border-black/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/20 dark:hover:border-white/40"
+            >
+              Eigenes Bild wählen …
+            </button>
+          )}
+        </div>
       )}
 
       {error && (
