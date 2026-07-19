@@ -22,9 +22,12 @@ import { characterFileName } from "@/lib/characterFile";
 import { downloadBlob, safeFileName } from "@/lib/download";
 import { randomName } from "@/lib/names";
 import {
+  DEFAULT_STORY_HOOK_ANCHOR,
+  STORY_HOOK_ANCHORS,
   withTrait,
   type CharacterTraits,
   type GeneratedCharacter,
+  type StoryHookAnchor,
 } from "@/lib/schema";
 import {
   primaryImage,
@@ -539,6 +542,14 @@ function DetailModal({
   const [hooks, setHooks] = useState(c.storyHooks);
   const [hooksBusy, setHooksBusy] = useState(false);
   const [hooksError, setHooksError] = useState<string | null>(null);
+  /**
+   * Wie fest die Ansatzpunkte am Charakter hängen sollen. Nur für diese
+   * Sitzung – die Stufe beschreibt nichts am Charakter, sondern wie man ihn
+   * gerade befragen will, und gehört deshalb nicht in die Datenbank.
+   */
+  const [anchor, setAnchor] = useState<StoryHookAnchor>(
+    DEFAULT_STORY_HOOK_ANCHOR,
+  );
 
   // Text neu erzeugen: Zusatzwunsch (Stil, Perspektive, Schwerpunkt).
   const [rewriteHint, setRewriteHint] = useState("");
@@ -670,7 +681,7 @@ function DetailModal({
     setHooksBusy(true);
     setHooksError(null);
     try {
-      const { ansatzpunkte } = await generateStoryHooks(edited);
+      const { ansatzpunkte } = await generateStoryHooks(edited, anchor);
       setHooks(ansatzpunkte);
     } catch (e) {
       setHooksError(e instanceof Error ? e.message : "Fehler.");
@@ -957,20 +968,45 @@ function DetailModal({
             <h3 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
               Ansatzpunkte für eine Geschichte
             </h3>
-            <button
-              type="button"
-              onClick={deriveHooks}
-              disabled={hooksBusy}
-              title="Leitet aus Beschreibung und Merkmalen drei Ausgangslagen für eine Geschichte ab"
-              className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
-            >
-              {hooksBusy
-                ? "Denkt nach …"
-                : hooks.trim()
-                  ? "✨ Neu ableiten"
-                  : "✨ Ableiten"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-xs">
+                <span className="text-foreground/60">Bindung:</span>
+                <select
+                  value={anchor}
+                  onChange={(e) =>
+                    setAnchor(e.target.value as StoryHookAnchor)
+                  }
+                  title={
+                    STORY_HOOK_ANCHORS.find((a) => a.value === anchor)?.hint
+                  }
+                  className="rounded-md border border-black/15 bg-white px-2 py-1 text-xs outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                >
+                  {STORY_HOOK_ANCHORS.map((a) => (
+                    <option key={a.value} value={a.value}>
+                      {a.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={deriveHooks}
+                disabled={hooksBusy}
+                title="Leitet aus Beschreibung und Merkmalen drei Ausgangslagen für eine Geschichte ab"
+                className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              >
+                {hooksBusy
+                  ? "Denkt nach …"
+                  : hooks.trim()
+                    ? "✨ Neu ableiten"
+                    : "✨ Ableiten"}
+              </button>
+            </div>
           </div>
+          {/* Der Hinweis erklärt die Stufe, ohne dass man das Menü aufklappen muss. */}
+          <p className="mb-2 text-xs text-foreground/50">
+            {STORY_HOOK_ANCHORS.find((a) => a.value === anchor)?.hint}
+          </p>
           <div className="rounded-md border border-black/10 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
             <AutoTextarea
               value={hooks}

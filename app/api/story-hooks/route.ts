@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getOpenAI, TEXT_MODEL } from "@/lib/openai";
 import { buildStoryHooksPrompt } from "@/lib/prompts";
-import { generatedCharacterSchema } from "@/lib/schema";
+import {
+  DEFAULT_STORY_HOOK_ANCHOR,
+  generatedCharacterSchema,
+  storyHookAnchorSchema,
+} from "@/lib/schema";
 
 export const runtime = "nodejs";
 
@@ -21,6 +25,8 @@ export const runtime = "nodejs";
  */
 const bodySchema = z.object({
   character: generatedCharacterSchema,
+  /** Wie fest die Ansatzpunkte am Charakter hängen sollen. */
+  anchor: storyHookAnchorSchema.default(DEFAULT_STORY_HOOK_ANCHOR),
 });
 
 export async function POST(request: Request) {
@@ -46,11 +52,20 @@ export async function POST(request: Request) {
           content:
             "Du bist Dramaturg und Lektor. Du findest in Figuren die Stellen, an denen eine Geschichte ansetzen kann, und antwortest ausschließlich mit den Ansatzpunkten selbst.",
         },
-        { role: "user", content: buildStoryHooksPrompt(parsed.data.character) },
+        {
+          role: "user",
+          content: buildStoryHooksPrompt(
+            parsed.data.character,
+            parsed.data.anchor,
+          ),
+        },
       ],
-      // Hoch: gefragt sind drei verschiedene Richtungen, und wiederholtes
-      // Klicken soll auch etwas anderes bringen als beim ersten Mal.
-      temperature: 1.0,
+      // Gefragt sind drei verschiedene Richtungen, und wiederholtes Klicken
+      // soll etwas anderes bringen als beim ersten Mal. Bei „eng" aber
+      // niedriger: dort ist der Vorrat an zulässigem Material klein (nur was
+      // im Charakter steht), und hohe Temperatur wird dann zu genau dem
+      // Ausweichen ins Erfundene, das die Stufe verhindern soll.
+      temperature: parsed.data.anchor === "eng" ? 0.7 : 1.0,
       max_tokens: 900,
     });
 

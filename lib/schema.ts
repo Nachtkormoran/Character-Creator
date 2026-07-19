@@ -297,6 +297,51 @@ export function inputDisplayValue(
 }
 
 // ---------------------------------------------------------------------------
+// Ansatzpunkte für eine Geschichte
+// ---------------------------------------------------------------------------
+
+/**
+ * Wie fest die Ansatzpunkte am Charakter hängen sollen.
+ *
+ * Ohne diese Wahl driftet das Modell verlässlich ins Allgemeine: ein
+ * Zufallsfund, ein anonymer Hinweis, ein Netz von Intrigen – Aufhänger, die an
+ * jede beliebige Figur passen und deshalb an keiner etwas erzählen. Die Stufe
+ * steuert genau eine Frage: **darf Neues erfunden werden, und wie viel?**
+ *
+ * Default ist `eng`, nicht die Mitte. Wer die Ansatzpunkte gerade erst hat
+ * ableiten lassen, will sehen, was in der Figur schon drinsteckt; auf Effekt
+ * spielen kann man danach immer noch.
+ */
+export const STORY_HOOK_ANCHORS = [
+  {
+    value: "eng",
+    label: "Eng am Charakter",
+    hint: "Nur aus dem, was schon dasteht. Keine neuen Personen, Orte oder Ereignisse.",
+  },
+  {
+    value: "mittel",
+    label: "Etwas Spielraum",
+    hint: "Je Ansatzpunkt ein neues Element, das aus etwas Vorhandenem folgt.",
+  },
+  {
+    value: "frei",
+    label: "Freie Hand",
+    hint: "Der Charakter ist Ausgangspunkt; die Handlung darf weit ausgreifen.",
+  },
+] as const;
+
+export type StoryHookAnchor = (typeof STORY_HOOK_ANCHORS)[number]["value"];
+
+export const DEFAULT_STORY_HOOK_ANCHOR: StoryHookAnchor = "eng";
+
+export const storyHookAnchorSchema = z.enum(
+  STORY_HOOK_ANCHORS.map((a) => a.value) as [
+    StoryHookAnchor,
+    ...StoryHookAnchor[],
+  ],
+);
+
+// ---------------------------------------------------------------------------
 // Vollständiges generiertes Ergebnis
 // ---------------------------------------------------------------------------
 

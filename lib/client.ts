@@ -9,6 +9,7 @@ import type {
   CharacterTraits,
   GeneratedCharacter,
   Settings,
+  StoryHookAnchor,
 } from "./schema";
 import type { StoredCharacter, StoredGroup } from "./serialize";
 
@@ -73,9 +74,19 @@ export function regenerateDescription(
   });
 }
 
-/** Drei Ansatzpunkte für eine Geschichte, als Freitext. */
-export function generateStoryHooks(character: GeneratedCharacter) {
-  return postJson<{ ansatzpunkte: string }>("/api/story-hooks", { character });
+/**
+ * Drei Ansatzpunkte für eine Geschichte, als Freitext. `anchor` bestimmt, wie
+ * fest sie am Charakter hängen – von „nur aus dem, was schon dasteht" bis
+ * „freie Hand".
+ */
+export function generateStoryHooks(
+  character: GeneratedCharacter,
+  anchor: StoryHookAnchor,
+) {
+  return postJson<{ ansatzpunkte: string }>("/api/story-hooks", {
+    character,
+    anchor,
+  });
 }
 
 export function generateImage(

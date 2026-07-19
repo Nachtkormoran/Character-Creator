@@ -1,7 +1,9 @@
+import { DEFAULT_STORY_HOOK_ANCHOR } from "./schema";
 import type {
   CharacterInput,
   CharacterTraits,
   GeneratedCharacter,
+  StoryHookAnchor,
 } from "./schema";
 
 /** Hilfsfunktion: nur ausgefüllte Vorgaben in den Prompt aufnehmen. */
@@ -134,8 +136,33 @@ Antworte mit nichts als dem Text selbst – keine Überschrift, keine Anführung
  * einem Textfeld, das von Hand weitergeschrieben wird. Ein Schema für drei
  * Absätze wäre nur Aufschlag – dieselbe Überlegung wie bei `buildNamePrompt`.
  */
-export function buildStoryHooksPrompt(character: GeneratedCharacter): string {
+export function buildStoryHooksPrompt(
+  character: GeneratedCharacter,
+  anchor: StoryHookAnchor = DEFAULT_STORY_HOOK_ANCHOR,
+): string {
   const m = character.merkmale;
+
+  /**
+   * Der eigentliche Hebel. Ohne ihn greift das Modell zu Aufhängern, die an
+   * jede Figur passen (ein Zufallsfund, ein anonymer Hinweis, ein altes Buch
+   * voller Geheimnisse) – und was überall passt, erzählt nirgends etwas.
+   *
+   * Bewusst als **Verbot plus Nachweispflicht** formuliert, nicht als Bitte um
+   * „mehr Nähe": „bleib nah am Charakter" ist eine Geschmacksangabe, die das
+   * Modell mit ein paar Namensnennungen erfüllt zu haben glaubt. „Erfinde keine
+   * neuen Personen" ist überprüfbar, auch für den Leser.
+   */
+  const bindung: Record<StoryHookAnchor, string> = {
+    eng: `- Jeder Ansatzpunkt muss auf einer Stelle beruhen, die oben schon steht – in der Beschreibung oder in den Eckdaten. Setze diese Stelle am Ende in Klammern dahinter, in wenigen Worten.
+- Erfinde **keine** neuen Personen, Orte, Gegenstände oder Ereignisse. Arbeite ausschließlich mit dem, was der Charakter mitbringt: seiner Vorgeschichte, seiner Arbeit, seinen Beziehungen, seinen Interessen, den Widersprüchen in seinem Wesen.
+- Keine Geheimnisse, Verschwörungen, Zufallsfunde oder anonymen Hinweise. Die Spannung entsteht daraus, dass der Charakter ist, wie er ist – nicht daraus, dass ihm etwas zustößt.
+- Der Alltag reicht als Schauplatz. Ein ungeklärtes Verhältnis oder eine anstehende Entscheidung ist ein vollwertiger Ansatzpunkt.`,
+    mittel: `- Jeder Ansatzpunkt geht von etwas aus, das oben schon steht, und darf **ein** neues Element hinzufügen (eine Person, einen Vorfall, eine Gelegenheit).
+- Dieses neue Element muss sich aus dem Vorhandenen ergeben und nicht bloß dazukommen: Es soll den Charakter genau dort treffen, wo er verwundbar oder ehrgeizig ist.
+- Keine großen Zufälle. Wenn etwas passiert, dann weil dieser Charakter so lebt, wie er lebt.`,
+    frei: `- Der Charakter ist der Ausgangspunkt, die Handlung darf von dort aus weit ausgreifen – neue Personen, Orte und Ereignisse sind erlaubt.
+- Auch dann muss erkennbar bleiben, warum es **diese** Figur trifft und keine andere.`,
+  };
 
   const eckdaten =
     line("Alter", String(m.alter)) +
@@ -156,11 +183,13 @@ ${eckdaten || "- (keine)\n"}
 Beschreibung:
 ${character.beschreibung}
 
-Anforderungen:
+Bindung an den Charakter – das ist die wichtigste Anforderung:
+${bindung[anchor]}
+
+Weitere Anforderungen:
 - Genau drei Ansatzpunkte, nummeriert (1., 2., 3.), je zwei bis vier Sätze.
 - Jeder beginnt mit einer knappen Überschrift von wenigen Worten, danach ein Doppelpunkt und der Text.
 - Reiner Fließtext ohne Markdown: keine Sternchen, keine Rauten, keine Fettschrift.
-- Jeder muss sich aus etwas Konkretem an diesem Charakter ergeben – aus einem Bruch in seiner Vorgeschichte, einem Widerspruch in seinem Wesen, einer Beziehung oder etwas Unerledigtem. Dieser Anknüpfungspunkt muss im Text erkennbar sein, aber nicht eigens ausgewiesen werden.
 - Drei verschiedene Richtungen, nicht drei Fassungen derselben Idee.
 - Ein Ansatzpunkt ist eine offene Ausgangslage mit einer Spannung, kein fertiges Handlungsgerüst und kein Ende.
 - Auf Deutsch, nüchtern und konkret.

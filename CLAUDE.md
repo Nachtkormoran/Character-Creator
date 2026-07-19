@@ -142,6 +142,23 @@ andere nicht hat (Text die Vorgeschichte, Tabelle die Eckdaten). Die
 Formular-Vorgaben gehen bewusst **nicht** mit: was aus ihnen wurde, steht längst
 im Text.
 
+Davor steht die Wahl **„Bindung"** (`STORY_HOOK_ANCHORS` in `schema.ts`:
+`eng` | `mittel` | `frei`, Default `eng`). Ohne sie driftet das Modell
+verlässlich ins Allgemeine – ein Zufallsfund, ein anonymer Hinweis, ein Netz von
+Intrigen; Aufhänger, die an jede Figur passen und deshalb an keiner etwas
+erzählen. Die Stufe steuert genau eine Frage: **darf Neues erfunden werden, und
+wie viel?** Sie ist deshalb als **Verbot mit Nachweispflicht** formuliert
+(„erfinde keine neuen Personen", „setze die Belegstelle in Klammern dahinter")
+und nicht als Bitte um mehr Nähe – „bleib nah am Charakter" ist eine
+Geschmacksangabe, die das Modell mit ein paar Namensnennungen erfüllt zu haben
+glaubt. Bei `eng` senkt die Route zusätzlich die Temperatur auf 0.7: dort ist
+der Vorrat an zulässigem Material klein, und hohe Temperatur führt dann zu genau
+dem Ausweichen ins Erfundene, das die Stufe verhindern soll.
+
+Die Stufe wird **nicht gespeichert**. Sie beschreibt nichts am Charakter,
+sondern wie man ihn gerade befragen will – anders als die Ansatzpunkte selbst,
+die am Charakter hängen.
+
 Beide Routen liefern **Freitext**, kein Structured Output: eine Beschreibung ist
 ein String und drei Ansatzpunkte landen in einem Textfeld, das von Hand
 weitergeschrieben wird – ein JSON-Schema drumherum wäre reiner Token-Aufschlag
