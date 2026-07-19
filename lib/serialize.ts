@@ -3,8 +3,12 @@ import type {
   CharacterImage,
   Scenario,
 } from "@/app/generated/prisma/client";
-import { normalizeTraits } from "./schema";
-import type { CharacterInput, GeneratedCharacter } from "./schema";
+import { normalizeScenarioDetails, normalizeTraits } from "./schema";
+import type {
+  CharacterInput,
+  GeneratedCharacter,
+  ScenarioDetails,
+} from "./schema";
 
 /** Client-Repräsentation eines einzelnen Bildes. */
 export interface StoredImage {
@@ -99,17 +103,30 @@ export function serializeCharacter(
   };
 }
 
-/** Client-Repräsentation einer Szenario (inkl. Anzahl zugeordneter Charaktere). */
+/** Client-Repräsentation eines Szenarios (inkl. Anzahl zugeordneter Charaktere). */
 export interface StoredScenario {
   id: string;
+  createdAt: string;
   name: string;
+  /**
+   * Die Festlegungen. Immer vollständig – fehlende Felder füllt
+   * `normalizeScenarioDetails` auf, damit die Anzeige keinen Sonderfall
+   * braucht und ein später ergänztes Feld Altbestände nicht bricht.
+   */
+  details: ScenarioDetails;
   count: number;
 }
 
-export function serializeScenario(row: Scenario & { _count?: { characters: number } }): StoredScenario {
+export function serializeScenario(
+  row: Scenario & { _count?: { characters: number } },
+): StoredScenario {
   return {
     id: row.id,
+    createdAt: row.createdAt.toISOString(),
     name: row.name,
+    details: normalizeScenarioDetails(
+      row.details ? JSON.parse(row.details) : {},
+    ),
     count: row._count?.characters ?? 0,
   };
 }

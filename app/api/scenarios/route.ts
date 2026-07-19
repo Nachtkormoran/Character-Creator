@@ -2,11 +2,18 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { serializeScenario } from "@/lib/serialize";
+import { scenarioDetailsSchema } from "@/lib/schema";
 
 export const runtime = "nodejs";
 
+/**
+ * `details` ist optional: das Schnellanlegen in der Galerie schickt nur einen
+ * Namen, das Formular unter `/scenarios` alles. Beides muss gehen – ein
+ * Szenario entsteht oft, bevor feststeht, wo es spielt.
+ */
 const createSchema = z.object({
   name: z.string().trim().min(1, "Der Name darf nicht leer sein.").max(80),
+  details: scenarioDetailsSchema.optional(),
 });
 
 // Alle Szenarien (alphabetisch, inkl. Anzahl zugeordneter Charaktere).
@@ -30,7 +37,12 @@ export async function POST(request: Request) {
       );
     }
     const row = await prisma.scenario.create({
-      data: { name: parsed.data.name },
+      data: {
+        name: parsed.data.name,
+        details: parsed.data.details
+          ? JSON.stringify(parsed.data.details)
+          : null,
+      },
       include: { _count: { select: { characters: true } } },
     });
     return NextResponse.json({ scenario: serializeScenario(row) });

@@ -297,6 +297,81 @@ export function inputDisplayValue(
 }
 
 // ---------------------------------------------------------------------------
+// Szenario (Festlegungen, die für alle enthaltenen Charaktere gelten)
+// ---------------------------------------------------------------------------
+
+/**
+ * Die Festlegungen eines Szenarios.
+ *
+ * Liegen in der Spalte `Scenario.details` als **JSON-String**, nicht als
+ * einzelne Tabellenspalten – dasselbe Muster wie `Character.traits` und
+ * `Character.input`, und aus demselben Grund: hier kommen weitere Felder dazu,
+ * und jedes davon wäre sonst eine eigene Migration. So ist ein neues Feld zwei
+ * Zeilen (hier und in `SCENARIO_LABELS`).
+ *
+ * Der **Name** bleibt dagegen eine echte Spalte: nach ihm wird sortiert, und er
+ * ist die Identität des Szenarios, nicht eine seiner Eigenschaften.
+ *
+ * Alles ist optional und darf leer bleiben. Ein Szenario entsteht oft, bevor
+ * feststeht, wo es spielt – ein Pflichtfeld würde nur zu Platzhaltern führen.
+ */
+export const scenarioDetailsSchema = z.object({
+  genre: z.string().trim().max(60).optional().default(""),
+  ort: z.string().trim().max(300).optional().default(""),
+  zeit: z.string().trim().max(200).optional().default(""),
+  regeln: z.string().trim().max(4000).optional().default(""),
+});
+
+export type ScenarioDetails = z.infer<typeof scenarioDetailsSchema>;
+
+/**
+ * Reihenfolge & Anzeigenamen der Szenario-Felder. Wie bei `TRAIT_LABELS` ist
+ * diese Karte zugleich die Feldliste der Anzeige: Szenarien aus älteren
+ * Ständen haben nicht alle Schlüssel, und über die Labels zu laufen zeigt sie
+ * als leer an, statt sie stillschweigend zu unterschlagen.
+ */
+export const SCENARIO_LABELS: Record<keyof ScenarioDetails, string> = {
+  genre: "Genre",
+  ort: "Ort",
+  zeit: "Zeit",
+  regeln: "Regeln",
+};
+
+/**
+ * Kurzer Hinweis je Feld – steht unter dem Eingabefeld im Formular. Getrennt
+ * von den Labels, weil die Labels auch in der reinen Anzeige verwendet werden,
+ * wo eine Ausfüllhilfe nur stören würde.
+ */
+export const SCENARIO_HINTS: Record<keyof ScenarioDetails, string> = {
+  genre: "Bestimmt später Namen, Hintergründe und Berufe der Charaktere.",
+  ort: "Wo spielt es? Stadt, Region, Welt – so genau, wie es schon feststeht.",
+  zeit: "Epoche, Jahr oder Jahreszeit – z. B. Spätherbst 1923.",
+  regeln:
+    "Was in diesem Szenario gilt und für alle Figuren darin wahr ist – Technikstand, Magie, gesellschaftliche Ordnung, Tabus.",
+};
+
+/** Felder, die im Formular mehrzeilig sind. Alles andere ist einzeilig. */
+export const SCENARIO_MULTILINE: ReadonlySet<keyof ScenarioDetails> = new Set([
+  "ort",
+  "regeln",
+]);
+
+/**
+ * Ergänzt fehlende Felder mit leeren Werten – dieselbe Aufgabe wie
+ * `normalizeTraits`, aus demselben Grund: ein später ergänztes Feld fehlt allen
+ * zuvor gespeicherten Szenarien.
+ */
+export function normalizeScenarioDetails(raw: unknown): ScenarioDetails {
+  const source = (raw ?? {}) as Record<string, unknown>;
+  const result = {} as Record<string, string>;
+  for (const key of Object.keys(SCENARIO_LABELS)) {
+    const value = source[key];
+    result[key] = typeof value === "string" ? value : "";
+  }
+  return result as ScenarioDetails;
+}
+
+// ---------------------------------------------------------------------------
 // Ansatzpunkte für eine Geschichte
 // ---------------------------------------------------------------------------
 

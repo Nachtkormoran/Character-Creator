@@ -8,6 +8,7 @@ import type {
   CharacterInput,
   CharacterTraits,
   GeneratedCharacter,
+  ScenarioDetails,
   Settings,
   StoryHookAnchor,
 } from "./schema";
@@ -389,14 +390,47 @@ export async function listScenarios(): Promise<StoredScenario[]> {
   return data.scenarios as StoredScenario[];
 }
 
-export async function createScenario(name: string): Promise<StoredScenario> {
+/**
+ * `details` ist optional, weil es zwei Wege zum Anlegen gibt: das Feld in der
+ * Galerie kennt nur den Namen (man ordnet gerade einen Charakter zu und will
+ * nicht in ein Formular gedrängt werden), das Formular unter `/scenarios`
+ * kennt alles.
+ */
+export async function createScenario(
+  name: string,
+  details?: ScenarioDetails,
+): Promise<StoredScenario> {
   const res = await fetch("/api/scenarios", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, ...(details ? { details } : {}) }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Szenario anlegen fehlgeschlagen.");
+  return data.scenario as StoredScenario;
+}
+
+/** Einzelnes Szenario samt seiner Charaktere (ohne Bild-Originale). */
+export async function getScenario(
+  id: string,
+): Promise<{ scenario: StoredScenario; characters: StoredCharacter[] }> {
+  const res = await fetch(`/api/scenarios/${id}`, { cache: "no-store" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Laden fehlgeschlagen.");
+  return data as { scenario: StoredScenario; characters: StoredCharacter[] };
+}
+
+export async function updateScenario(
+  id: string,
+  patch: { name?: string; details?: ScenarioDetails },
+): Promise<StoredScenario> {
+  const res = await fetch(`/api/scenarios/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Speichern fehlgeschlagen.");
   return data.scenario as StoredScenario;
 }
 

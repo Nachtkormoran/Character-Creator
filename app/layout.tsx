@@ -56,6 +56,12 @@ export default function RootLayout({
                 Charaktere
               </Link>
               <Link
+                href="/scenarios"
+                className="text-foreground/70 transition-colors hover:text-foreground"
+              >
+                Szenarien
+              </Link>
+              <Link
                 href="/settings"
                 className="text-foreground/70 transition-colors hover:text-foreground"
               >

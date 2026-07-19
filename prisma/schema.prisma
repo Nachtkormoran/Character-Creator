@@ -33,7 +33,18 @@ model Setting {
 model Scenario {
   id         String      @id @default(cuid())
   createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  // Der Name ist die Identität des Szenarios (und das Sortierkriterium),
+  // deshalb eine echte Spalte.
   name       String
+
+  // Alle übrigen Festlegungen (Genre, Ort, Zeit, Regeln …) als JSON-String,
+  // wie `Character.traits` und `Character.input`. Hier kommen weitere Felder
+  // dazu, und jedes einzelne wäre sonst eine eigene Migration.
+  // Optional: Szenarien von vor diesem Feld haben keine Festlegungen.
+  details    String?
+
   characters Character[]
 }
 

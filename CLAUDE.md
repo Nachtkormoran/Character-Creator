@@ -43,8 +43,9 @@ npx prisma generate    # Prisma-Client neu generieren (nach Schema-Änderungen)
 Next.js 16 **App Router**, React 19, TypeScript, Tailwind v4 (rein CSS-basiert
 über `@import "tailwindcss"` in `app/globals.css`, **keine** `tailwind.config`).
 
-Drei Seiten: `/` (Erstellen; Client-Komponente mit Umschaltung Formular-/
-Ergebnis-Ansicht), `/gallery` und `/settings`.
+Seiten: `/` (Erstellen; Client-Komponente mit Umschaltung Formular-/
+Ergebnis-Ansicht), `/gallery`, `/scenarios` (+ `/scenarios/[id]`) und
+`/settings`.
 
 **Server/Client-Trennung:** Sämtlicher OpenAI- und DB-Zugriff liegt in den
 API-Routen unter `app/api/*` (Node-Runtime). Der OpenAI-Key wird nur
@@ -84,7 +85,10 @@ neu erzeugten oder hochgeladenen Bild wieder scharf.
   PATCH `{ isPrimary: true }` wählt das Primärbild; DELETE löscht das Bild.
   Alle drei schreibenden Routen geben den vollständigen, aktualisierten
   Charakter zurück, damit der Client seinen Zustand einfach ersetzen kann.
-- `GET|POST /api/scenarios`, `DELETE /api/scenarios/[id]` – Szenarien.
+- `GET|POST /api/scenarios` – Liste / Anlegen (`details` optional, s. u.).
+- `GET|PATCH|DELETE /api/scenarios/[id]` – **GET liefert das Szenario samt
+  seiner Charaktere** (ohne Bild-Originale, nur Thumbnails – wie die
+  Charakter-Liste); PATCH ist ein Teil-Update von `name` und `details`.
 - `GET|PATCH /api/settings` – App-Einstellungen (`imageModel`, `imageQuality`).
 - `GET|POST /api/backup` – Datenbank sichern / wiederherstellen. **POST
   ersetzt den gesamten Bestand** (Bestätigung passiert in der UI).
@@ -176,6 +180,41 @@ Knopfdruck). Deshalb führt die Detailansicht sie in einem eigenen State neben
 `edited` und teilt mit ihm nur den Speichern-Knopf; `updateCharacterContent`
 nimmt sie als **optionalen** dritten Parameter, und bleibt er weg, rührt der
 Teil-PATCH das Feld nicht an.
+
+**Szenarien:** Ein Szenario fasst Charaktere für eine Geschichte zusammen und
+hält fest, was für sie alle gilt. Eigener Bereich unter `/scenarios`
+(Übersicht mit Anlege-Formular) und `/scenarios/[id]` (Detailansicht:
+Festlegungen bearbeiten, zugeordnete Charaktere als Kacheln, Löschen).
+
+**Die Festlegungen liegen als JSON-String in `Scenario.details`**, nicht als
+einzelne Spalten – dasselbe Muster wie `Character.traits` und
+`Character.input`, und aus demselben Grund: hier kommen weitere Felder dazu,
+und jedes einzelne wäre sonst eine Migration. Ein neues Feld kostet **zwei
+Zeilen** in `schema.ts` (`scenarioDetailsSchema` + `SCENARIO_LABELS`, dazu
+optional ein Hinweis in `SCENARIO_HINTS` und ein Eintrag in
+`SCENARIO_MULTILINE`); Formular, Detailansicht und die Zusammenfassungszeile
+der Übersicht ziehen automatisch mit, weil alle drei über `SCENARIO_LABELS`
+laufen statt über die Schlüssel des Objekts. `normalizeScenarioDetails` füllt
+fehlende Felder beim Lesen auf – Altbestände kennen ein neues Feld nicht.
+
+Der **Name** bleibt dagegen eine echte Spalte: nach ihm wird sortiert, und er
+ist die Identität des Szenarios, nicht eine seiner Eigenschaften.
+
+**Zwei Wege zum Anlegen**, beide gewollt: das Feld in der Galerie schickt nur
+einen Namen (man ordnet gerade einen Charakter zu und will nicht in ein
+Formular gedrängt werden), das Formular unter `/scenarios` schickt alles.
+Deshalb ist `details` beim POST optional. Alle Felder dürfen leer bleiben – ein
+Szenario entsteht oft, bevor feststeht, wo es spielt, und ein Pflichtfeld führte
+nur zu Platzhaltern.
+
+Das **Genre** kommt aus `GENRE_TEMPLATES` (`templates.ts`), derselben Liste wie
+die Vorlagen im Erstellen-Formular. Gespeichert wird die Id, angezeigt das
+Label. Beide Seiten müssen dieselben Genres kennen, sonst stünde im Szenario
+„Steampunk" und im Charakter-Formular etwas, das nicht dazu passt.
+
+**Noch offen:** Die Festlegungen werden bisher nur gespeichert und angezeigt –
+sie fließen **nicht** in die Generierung ein. Das ist der nächste Schritt und
+die eigentliche Absicht hinter dem Bereich.
 
 **Vorgaben-Ansicht:** Die Formular-Eingaben, aus denen ein Charakter entstanden
 ist, liegen seit jeher in der Spalte `input` (JSON-String) und sind über
@@ -349,7 +388,7 @@ mitwachsende Textarea für die editierbaren Textfelder.
 `CharacterImage`
 (`imageData` als Base64-Data-URL, `thumbnail` als verkleinerte Fassung davon,
 `isPrimary`; `onDelete: Cascade` – Bilder gehen mit dem Charakter),
-`Scenario` (`onDelete: SetNull` – beim Löschen des Szenarios bleiben
+`Scenario` (`details` als JSON-String, `onDelete: SetNull` – beim Löschen des Szenarios bleiben
 Charaktere erhalten) und `Setting` (Key-Value für App-Einstellungen). SQLite
 lokal.
 
