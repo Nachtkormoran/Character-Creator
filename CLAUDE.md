@@ -67,7 +67,7 @@ neu erzeugten oder hochgeladenen Bild wieder scharf.
 **API-Routen:**
 - `POST /api/generate-text`, `POST /api/generate-image`,
   `POST /api/generate-name`, `POST /api/regenerate-text`,
-  `POST /api/scenario-description`,
+  `POST /api/scenario-description`, `POST /api/scenario-plot`,
   `POST /api/story-hooks` – OpenAI (persistieren nichts).
 - `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional
   `scenarioId`, `imageData` und `thumbnail`; ein mitgegebenes Bild wird das erste
@@ -248,9 +248,36 @@ die Vorlagen im Erstellen-Formular. Gespeichert wird die Id, angezeigt das
 Label. Beide Seiten müssen dieselben Genres kennen, sonst stünde im Szenario
 „Steampunk" und im Charakter-Formular etwas, das nicht dazu passt.
 
-**Noch offen:** Die Festlegungen werden bisher nur gespeichert und angezeigt –
-sie fließen **nicht** in die Generierung ein. Das ist der nächste Schritt und
-die eigentliche Absicht hinter dem Bereich.
+Der **Handlungsentwurf** (`POST /api/scenario-plot`) ist das Gegenstück zur
+Beschreibung und die **einzige Stelle im Projekt, an der mehrere Figuren
+zugleich betrachtet werden**. Bis dahin stand jeder Charakter für sich: eigene
+Beschreibung, eigene Ansatzpunkte, die einander nie begegneten. Hier treffen
+sie aufeinander – die `storyHooks` der zugeordneten Charaktere sind das
+eigentliche Material des Prompts.
+
+Drei Zuschnitte, die zusammengehören:
+- Die **Charaktere lädt die Route selbst** über die `scenarioId`, statt sie im
+  Request entgegenzunehmen. Sonst hätte sie eine zweite Wahrheit über den
+  Bestand, und der Client müsste alle Figuren mitschicken.
+- Die **Festlegungen kommen dagegen aus dem Request**: in der Detailansicht
+  können sie ungespeichert geändert sein, und wer gerade die Regeln
+  umgeschrieben hat, meint die neuen.
+- **Ohne zugeordnete Charaktere antwortet die Route mit 400** und einem
+  Hinweis, was zu tun ist. Ein Handlungsentwurf über niemanden wäre teurer
+  Unsinn. Aus demselben Grund ist der Knopf im **Anlege-Formular gar nicht
+  vorhanden** – dort gibt es weder Id noch Besetzung.
+
+Welche Felder einen KI-Knopf bekommen, bestimmt die **aufrufende Seite** über
+`generatable` (ein `Set` von Feldnamen), nicht `ScenarioFields`. Die Komponente
+bleibt darstellend: sie kennt kein `fetch` und ruft nur `onGenerate(key)`.
+Während ein Feld erzeugt wird, sind **alle** Knöpfe gesperrt – die Erzeugung
+liest die übrigen Felder mit, und zwei gleichzeitige Läufe säßen auf
+verschiedenen Ständen.
+
+**Noch offen:** Die Festlegungen fließen bisher nur in die Szenario-eigenen
+Texte ein (Beschreibung, Handlungsentwurf), **nicht** in die
+Charakter-Generierung. Ein Charakter, der einem Szenario zugeordnet ist, weiß
+nichts von dessen Ort, Zeit und Regeln.
 
 **Vorgaben-Ansicht:** Die Formular-Eingaben, aus denen ein Charakter entstanden
 ist, liegen seit jeher in der Spalte `input` (JSON-String) und sind über

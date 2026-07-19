@@ -245,6 +245,103 @@ ${zusatzBlock}
 Antworte mit nichts als dem Text selbst – keine Überschrift, keine Aufzählung, kein Markdown.`;
 }
 
+/** Was der Handlungsentwurf von einem Charakter braucht. */
+export interface PlotCharacter {
+  name: string;
+  kurzbeschreibung: string;
+  beruf: string;
+  wohnort: string;
+  persoenlichkeit: string;
+  /** Die Ansatzpunkte der Figur – hier das wichtigste Material. */
+  storyHooks: string;
+}
+
+/**
+ * Baut den Prompt für den **Handlungsentwurf** eines Szenarios.
+ *
+ * Das Gegenstück zu `buildScenarioDescriptionPrompt`: Die Beschreibung bekommt
+ * die Charaktere bewusst **nicht**, weil sie die Welt beschreiben soll und
+ * nicht den heutigen Bestand. Dieser Prompt bekommt sie **ausdrücklich** – er
+ * fragt genau danach, wer hier mit wem worüber aneinandergerät. Es ist die
+ * einzige Stelle im Projekt, an der mehrere Figuren zugleich betrachtet werden.
+ *
+ * Die **Ansatzpunkte** der Figuren gehen mit und sind das eigentliche Material.
+ * Bisher standen sie unverbunden nebeneinander: drei Ausgangslagen je Person,
+ * die einander nie begegneten. Hier treffen sie aufeinander.
+ *
+ * Der Entwurf darf **keine neuen Hauptfiguren erfinden**. Sonst wäre er ein
+ * Vorschlag für eine andere Besetzung, und die vorhandenen Charaktere – der
+ * ganze Grund für das Szenario – wären Statisten in ihrer eigenen Geschichte.
+ */
+export function buildScenarioPlotPrompt(
+  name: string,
+  details: {
+    genre?: string;
+    ort?: string;
+    zeit?: string;
+    regeln?: string;
+    beschreibung?: string;
+  },
+  characters: PlotCharacter[],
+  zusatz?: string,
+): string {
+  const welt =
+    line("Szenario", name) +
+    line("Genre", details.genre) +
+    line("Ort", details.ort) +
+    line("Zeit", details.zeit) +
+    line("Regeln", details.regeln);
+
+  const weltText = details.beschreibung?.trim()
+    ? `\nBeschreibung der Welt:\n${details.beschreibung.trim()}\n`
+    : "";
+
+  const figuren = characters
+    .map((c, i) => {
+      const kopf =
+        `${i + 1}. ${c.name}` +
+        [c.beruf, c.wohnort].filter(Boolean).map((v) => ` – ${v}`).join("");
+      const zeilen = [
+        c.kurzbeschreibung && `   ${c.kurzbeschreibung}`,
+        c.persoenlichkeit && `   Wesen: ${c.persoenlichkeit}`,
+        // Eingerückt, damit erkennbar bleibt, welche Ansatzpunkte zu wem
+        // gehören – bei sechs Figuren sonst nicht mehr auseinanderzuhalten.
+        c.storyHooks &&
+          `   Offene Ansatzpunkte:\n${c.storyHooks
+            .split("\n")
+            .filter((z) => z.trim())
+            .map((z) => `     ${z.trim()}`)
+            .join("\n")}`,
+      ].filter(Boolean);
+      return [kopf, ...zeilen].join("\n");
+    })
+    .join("\n\n");
+
+  const zusatzBlock = zusatz?.trim()
+    ? `\nBesonders wichtig – zusätzliche Wünsche für diesen Entwurf:\n${zusatz.trim()}\n`
+    : "";
+
+  return `Entwirf die Handlung für ein Szenario: die Ausgangslage, aus der sich eine Geschichte zwischen diesen Figuren entwickeln kann.
+
+Die Welt steht fest:
+${welt}${weltText}
+Diese Figuren gibt es, und nur diese:
+
+${figuren}
+
+Anforderungen:
+- Drei bis vier kurze Absätze (insgesamt ca. 900–1400 Zeichen).
+- **Erfinde keine neuen Hauptfiguren.** Arbeite mit den Genannten. Nebenfiguren dürfen vorkommen, aber die Handlung muss von diesen Personen getragen werden.
+- Benenne, **wer was von wem will** und woran es sich entzündet. Ein Konflikt braucht mindestens zwei Personen mit unvereinbaren Absichten.
+- Greife die offenen Ansatzpunkte der Figuren auf und verbinde sie: Das Interessante entsteht dort, wo das Anliegen der einen die Wunde der anderen trifft.
+- Nenne einen konkreten **Auslöser** – ein Ereignis, ein Termin, eine Nachricht –, der die Lage in Bewegung bringt.
+- Alles muss den Regeln des Szenarios gehorchen. Was dort gilt, gilt auch hier.
+- Kein fertiger Plot mit Auflösung: eine Ausgangslage mit offenem Ausgang. Schreibe nicht, wie es endet.
+- Reiner Fließtext auf Deutsch, ohne Markdown, ohne Überschriften, ohne Aufzählung.
+${zusatzBlock}
+Antworte mit nichts als dem Entwurf selbst.`;
+}
+
 /**
  * Baut den Prompt für einen einzelnen Namensvorschlag.
  *

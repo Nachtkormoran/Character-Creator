@@ -31,9 +31,9 @@ export function genreLabel(id: string): string {
 function summary(details: ScenarioDetails): string {
   return (Object.keys(SCENARIO_LABELS) as Array<keyof ScenarioDetails>)
     .map((key) => {
-      // Die Beschreibung bleibt draußen: sie ist der längste Text von allen
-      // und würde die Zeile allein füllen. Hier stehen die Eckdaten.
-      if (key === "beschreibung") return null;
+      // Die langen Texte bleiben draußen: sie würden die Zeile allein füllen.
+      // Hier stehen die Eckdaten.
+      if (key === "beschreibung" || key === "handlung") return null;
       const value = details[key]?.trim();
       if (!value) return null;
       if (key === "genre") return genreLabel(value);
@@ -58,21 +58,33 @@ export default function ScenariosPage() {
   const [details, setDetails] = useState<ScenarioDetails>(LEER);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [generatingField, setGeneratingField] = useState<
+    keyof ScenarioDetails | null
+  >(null);
+
+  /**
+   * Im Anlege-Formular ist **nur die Beschreibung** erzeugbar. Der
+   * Handlungsentwurf braucht ein gespeichertes Szenario mit zugeordneten
+   * Charakteren – beides gibt es hier noch nicht. Der Knopf erscheint erst in
+   * der Detailansicht, statt hier zu sitzen und zu scheitern.
+   */
+  const ERZEUGBAR: ReadonlySet<keyof ScenarioDetails> = new Set([
+    "beschreibung",
+  ]);
 
   /**
    * Beschreibung erzeugen. Ein zweiter Klick überschreibt, was im Feld steht –
    * deshalb die Rückfrage, sobald dort schon etwas ist. Von Hand Geschriebenes
    * wäre sonst still weg.
    */
-  async function generateDescription() {
-    if (generating) return;
+  async function handleGenerate(key: keyof ScenarioDetails) {
+    if (generatingField) return;
     if (
-      details.beschreibung.trim() &&
-      !confirm("Die vorhandene Beschreibung wird ersetzt. Fortfahren?")
+      details[key].trim() &&
+      !confirm(`${SCENARIO_LABELS[key]} wird ersetzt. Fortfahren?`)
     )
       return;
-    setGenerating(true);
+    setGeneratingField(key);
     setFormError(null);
     try {
       const { beschreibung } = await generateScenarioDescription(
@@ -83,7 +95,7 @@ export default function ScenariosPage() {
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Fehler.");
     } finally {
-      setGenerating(false);
+      setGeneratingField(null);
     }
   }
 
@@ -166,8 +178,9 @@ export default function ScenariosPage() {
             details={details}
             onChange={setDetails}
             disabled={saving}
-            onGenerateBeschreibung={generateDescription}
-            generating={generating}
+            generatable={ERZEUGBAR}
+            onGenerate={handleGenerate}
+            generatingField={generatingField}
           />
 
           <div className="flex items-center gap-3">

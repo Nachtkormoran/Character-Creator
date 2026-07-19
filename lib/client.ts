@@ -426,6 +426,24 @@ export function generateScenarioDescription(
   });
 }
 
+/**
+ * Handlungsentwurf für ein Szenario. Die Charaktere lädt die Route selbst über
+ * die Id – der Client schickt nur die (womöglich ungespeicherten)
+ * Festlegungen. Braucht ein **gespeichertes** Szenario mit mindestens einem
+ * zugeordneten Charakter, sonst antwortet die Route mit einem Hinweis.
+ */
+export function generateScenarioPlot(
+  scenarioId: string,
+  name: string,
+  details: ScenarioDetails,
+  zusatz = "",
+) {
+  return postJson<{ handlung: string; characters: number }>(
+    "/api/scenario-plot",
+    { scenarioId, name, details, zusatz },
+  );
+}
+
 /** Einzelnes Szenario samt seiner Charaktere (ohne Bild-Originale). */
 export async function getScenario(
   id: string,

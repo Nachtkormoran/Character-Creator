@@ -27,6 +27,13 @@ const WUERFEL: Partial<
   regeln: randomRules,
 };
 
+/** Was der KI-Knopf je Feld tut – als Titel am Knopf. */
+const GENERATE_HINTS: Partial<Record<keyof ScenarioDetails, string>> = {
+  beschreibung: "Erzeugt die Beschreibung aus Genre, Ort, Zeit und Regeln",
+  handlung:
+    "Erzeugt einen Handlungsentwurf aus den Festlegungen und den zugeordneten Charakteren samt ihren Ansatzpunkten",
+};
+
 /**
  * Die Eingabefelder eines Szenarios – geteilt zwischen Anlege-Formular und
  * Detailansicht, damit ein neues Feld an **einer** Stelle sichtbar wird.
@@ -46,19 +53,27 @@ export function ScenarioFields({
   details,
   onChange,
   disabled = false,
-  onGenerateBeschreibung,
-  generating = false,
+  generatable,
+  onGenerate,
+  generatingField = null,
 }: {
   details: ScenarioDetails;
   onChange: (details: ScenarioDetails) => void;
   disabled?: boolean;
   /**
-   * Erzeugt die Beschreibung per KI. Die Anfrage selbst macht die aufrufende
-   * Seite – diese Komponente bleibt darstellend und kennt kein `fetch`.
-   * Fehlt der Handler, erscheint der Knopf nicht.
+   * Welche Felder einen KI-Knopf bekommen. Bewusst von der aufrufenden Seite
+   * bestimmt und nicht hier festgelegt: das Anlege-Formular kann noch keinen
+   * Handlungsentwurf erzeugen (das Szenario hat weder Id noch Charaktere), die
+   * Detailansicht schon. Fehlt ein Feld hier, erscheint kein Knopf.
    */
-  onGenerateBeschreibung?: () => void;
-  generating?: boolean;
+  generatable?: ReadonlySet<keyof ScenarioDetails>;
+  /**
+   * Erzeugt den Inhalt eines Feldes per KI. Die Anfrage macht die aufrufende
+   * Seite – diese Komponente bleibt darstellend und kennt kein `fetch`.
+   */
+  onGenerate?: (key: keyof ScenarioDetails) => void;
+  /** Welches Feld gerade erzeugt wird (für Beschriftung und Sperre). */
+  generatingField?: keyof ScenarioDetails | null;
 }) {
   const set = (key: keyof ScenarioDetails, value: string) =>
     onChange({ ...details, [key]: value });
@@ -88,17 +103,20 @@ export function ScenarioFields({
                   🎲 Würfeln
                 </button>
               )}
-              {key === "beschreibung" && onGenerateBeschreibung && (
+              {generatable?.has(key) && onGenerate && (
                 <button
                   type="button"
-                  onClick={onGenerateBeschreibung}
-                  disabled={disabled || generating}
-                  title="Erzeugt die Beschreibung aus Genre, Ort, Zeit und Regeln"
+                  onClick={() => onGenerate(key)}
+                  // Während irgendein Feld erzeugt wird, sind alle Knöpfe
+                  // gesperrt: die Erzeugung liest die übrigen Felder mit, und
+                  // zwei gleichzeitige Läufe säßen auf verschiedenen Ständen.
+                  disabled={disabled || generatingField !== null}
+                  title={GENERATE_HINTS[key]}
                   className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
                 >
-                  {generating
+                  {generatingField === key
                     ? "Schreibt …"
-                    : details.beschreibung.trim()
+                    : details[key].trim()
                       ? "✨ Neu erzeugen"
                       : "✨ Erzeugen"}
                 </button>

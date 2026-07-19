@@ -7,10 +7,15 @@ import { useRouter } from "next/navigation";
 import {
   deleteScenario,
   generateScenarioDescription,
+  generateScenarioPlot,
   getScenario,
   updateScenario,
 } from "@/lib/client";
-import { normalizeScenarioDetails, type ScenarioDetails } from "@/lib/schema";
+import {
+  SCENARIO_LABELS,
+  normalizeScenarioDetails,
+  type ScenarioDetails,
+} from "@/lib/schema";
 import { primaryImage, type StoredCharacter } from "@/lib/serialize";
 import { ScenarioFields } from "../../components/ScenarioFields";
 
@@ -37,32 +42,50 @@ export default function ScenarioDetailPage({
   const [saved, setSaved] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
+  const [generatingField, setGeneratingField] = useState<
+    keyof ScenarioDetails | null
+  >(null);
+
+  /** Hier sind beide Textfelder erzeugbar – das Szenario ist gespeichert. */
+  const ERZEUGBAR: ReadonlySet<keyof ScenarioDetails> = new Set([
+    "beschreibung",
+    "handlung",
+  ]);
 
   /**
-   * Beschreibung erzeugen. Landet als **ungespeicherte Änderung** im Formular –
-   * wie überall sonst muss „Verwerfen" den alten Text zurückbringen können.
-   * Die Rückfrage schützt eine von Hand geschriebene Beschreibung.
+   * Ein Textfeld per KI erzeugen. Das Ergebnis landet als **ungespeicherte
+   * Änderung** im Formular – wie überall sonst muss „Verwerfen" den alten Text
+   * zurückbringen können. Die Rückfrage schützt von Hand Geschriebenes.
+   *
+   * Die Festlegungen gehen im **aktuellen, womöglich ungespeicherten** Stand
+   * mit: wer gerade die Regeln umgeschrieben hat, meint die neuen. Die
+   * Charaktere für den Handlungsentwurf lädt dagegen die Route selbst – die
+   * gespeicherte Zuordnung ist dort die einzige, die es gibt.
    */
-  async function generateDescription() {
-    if (generating) return;
+  async function handleGenerate(key: keyof ScenarioDetails) {
+    if (generatingField) return;
     if (
-      details.beschreibung.trim() &&
-      !confirm("Die vorhandene Beschreibung wird ersetzt. Fortfahren?")
+      details[key].trim() &&
+      !confirm(`${SCENARIO_LABELS[key]} wird ersetzt. Fortfahren?`)
     )
       return;
-    setGenerating(true);
+    setGeneratingField(key);
     setSaveError(null);
     try {
-      const { beschreibung } = await generateScenarioDescription(
-        name.trim(),
-        details,
-      );
-      setDetails((d) => ({ ...d, beschreibung }));
+      if (key === "handlung") {
+        const { handlung } = await generateScenarioPlot(id, name.trim(), details);
+        setDetails((d) => ({ ...d, handlung }));
+      } else {
+        const { beschreibung } = await generateScenarioDescription(
+          name.trim(),
+          details,
+        );
+        setDetails((d) => ({ ...d, beschreibung }));
+      }
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Fehler.");
     } finally {
-      setGenerating(false);
+      setGeneratingField(null);
     }
   }
 
@@ -190,8 +213,9 @@ export default function ScenarioDetailPage({
           details={details}
           onChange={setDetails}
           disabled={saving}
-          onGenerateBeschreibung={generateDescription}
-          generating={generating}
+          generatable={ERZEUGBAR}
+          onGenerate={handleGenerate}
+          generatingField={generatingField}
         />
       </section>
 

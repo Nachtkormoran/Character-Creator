@@ -321,6 +321,7 @@ export const scenarioDetailsSchema = z.object({
   zeit: z.string().trim().max(200).optional().default(""),
   regeln: z.string().trim().max(4000).optional().default(""),
   beschreibung: z.string().trim().max(4000).optional().default(""),
+  handlung: z.string().trim().max(4000).optional().default(""),
 });
 
 export type ScenarioDetails = z.infer<typeof scenarioDetailsSchema>;
@@ -336,9 +337,12 @@ export const SCENARIO_LABELS: Record<keyof ScenarioDetails, string> = {
   ort: "Ort",
   zeit: "Zeit",
   regeln: "Regeln",
-  // Steht **hinter** den übrigen Feldern, weil sie ihre Grundlage sind: die
-  // Beschreibung wird aus ihnen erzeugt, nicht umgekehrt.
+  // Stehen **hinter** den übrigen Feldern, weil sie ihre Grundlage sind: beide
+  // werden aus ihnen erzeugt, nicht umgekehrt. Der Handlungsentwurf kommt
+  // zuletzt, weil er zusätzlich die Charaktere braucht – er ist das einzige
+  // Feld im Projekt, das mehrere Figuren zugleich betrachtet.
   beschreibung: "Beschreibung",
+  handlung: "Handlungsentwurf",
 };
 
 /**
@@ -354,6 +358,8 @@ export const SCENARIO_HINTS: Record<keyof ScenarioDetails, string> = {
     "Was in diesem Szenario gilt und für alle Figuren darin wahr ist – Technikstand, Magie, gesellschaftliche Ordnung, Tabus.",
   beschreibung:
     "Fließtext über die Welt des Szenarios. Lässt sich aus den Feldern darüber erzeugen und danach frei bearbeiten.",
+  handlung:
+    "Wer gerät hier mit wem worüber aneinander? Lässt sich aus den Festlegungen und den zugeordneten Charakteren erzeugen – dafür muss das Szenario gespeichert sein und Figuren enthalten.",
 };
 
 /** Felder, die im Formular mehrzeilig sind. Alles andere ist einzeilig. */
@@ -361,6 +367,7 @@ export const SCENARIO_MULTILINE: ReadonlySet<keyof ScenarioDetails> = new Set([
   "ort",
   "regeln",
   "beschreibung",
+  "handlung",
 ]);
 
 /**
