@@ -221,7 +221,8 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   passen (Körper und Auftreten statt konkreter Kleidungsstücke). Das Aussehen
   verbindet mit **Semikolon**, weil seine Einträge selbst Kommas enthalten
   („silbergraues Haar, mit Stolz getragen").
-  **Das Aussehen hat drei Listen zu je 100:** `FEMALE_APPEARANCE`,
+  **Das Aussehen hat drei Listen zu je rund 100 Einträgen** (die Länge ist
+  nirgends fixiert, die Listen dürfen wachsen): `FEMALE_APPEARANCE`,
   `MALE_APPEARANCE` und `NEUTRAL_APPEARANCE`. `randomAppearance(gender)` zieht
   2–3 geschlechtsspezifische plus 1–2 neutrale Merkmale. Das Geschlecht ist
   **Freitext** und wird wie in `names.ts` per `startsWith` geprüft, damit auch

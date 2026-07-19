@@ -51,3 +51,9 @@ next-env.d.ts
 
 /Reference Pics
 
+
+# Konversations-Mitschriften, die scripts/transcript.mjs erzeugt.
+# Das Skript gehört ins Repo, seine Ausgabe nicht: je ~270 KB, reiner
+# Arbeitsverlauf, und das Repo ist öffentlich.
+GESPRAECH.md
+VERLAUF.md

@@ -1,10 +1,12 @@
 /**
  * Bausteine für die Würfel-Knöpfe an den Freitextfeldern „Aussehen" und
- * „Persönlichkeit". Je 100 Einträge, rein lokal wie `names.ts` und
- * `professions.ts`. Der Hintergrund steht in `backgrounds.ts`, weil er als
- * Einziges nach Genre getrennt ist.
+ * „Persönlichkeit". Rund 100 Einträge je Liste, rein lokal wie `names.ts` und
+ * `professions.ts`. Die Längen sind bewusst nicht fixiert – `pickSome` zieht
+ * aus der Liste, wie lang sie auch ist, und jede Liste darf jederzeit wachsen.
+ * Der Hintergrund steht in `backgrounds.ts`, weil er als Einziges nach Genre
+ * getrennt ist.
  *
- * Beim Aussehen sind es **drei** Listen zu je 100: eine für weibliche, eine
+ * Beim Aussehen sind es **drei** Listen: eine für weibliche, eine
  * für männliche Charaktere und eine, die für beide gilt. Das ist der einzige
  * Bereich, in dem das Geschlecht zählt – Bart, Haarschnitt und Schnitt der
  * Kleidung lesen sich sonst falsch. Augen, Narben und Gewohnheiten sind davon
@@ -96,6 +98,13 @@ export const FEMALE_APPEARANCE: string[] = [
   "kräftige Unterarme",
   "ein federnder, leichter Gang",
   "ein ausgreifender, schneller Schritt",
+  "ausgesprochen dürr",
+  "abgemagert",
+  "deutlich sichtbare Rippen",
+  "hervorstehende Schlüsselbeine",
+  "lang und dürr",
+  "knochiger Körper",
+  "flache Brust",
 
   // Stimme & Auftreten
   "eine helle, klare Stimme",
@@ -249,6 +258,7 @@ export const MALE_APPEARANCE: string[] = [
   "ein Messer, das er ständig in der Hand dreht",
   "stets zu leicht angezogen, bei jedem Wetter",
   "der Geruch von Öl und Metall",
+  "gepflegtes Äußeres",
 ];
 
 /**
