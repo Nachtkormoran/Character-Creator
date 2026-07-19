@@ -4,7 +4,8 @@ Sammlung von Vorschlägen für nützliche oder interessante Ergänzungen rund um
 die Charaktererstellung. Gegliedert nach Themenbereichen; Top-Empfehlungen
 sind mit ⭐ markiert.
 
-Stand: 18.07.2026 (nach der Mehrbild-Umstellung).
+Stand: 19.07.2026 (nach Würfeln, drei neuen Merkmalen und dem Charakter-
+Export/Import).
 
 ## Terminsache
 
@@ -17,7 +18,8 @@ Stand: 18.07.2026 (nach der Mehrbild-Umstellung).
 
 ## Top-3-Empfehlungen
 
-Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
+Wenn nur drei umgesetzt würden, mit dem größten Nutzen. Alle drei stehen
+unverändert seit dem letzten Stand – dazwischen ist anderes passiert:
 
 1. **Text nachträglich anpassen / neu erzeugen** – der einzige Teil der
    KI-Ausgabe, der sich noch nicht überarbeiten lässt.
@@ -35,9 +37,14 @@ Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
   Editieren geht bereits, das Nachgenerieren per KI nicht.
 - **Mehr strukturierte Felder** – z. B. Motivation/Ziele, Ängste, Geheimnisse,
   Eigenheiten/Sprechweise, Fähigkeiten. Optional als eigene Abschnitte.
+  **Der Weg ist inzwischen erprobt:** „Interessen und Hobbies", „Wohnort" und
+  „Beruf" kamen so dazu – Feld in `characterTraitsSchema` mit `.describe()`,
+  Eintrag in `TRAIT_LABELS`, fertig. Tabelle und PDF ziehen automatisch mit,
+  und weil `traits` ein JSON-String ist, braucht es **keine Migration**.
   **Vorher lesen:** Neue Merkmale fehlen allen Bestandsdaten;
   `normalizeTraits` fängt das ab, die DB sollte trotzdem nachgezogen werden
-  (s. Fallstricke in `CLAUDE.md`).
+  (s. Fallstricke in `CLAUDE.md`). Ein neues Merkmal wirkt außerdem **nicht**
+  von selbst aufs Bild – `buildImagePrompt` zählt die Merkmale einzeln auf.
 - **RPG-Werteblock** (für Spiele) – Attribute wie Stärke/Geschicklichkeit,
   Gesinnung, Ausrüstung/Inventar. Als eigener, abschaltbarer Bereich.
 - **„Überrasch mich"** – komplett zufälliger Charakter per Klick.
@@ -65,9 +72,15 @@ Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
 
 ## Organisation & Workflow
 
-- **Charakter duplizieren** – als Ausgangspunkt für Varianten.
+- **Charakter duplizieren** – als Ausgangspunkt für Varianten. Geht seit dem
+  Charakter-Export **auf Umwegen** schon: exportieren und wieder importieren
+  ergibt eine vollständige Kopie mit eigener Id. Ein Knopf in der Detailansicht
+  wäre nur noch Bequemlichkeit (und könnte „(Kopie)" an den Namen hängen).
 - **Beziehungen zwischen Charakteren** – innerhalb eines Projekts verknüpfen
   (Familie, Rivale, Verbündeter), evtl. als kleine Beziehungsübersicht.
+  **Entwurf liegt vor:** `RELATIONS.md` – Datenmodell (eine Zeile je Beziehung,
+  Umkehrung über eine Typtabelle), Kreis-Layout als SVG ohne Bibliothek,
+  Vorschlag in zwei Schritten. Noch nicht umgesetzt.
 - **Projekt-/Gruppen-Kontext** – pro Gruppe ein gemeinsames Setting/Welt-
   beschreibung, das alle Charaktere dieses Projekts beeinflusst.
 - **Route `/gallery` → `/characters`** – die Seite heißt inzwischen
@@ -96,7 +109,13 @@ Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
   eine Aufgabe mit 120 Token Ausgabe. Ein eigenes `OPENAI_EXTRACT_MODEL` wäre
   ein Einzeiler.
 - **Alte Sicherungskopien aufräumen** – jeder Datenbank-Import legt eine
-  `.bak`-Datei neben `dev.db` (~12 MB), die niemand löscht.
+  `.bak`-Datei neben `dev.db` ab, die niemand löscht. Dazu kommen von Hand
+  angelegte Kopien vor größeren Datenänderungen. **Stand 19.07.2026: fünf
+  Dateien, zusammen rund 200 MB** – deutlich mehr als die Datenbank selbst
+  (58 MB), weil jede Kopie sämtliche Bilder mitschleppt. Sie sind in
+  `.gitignore`, liegen aber im Projektverzeichnis. Eine Aufräumhilfe in den
+  Einstellungen (auflisten, einzeln löschen) oder schlicht ein Hinweis auf das
+  Alter wäre schon genug.
 - **Preisangaben pflegen** – `IMAGE_PRICES_USD` in `lib/schema.ts` ist eine
   Momentaufnahme mit Stand-Datum, keine lebende Quelle.
 
@@ -107,6 +126,25 @@ Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
   ist **additiv** und legt immer neu an, im Gegensatz zur Datenbank-Sicherung.
   Export in der Fußzeile der Detailansicht, Import im Kopf der Galerie (mehrere
   Dateien auf einmal möglich).
+- **Drei weitere Merkmale** – „Interessen und Hobbies", „Wohnort" und „Beruf",
+  befüllt aus derselben Structured-Outputs-Antwort wie die übrigen. Die
+  Bestandscharaktere wurden nachgetragen: aus dem Beschreibungstext, wo er den
+  Wert nennt, sonst aus Wesen und Lebenslage erschlossen.
+- **Vorgaben-Ansicht** – der Fußzeilen-Knopf „Vorgaben anzeigen" zeigt die
+  Formular-Eingaben, aus denen der Charakter entstand. Reine Anzeige: die Werte
+  protokollieren den Erstellungszeitpunkt und dürfen nicht von dem Text
+  abweichen, der aus ihnen entstanden ist. Ein neues Feld war dafür nicht
+  nötig – `Character.input` gibt es seit dem ersten Commit.
+- **Würfel an fünf Formularfeldern** – Name, Aussehen, Persönlichkeit, Beruf
+  und Hintergrund, alle **rein lokal ohne API**: der Knopf lebt davon, dass man
+  ihn mehrmals drückt, und das verträgt keine Netzwerk-Wartezeit. Am Namen
+  zusätzlich ein KI-Knopf für Vorgaben, für die es keine Liste gibt.
+  – Namen: neun Kulturkreise à 200 (`names.ts`)
+  – Berufe: 300, nach Genre markiert (`professions.ts`)
+  – Aussehen: drei Listen à 100, nach Geschlecht getrennt (`inspiration.ts`)
+  – Hintergründe: sechs Listen à 100, eine je Genre (`backgrounds.ts`)
+- **Detailansicht umgeordnet** – breiter (`max-w-5xl`), Beschreibung und Bild
+  über der Merkmalstabelle, Tabelle in kleinerer Schrift.
 - **Mehrere Bilder pro Charakter** – eigenes `CharacterImage`-Modell, eines
   davon primär. Die Bilder-Ansicht liegt als eigene Ebene über der
   Detailansicht und trägt die gesamte Bild-Bedienung; neu erzeugte oder
