@@ -207,6 +207,26 @@ Formular oder Detailansicht. Extra-Arbeit entstand nur durch die Eigenheiten
 **dieses** Feldes: der Erzeugen-Knopf und der Ausschluss aus der
 Zusammenfassungszeile der Übersicht (ein 1200-Zeichen-Text füllte sie allein).
 
+An **Ort, Zeit und Regeln** hängt je ein **Würfel** (`scenarioPlaces.ts`,
+`scenarioTimes.ts`, `scenarioRules.ts` – je sechs Listen zu 100, eine pro
+Genre, zusammen 1800 Einträge). Rein lokal wie alle Würfel im Projekt. Welche
+Liste gezogen wird, entscheidet das **Genre-Feld daneben**; ohne Auswahl fällt
+es auf „Gegenwart" zurück, und über die Listen wird **nie** gemischt – dieselbe
+Regel wie in `backgrounds.ts`. Die Zuordnung Feld → Funktion steht in der Karte
+`WUERFEL` in `ScenarioFields.tsx`; ein Feld ohne Eintrag dort bekommt keinen
+Knopf. Der Würfel sitzt **in der Komponente**, nicht in den Seiten: nur sie
+kennt das gerade gewählte Genre.
+
+Der Unterschied zwischen den drei: **Ort und Zeit ziehen genau einen Eintrag**
+(ein Szenario spielt an einem Ort, zu einer Zeit), **Regeln ziehen zwei bis
+drei** über `pickSome` – eine Welt entsteht erst aus dem Zusammentreffen
+mehrerer Festlegungen. Regeln sind deshalb **vollständige Sätze mit Punkt** und
+werden mit **Leerzeichen** verbunden, nicht mit Semikolon wie Aussehen und
+Hintergrund (das sind Satzteile). Sie enthalten bewusst keine Zahlen,
+Eigennamen oder Aussagen über die Regierungsform – zwei gezogene Regeln müssen
+nebeneinander stehen können, ohne sich zu widersprechen, und über Ort und Zeit
+sagen sie nichts, dafür gibt es die anderen Felder.
+
 Die **Beschreibung** lässt sich per KI erzeugen (`POST
 /api/scenario-description`), aus Genre, Ort, Zeit und Regeln. Sie steht deshalb
 **hinter** ihnen: sie ist deren Fließtext-Fassung, nicht eine weitere Quelle,

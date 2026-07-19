@@ -7,6 +7,25 @@ import {
   type ScenarioDetails,
 } from "@/lib/schema";
 import { GENRE_TEMPLATES } from "@/lib/templates";
+import { randomPlace } from "@/lib/scenarioPlaces";
+import { randomTime } from "@/lib/scenarioTimes";
+import { randomRules } from "@/lib/scenarioRules";
+
+/**
+ * Welche Felder einen Würfel haben und woher er zieht.
+ *
+ * Alle drei bekommen das **aktuell gewählte Genre** – deshalb gehört der
+ * Würfel hierher und nicht in die Seiten: nur diese Komponente weiß, was im
+ * Genre-Feld steht. Ist keins gewählt, fällt jede Funktion auf „Gegenwart"
+ * zurück (so wie `randomBackground` es seit jeher tut).
+ */
+const WUERFEL: Partial<
+  Record<keyof ScenarioDetails, (genre?: string) => string>
+> = {
+  ort: randomPlace,
+  zeit: randomTime,
+  regeln: randomRules,
+};
 
 /**
  * Die Eingabefelder eines Szenarios – geteilt zwischen Anlege-Formular und
@@ -54,6 +73,21 @@ export function ScenarioFields({
           <label key={key} className="flex flex-col gap-1">
             <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
               {SCENARIO_LABELS[key]}
+              {WUERFEL[key] && (
+                <button
+                  type="button"
+                  onClick={() => set(key, WUERFEL[key]!(details.genre))}
+                  disabled={disabled}
+                  title={
+                    details.genre
+                      ? `Zufälliger Vorschlag, passend zum Genre – ersetzt den Inhalt`
+                      : `Zufälliger Vorschlag – ohne gewähltes Genre aus der Gegenwart`
+                  }
+                  className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                >
+                  🎲 Würfeln
+                </button>
+              )}
               {key === "beschreibung" && onGenerateBeschreibung && (
                 <button
                   type="button"
