@@ -76,14 +76,12 @@ Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
 
 ## Export & Teilen
 
-- **Export als JSON / Markdown** – PDF-Steckbrief und Bild-Export stehen, die
-  maschinenlesbaren Formate fehlen noch. JSON wäre zudem die Voraussetzung für
-  einen Charakter-Import (die Datenbank-Sicherung ersetzt alles, taugt also
-  nicht zum Zusammenführen).
-- **Einzelne Charaktere importieren** – Gegenstück zum JSON-Export, additiv
-  statt ersetzend.
+- **Export als Markdown** – JSON und PDF stehen; ein lesbares Textformat für
+  Notiz-Programme fehlt noch.
 - **Ganze Gruppe exportieren** – z. B. alle Figuren eines Projekts als
-  Sammel-PDF.
+  Sammel-PDF oder als mehrere Charakter-Dateien auf einmal. Das Dateiformat in
+  `lib/characterFile.ts` ist auf **einen** Charakter je Datei ausgelegt; für
+  eine Sammeldatei bräuchte es eine Version 2 (oder ein ZIP).
 
 ## Kosten & Betrieb
 
@@ -104,6 +102,11 @@ Wenn nur drei umgesetzt würden, mit dem größten Nutzen:
 
 ## Umgesetzt
 
+- **Einzelne Charaktere exportieren/importieren** – eine JSON-Datei je
+  Charakter (Texte, Merkmale, Vorgaben, alle Bilder im Original). Der Import
+  ist **additiv** und legt immer neu an, im Gegensatz zur Datenbank-Sicherung.
+  Export in der Fußzeile der Detailansicht, Import im Kopf der Galerie (mehrere
+  Dateien auf einmal möglich).
 - **Mehrere Bilder pro Charakter** – eigenes `CharacterImage`-Modell, eines
   davon primär. Die Bilder-Ansicht liegt als eigene Ebene über der
   Detailansicht und trägt die gesamte Bild-Bedienung; neu erzeugte oder

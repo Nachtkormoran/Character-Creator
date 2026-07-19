@@ -87,6 +87,23 @@ neu erzeugten oder hochgeladenen Bild wieder scharf.
 - `GET|PATCH /api/settings` – App-Einstellungen (`imageModel`, `imageQuality`).
 - `GET|POST /api/backup` – Datenbank sichern / wiederherstellen. **POST
   ersetzt den gesamten Bestand** (Bestätigung passiert in der UI).
+- `POST /api/characters/import` – **einzelnen** Charakter aus einer
+  Exportdatei einspielen, **additiv**. Nicht zu verwechseln mit `/api/backup`:
+  das ersetzt alles, das hier legt hinzu.
+
+**Einzelne Charaktere exportieren/importieren:** Format und Zod-Schema stehen
+in `lib/characterFile.ts` (`kind` + `version` im Kopf, damit nicht irgendein
+JSON eingelesen wird). Der **Export braucht keine Route** – Texte und Merkmale
+liegen im Client, nur die Bild-Originale holt `buildCharacterFile` einzeln über
+`getImage` nach (Thumbnail geht mit, weil der Server keines erzeugen kann:
+Canvas gibt es nur im Browser). Der **Import** ist eine eigene Route, weil
+Charakter und alle Bilder in **einer Transaktion** entstehen müssen; der Weg
+über `POST /api/characters` plus je Bild `POST …/images` ließe bei einem Fehler
+im dritten Bild einen halben Charakter stehen. Die Datei trägt bewusst **keine**
+`id`, `groupId` und `createdAt` – Begründung je Feld steht in
+`characterFile.ts`. Die Merkmale werden beim Import **lose** validiert und durch
+`normalizeTraits` geschickt: eine Exportdatei ist ein Altbestand außerhalb der
+DB und kennt ein später ergänztes Merkmal nicht.
 
 **Mehrere Bilder pro Charakter:** Ein Charakter hat beliebig viele Bilder
 (`CharacterImage`), genau eines ist `isPrimary` und wird überall groß gezeigt

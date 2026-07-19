@@ -4,16 +4,19 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
+  buildCharacterFile,
   createGroup,
   deleteCharacter,
   deleteGroup,
   generateName,
   getImage,
+  importCharacterFile,
   listCharacters,
   listGroups,
   updateCharacterContent,
   updateCharacterGroup,
 } from "@/lib/client";
+import { characterFileName } from "@/lib/characterFile";
 import { downloadBlob, safeFileName } from "@/lib/download";
 import { randomName } from "@/lib/names";
 import {
@@ -73,6 +76,9 @@ function searchableText(c: StoredCharacter): string {
 export default function GalleryPage() {
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
   const [groups, setGroups] = useState<StoredGroup[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<StoredCharacter | null>(null);
@@ -189,6 +195,49 @@ export default function GalleryPage() {
     }
   }
 
+  /**
+   * Exportdateien einspielen. Mehrere Dateien laufen **nacheinander** durch,
+   * nicht parallel: jede trägt ihre Bilder als base64 mit, und ein Schwung
+   * gleichzeitiger Mehr-Megabyte-Anfragen bringt nichts als Spitzenlast.
+   *
+   * Eine fehlerhafte Datei bricht den Rest nicht ab – am Ende steht, was
+   * angekommen ist und was nicht.
+   */
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    // Zurücksetzen, damit dieselbe Datei erneut gewählt werden kann.
+    e.target.value = "";
+    if (files.length === 0) return;
+
+    setImporting(true);
+    setImportMessage(null);
+    setImportError(null);
+
+    const neue: StoredCharacter[] = [];
+    const fehler: string[] = [];
+    for (const file of files) {
+      try {
+        const { character } = await importCharacterFile(file);
+        neue.push(character);
+      } catch (err) {
+        fehler.push(
+          `${file.name}: ${err instanceof Error ? err.message : "Fehler."}`,
+        );
+      }
+    }
+
+    if (neue.length > 0) {
+      setCharacters((cs) => [...neue, ...cs]);
+      setImportMessage(
+        neue.length === 1
+          ? `„${neue[0].character.name}" importiert.`
+          : `${neue.length} Charaktere importiert: ${neue.map((c) => c.character.name).join(", ")}.`,
+      );
+    }
+    if (fehler.length > 0) setImportError(fehler.join(" · "));
+    setImporting(false);
+  }
+
   async function handleDeleteGroup(id: string) {
     const group = groups.find((g) => g.id === id);
     if (
@@ -216,15 +265,46 @@ export default function GalleryPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-semibold tracking-tight">Charaktere</h1>
-        <Link
-          href="/"
-          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
-        >
-          + Neuer Charakter
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <label
+            title="Zuvor exportierte Charakter-Dateien einspielen – sie kommen zum Bestand hinzu"
+            className={`rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition dark:border-white/15 ${
+              importing
+                ? "cursor-not-allowed opacity-50"
+                : "cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+            }`}
+          >
+            {importing ? "Importiere …" : "Charakter importieren"}
+            <input
+              type="file"
+              accept=".json,application/json"
+              multiple
+              className="hidden"
+              disabled={importing}
+              onChange={handleImport}
+            />
+          </label>
+          <Link
+            href="/"
+            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
+          >
+            + Neuer Charakter
+          </Link>
+        </div>
       </div>
+
+      {importMessage && (
+        <p className="rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-800 dark:text-green-300">
+          {importMessage}
+        </p>
+      )}
+      {importError && (
+        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+          {importError}
+        </p>
+      )}
 
       {/* Gruppen-Filter & -Verwaltung */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-black/10 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]">
@@ -484,6 +564,7 @@ function DetailModal({
   const preview = primary?.thumbnail ?? cachedImage;
   const [assigningGroup, setAssigningGroup] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingJson, setExportingJson] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [namingAI, setNamingAI] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -518,6 +599,28 @@ function DetailModal({
       setNameError(e instanceof Error ? e.message : "Fehler.");
     } finally {
       setNamingAI(false);
+    }
+  }
+
+  /**
+   * Charakter als Datei sichern – Texte, Merkmale, Vorgaben und alle Bilder in
+   * Originalgröße. Grundlage sind die **bearbeiteten** Werte (`edited`), damit
+   * ungespeicherte Änderungen nicht stillschweigend aus der Datei fallen.
+   */
+  async function exportJson() {
+    if (exportingJson) return;
+    setExportingJson(true);
+    setExportError(null);
+    try {
+      const datei = await buildCharacterFile(c, edited);
+      const blob = new Blob([JSON.stringify(datei, null, 2)], {
+        type: "application/json",
+      });
+      downloadBlob(blob, characterFileName(safeFileName(edited.name)));
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : "Export fehlgeschlagen.");
+    } finally {
+      setExportingJson(false);
     }
   }
 
@@ -768,6 +871,14 @@ function DetailModal({
               className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
             >
               {exporting ? "Erstelle PDF …" : "Als PDF exportieren"}
+            </button>
+            <button
+              onClick={exportJson}
+              disabled={exportingJson}
+              title="Charakter samt Bildern als Datei – lässt sich anderswo wieder importieren"
+              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              {exportingJson ? "Sammle Bilder …" : "Als Datei exportieren"}
             </button>
             <button
               onClick={onDelete}

@@ -1,3 +1,8 @@
+import {
+  CHARACTER_FILE_KIND,
+  CHARACTER_FILE_VERSION,
+  type CharacterFile,
+} from "./characterFile";
 import { makeThumbnail } from "./image";
 import type {
   CharacterInput,
@@ -199,6 +204,63 @@ export async function getImage(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Bild laden fehlgeschlagen.");
   return data.imageData as string;
+}
+
+// --- Einzelne Charaktere exportieren / importieren -------------------------
+
+/**
+ * Baut die Exportdatei eines Charakters zusammen.
+ *
+ * Braucht **keine** eigene Route: Texte und Merkmale liegen bereits im Client,
+ * nur die Bild-Originale fehlen (die Listen-Antworten führen sie aus
+ * Größengründen nicht mit) und werden einzeln über `getImage` nachgeholt.
+ *
+ * Exportiert wird das **Original**, nicht das Thumbnail – eine Exportdatei mit
+ * 640-px-Vorschauen wäre beim Wiedereinspielen ein stiller Qualitätsverlust.
+ * Das Thumbnail geht zusätzlich mit, weil der Server es nicht erzeugen kann
+ * (Canvas gibt es nur im Browser).
+ */
+export async function buildCharacterFile(
+  c: StoredCharacter,
+  character: GeneratedCharacter = c.character,
+): Promise<CharacterFile> {
+  const images = await Promise.all(
+    c.images.map(async (bild) => ({
+      imageData: await getImage(c.id, bild.id),
+      thumbnail: bild.thumbnail,
+      isPrimary: bild.isPrimary,
+    })),
+  );
+
+  return {
+    kind: CHARACTER_FILE_KIND,
+    version: CHARACTER_FILE_VERSION,
+    exportedAt: new Date().toISOString(),
+    input: c.input,
+    character: {
+      name: character.name,
+      kurzbeschreibung: character.kurzbeschreibung,
+      beschreibung: character.beschreibung,
+      merkmale: character.merkmale,
+    },
+    images,
+  };
+}
+
+/** Spielt eine Exportdatei ein. Der Charakter wird **zusätzlich** angelegt. */
+export async function importCharacterFile(
+  file: File,
+): Promise<{ character: StoredCharacter; images: number }> {
+  let inhalt: unknown;
+  try {
+    inhalt = JSON.parse(await file.text());
+  } catch {
+    throw new Error(`„${file.name}" ist keine lesbare JSON-Datei.`);
+  }
+  return postJson<{ character: StoredCharacter; images: number }>(
+    "/api/characters/import",
+    inhalt,
+  );
 }
 
 export async function updateCharacterGroup(
