@@ -76,12 +76,25 @@ function DiceButton({
 export function CharacterForm({
   onGenerate,
   loading,
+  initialInput,
+  initialGenre,
 }: {
   onGenerate: (input: CharacterInput) => void;
   loading: boolean;
+  /**
+   * Vorbelegte Felder – aktuell aus einem Szenario (`scenarioToInput`). Sie
+   * werden **nur beim ersten Rendern** gelesen: danach gehört das Formular dem
+   * Nutzer, und ein Nachziehen würde seine Eingaben überschreiben. Die
+   * aufrufende Seite rendert das Formular deshalb erst, wenn sie sie hat.
+   */
+  initialInput?: Partial<CharacterInput>;
+  initialGenre?: string;
 }) {
-  const [form, setForm] = useState<CharacterInput>(EMPTY);
-  const [genre, setGenre] = useState<string>(DEFAULT_GENRE);
+  const [form, setForm] = useState<CharacterInput>({
+    ...EMPTY,
+    ...initialInput,
+  });
+  const [genre, setGenre] = useState<string>(initialGenre ?? DEFAULT_GENRE);
   const [namingAI, setNamingAI] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
@@ -100,9 +113,14 @@ export function CharacterForm({
     if (template) setForm((f) => ({ ...f, ...template.values }));
   }
 
+  /**
+   * Zurücksetzen führt auf die **Vorbelegung** zurück, nicht auf ein leeres
+   * Formular. Wer aus einem Szenario kommt, will seine Eingaben verwerfen –
+   * nicht die Zugehörigkeit zur Welt, für die er den Charakter anlegt.
+   */
   function reset() {
-    setForm(EMPTY);
-    setGenre(DEFAULT_GENRE);
+    setForm({ ...EMPTY, ...initialInput });
+    setGenre(initialGenre ?? DEFAULT_GENRE);
     setNameError(null);
   }
 

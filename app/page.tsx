@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CharacterForm } from "./components/CharacterForm";
 import { CharacterResult } from "./components/CharacterResult";
 import {
   generateImage,
   generateText,
+  getScenario,
   listScenarios,
   saveCharacter,
 } from "@/lib/client";
@@ -15,9 +17,24 @@ import {
   type CharacterInput,
   type GeneratedCharacter,
 } from "@/lib/schema";
+import { scenarioToInput, type ScenarioPrefill } from "@/lib/scenarioInput";
 import type { StoredScenario } from "@/lib/serialize";
 
-export default function Home() {
+/**
+ * `useSearchParams` verlangt eine Suspense-Grenze, sonst fällt die ganze Seite
+ * beim Bauen ins clientseitige Rendern. Deshalb der Umweg über diese Hülle.
+ */
+export default function Page() {
+  return (
+    <Suspense
+      fallback={<p className="text-foreground/60">Einen Moment …</p>}
+    >
+      <Home />
+    </Suspense>
+  );
+}
+
+function Home() {
   // Ansicht: Eingabeformular oder Ergebnis
   const [view, setView] = useState<"form" | "result">("form");
 
@@ -55,6 +72,45 @@ export default function Home() {
       .then(setScenarios)
       .catch(() => {});
   }, []);
+
+  /**
+   * „Charakter für dieses Szenario" führt mit `?scenario=<id>` hierher. Das
+   * Szenario belegt dann das Formular vor **und** ist als Zuordnung
+   * ausgewählt – wer den Weg über den Knopf nimmt, meint genau dieses.
+   */
+  const scenarioParam = useSearchParams().get("scenario");
+  const [prefill, setPrefill] = useState<ScenarioPrefill | null>(null);
+  const [prefillName, setPrefillName] = useState<string | null>(null);
+  const [prefillError, setPrefillError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!scenarioParam) return;
+    let abgebrochen = false;
+    getScenario(scenarioParam)
+      .then(({ scenario }) => {
+        if (abgebrochen) return;
+        setPrefill(scenarioToInput(scenario.name, scenario.details));
+        setPrefillName(scenario.name);
+        setSelectedScenarioId(scenario.id);
+      })
+      .catch((e) => {
+        if (!abgebrochen)
+          setPrefillError(e instanceof Error ? e.message : "Fehler.");
+      });
+    return () => {
+      abgebrochen = true;
+    };
+  }, [scenarioParam]);
+
+  /**
+   * Auf die Vorbelegung warten, statt das Formular leer zu zeigen und
+   * nachzuladen: `CharacterForm` liest sie nur beim ersten Rendern, und ein
+   * Nachziehen würde Eingaben überschreiben, die in der Zwischenzeit entstanden
+   * sind. Bei einem Fehler geht es ohne Vorbelegung weiter – ein unerreichbares
+   * Szenario darf das Erstellen nicht blockieren.
+   */
+  const wartetAufSzenario =
+    scenarioParam !== null && prefill === null && prefillError === null;
 
   async function handleGenerate(formInput: CharacterInput) {
     setTextLoading(true);
@@ -98,7 +154,10 @@ export default function Home() {
     setImageError(null);
     setTextError(null);
     setSaved(false);
-    setSelectedScenarioId(null);
+    // Kam der Nutzer über ein Szenario, bleibt dessen Zuordnung stehen: nach
+    // dem Speichern legt man dort meist die nächste Figur an, und die
+    // Auswahl jedes Mal neu zu treffen wäre nur eine Falle.
+    setSelectedScenarioId(scenarioParam);
     setExtraPrompt("");
   }
 
@@ -162,13 +221,49 @@ export default function Home() {
         {savedNotice && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-green-600/30 bg-green-500/10 px-4 py-3 text-sm text-green-800 dark:text-green-300">
             <span>„{savedNotice}“ wurde gespeichert.</span>
-            <Link href="/gallery" className="font-medium underline">
-              In der Galerie ansehen
+            <Link
+              href={
+                scenarioParam ? `/scenarios/${scenarioParam}` : "/gallery"
+              }
+              className="font-medium underline"
+            >
+              {scenarioParam ? "Zum Szenario" : "In der Galerie ansehen"}
             </Link>
           </div>
         )}
 
-        <CharacterForm onGenerate={handleGenerate} loading={textLoading} />
+        {prefillName && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-black/10 bg-black/[0.03] px-4 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
+            <span>
+              Für das Szenario <strong>{prefillName}</strong>. Genre, Ort, Zeit
+              und Regeln sind unten übernommen und lassen sich ändern.
+            </span>
+            <Link
+              href={`/scenarios/${scenarioParam}`}
+              className="font-medium underline"
+            >
+              Zum Szenario
+            </Link>
+          </div>
+        )}
+
+        {prefillError && (
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+            Das Szenario konnte nicht geladen werden ({prefillError}) – das
+            Formular bleibt leer.
+          </div>
+        )}
+
+        {wartetAufSzenario ? (
+          <p className="text-foreground/60">Lade Szenario …</p>
+        ) : (
+          <CharacterForm
+            onGenerate={handleGenerate}
+            loading={textLoading}
+            initialInput={prefill?.values}
+            initialGenre={prefill?.genre}
+          />
+        )}
       </div>
     );
   }

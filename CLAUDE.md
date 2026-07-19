@@ -287,10 +287,39 @@ Während ein Feld erzeugt wird, sind **alle** Knöpfe gesperrt – die Erzeugung
 liest die übrigen Felder mit, und zwei gleichzeitige Läufe säßen auf
 verschiedenen Ständen.
 
-**Noch offen:** Die Festlegungen fließen bisher nur in die Szenario-eigenen
-Texte ein (Beschreibung, Handlungsentwurf), **nicht** in die
-Charakter-Generierung. Ein Charakter, der einem Szenario zugeordnet ist, weiß
-nichts von dessen Ort, Zeit und Regeln.
+**Charakter für ein Szenario anlegen:** Der Knopf in der Szenario-Detailansicht
+führt auf `/?scenario=<id>`. Die Erstellen-Seite lädt das Szenario, belegt das
+Formular über `scenarioToInput` (`lib/scenarioInput.ts`) vor **und** wählt es
+als Zuordnung aus – wer den Weg über den Knopf nimmt, meint genau dieses.
+
+Die Übernahme läuft bewusst **über die Formularfelder**, nicht als unsichtbarer
+Zusatz am Prompt: So sieht man, was den Charakter prägt, kann es ändern, und es
+landet in `input`, also in der Vorgaben-Ansicht. Später ist damit
+nachvollziehbar, aus welchem **Weltstand** die Figur entstand; ändert sich das
+Szenario danach, bleibt die Figur bei dem, was zu ihrer Zeit galt. Deshalb
+brauchte **keine Route eine Änderung** – `setting` und `notes` fließen längst in
+`buildTextPrompt`.
+
+Die Aufteilung folgt den Feldtypen: `setting` ist ein **einzeiliges** Feld mit
+200 Zeichen und bekommt Genre, Ort und Zeit als Gerüst; `notes` ist ein
+**Textfeld** mit 2000 Zeichen und der einzige Platz für Regeln und
+Weltbeschreibung. Nicht belegt werden `background`, `personality` und
+`appearance` – das sind Eigenschaften der Person, nicht der Welt, und ein
+Szenario, das sie vorschreibt, brächte sechs Varianten derselben Figur.
+
+`CharacterForm` liest `initialInput`/`initialGenre` **nur beim ersten Rendern**;
+die Seite rendert es deshalb erst, wenn die Vorbelegung da ist. Nachziehen
+würde Eingaben überschreiben, die inzwischen entstanden sind. „Zurücksetzen"
+führt auf die Vorbelegung zurück, nicht auf ein leeres Formular. Und weil
+`useSearchParams` eine Suspense-Grenze verlangt, ist `app/page.tsx` in eine
+Hülle gewickelt.
+
+**Noch offen:** Die Festlegungen fließen in **neu erstellte** Charaktere ein,
+aber nicht rückwirkend: Wer einen bestehenden Charakter nachträglich einem
+Szenario zuordnet, ändert nichts an dessen Text. Auch „Text neu erzeugen" in
+der Galerie kennt das Szenario nicht – es arbeitet mit den gespeicherten
+Vorgaben, und die enthalten den Weltkontext nur, wenn die Figur über diesen Weg
+entstanden ist.
 
 **Vorgaben-Ansicht:** Die Formular-Eingaben, aus denen ein Charakter entstanden
 ist, liegen seit jeher in der Spalte `input` (JSON-String) und sind über

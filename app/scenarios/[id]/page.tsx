@@ -220,9 +220,29 @@ export default function ScenarioDetailPage({
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
-          Charaktere ({characters.length})
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+            Charaktere ({characters.length})
+          </h2>
+          {/*
+            Führt aufs Erstellen-Formular, mit dem Szenario im Parameter: es
+            belegt Genre, Setting und Weltkontext vor und ist als Zuordnung
+            ausgewählt. Bewusst ein Link und kein Knopf – es ist eine
+            Navigation, und man soll ihn in einem neuen Tab öffnen können.
+          */}
+          <Link
+            href={`/?scenario=${id}`}
+            className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition hover:opacity-90"
+          >
+            + Charakter für dieses Szenario
+          </Link>
+        </div>
+        {dirty && (
+          <p className="mb-3 text-xs text-amber-700 dark:text-amber-400">
+            Ungespeicherte Änderungen werden nicht übernommen – erst speichern,
+            dann den Charakter anlegen.
+          </p>
+        )}
         {characters.length === 0 ? (
           <div className="rounded-xl border border-dashed border-black/15 p-8 text-center text-sm text-foreground/60 dark:border-white/15">
             Diesem Szenario ist noch niemand zugeordnet. Die Zuordnung passiert

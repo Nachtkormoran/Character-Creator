@@ -13,14 +13,8 @@ import {
   type ScenarioDetails,
 } from "@/lib/schema";
 import type { StoredScenario } from "@/lib/serialize";
-import { GENRE_TEMPLATES } from "@/lib/templates";
+import { genreLabel } from "@/lib/templates";
 import { ScenarioFields } from "../components/ScenarioFields";
-
-/** Genre-Id → Anzeigename. Gespeichert wird die Id, angezeigt das Label. */
-export function genreLabel(id: string): string {
-  const g = GENRE_TEMPLATES.find((t) => t.id === id);
-  return g ? `${g.emoji} ${g.label}` : id;
-}
 
 /**
  * Die Zeile unter dem Namen in der Übersicht: die gefüllten Festlegungen,

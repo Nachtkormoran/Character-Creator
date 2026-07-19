@@ -17,6 +17,16 @@ export interface GenreTemplate {
 
 export const DEFAULT_GENRE = "gegenwart";
 
+/**
+ * Genre-Id → Anzeigename mit Emoji. Gespeichert wird überall die **Id**
+ * (`cyberpunk`), angezeigt das Label – diese Funktion ist die einzige Stelle,
+ * die das übersetzt.
+ */
+export function genreLabel(id: string): string {
+  const t = GENRE_TEMPLATES.find((g) => g.id === id);
+  return t ? `${t.emoji} ${t.label}` : id;
+}
+
 export const GENRE_TEMPLATES: GenreTemplate[] = [
   {
     id: "gegenwart",
