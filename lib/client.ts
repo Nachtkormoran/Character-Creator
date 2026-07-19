@@ -9,6 +9,7 @@ import type {
   CharacterTraits,
   GeneratedCharacter,
   ScenarioDetails,
+  ScenarioDraft,
   Settings,
   StoryHookAnchor,
 } from "./schema";
@@ -408,6 +409,27 @@ export async function createScenario(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Szenario anlegen fehlgeschlagen.");
   return data.scenario as StoredScenario;
+}
+
+/**
+ * Ein Szenario aus einem Charakter ableiten – die Gegenrichtung zu
+ * „Charakter für dieses Szenario anlegen".
+ *
+ * Bekommt den Charakter **im Request** und nicht als Id: in der Detailansicht
+ * kann er ungespeichert bearbeitet sein, und gemeint ist der Stand auf dem
+ * Bildschirm. Persistiert nichts – der Vorschlag geht in eine Maske und wird
+ * erst über `createScenario` angelegt.
+ */
+export function generateScenarioFromCharacter(
+  character: GeneratedCharacter,
+  storyHooks = "",
+  setting = "",
+) {
+  return postJson<{ draft: ScenarioDraft }>("/api/scenario-from-character", {
+    character,
+    storyHooks,
+    setting,
+  });
 }
 
 /**

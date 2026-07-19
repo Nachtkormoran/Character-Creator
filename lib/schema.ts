@@ -1,4 +1,8 @@
 import { z } from "zod";
+// Nur für die Genre-Ids in `scenarioDraftSchema`. Kein Kreis: `templates.ts`
+// importiert von hier ausschließlich einen **Typ**, und der ist zur Laufzeit
+// nicht da.
+import { GENRE_TEMPLATES } from "./templates";
 
 /**
  * Zentrale Schemas & Typen für den Charakter Creator.
@@ -384,6 +388,46 @@ export function normalizeScenarioDetails(raw: unknown): ScenarioDetails {
   }
   return result as ScenarioDetails;
 }
+
+/**
+ * Der Szenario-Vorschlag, den das Modell aus **einem Charakter** ableitet.
+ *
+ * Bewusst ein **eigenes** Schema und nicht `scenarioDetailsSchema`, aus zwei
+ * Gründen:
+ *
+ * 1. Structured Outputs verlangen, dass **alle** Felder erforderlich sind.
+ *    `scenarioDetailsSchema` besteht aus `.optional().default("")` – richtig
+ *    für ein Formular, in dem alles leer bleiben darf, unbrauchbar hier.
+ * 2. Der Zuschnitt ist ein anderer: der `name` gehört dazu (er ist sonst keine
+ *    Festlegung, sondern die Identität), und `handlung` fehlt. Ein
+ *    Handlungsentwurf braucht mehrere Figuren; das frisch abgeleitete Szenario
+ *    hat genau eine. Er wird später in der Szenario-Detailansicht erzeugt,
+ *    wenn eine Besetzung dasteht.
+ *
+ * Das **Genre ist ein Enum** über die Ids aus `GENRE_TEMPLATES`, kein
+ * Freitext: gespeichert wird überall die Id, und ein Modell, das „Western"
+ * statt `western` liefert, ließe Würfel, Namenslisten und Berufe ins Leere
+ * laufen. Hier ist ein JSON-Schema also nicht bloß Aufschlag, sondern das
+ * Mittel, das die Antwort ins vorhandene Vokabular zwingt.
+ */
+export const scenarioDraftSchema = z.object({
+  name: z
+    .string()
+    .describe("Kurzer, prägnanter Titel des Szenarios (2–5 Wörter)"),
+  genre: z
+    .enum(
+      GENRE_TEMPLATES.map((g) => g.id) as [string, ...string[]],
+    )
+    .describe("Das am besten passende Genre"),
+  ort: z.string().describe("Wo die Geschichte spielt"),
+  zeit: z.string().describe("Epoche, Jahr oder Jahreszeit"),
+  regeln: z
+    .string()
+    .describe("Was in dieser Welt gilt und für alle Figuren wahr ist"),
+  beschreibung: z.string().describe("Fließtext über die Welt des Szenarios"),
+});
+
+export type ScenarioDraft = z.infer<typeof scenarioDraftSchema>;
 
 // ---------------------------------------------------------------------------
 // Ansatzpunkte für eine Geschichte

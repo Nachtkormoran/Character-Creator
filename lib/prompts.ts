@@ -1,4 +1,5 @@
 import { DEFAULT_STORY_HOOK_ANCHOR, TRAIT_LABELS } from "./schema";
+import { GENRE_TEMPLATES } from "./templates";
 import type {
   CharacterInput,
   CharacterTraits,
@@ -372,6 +373,90 @@ Anforderungen:
 - Reiner Fließtext auf Deutsch, ohne Markdown, ohne Überschriften, ohne Aufzählung.
 ${zusatzBlock}
 Antworte mit nichts als dem Entwurf selbst.`;
+}
+
+/**
+ * Baut den Prompt für ein **aus einem Charakter abgeleitetes Szenario**.
+ *
+ * Die Gegenrichtung zu `scenarioToInput`: dort prägt eine fertige Welt eine
+ * neue Figur, hier spannt eine fertige Figur die Welt auf, in die sie gehört.
+ * Beides muss gehen, weil beides vorkommt – mal steht die Welt zuerst fest,
+ * mal fällt einem eine Person ein.
+ *
+ * **Ableiten, nicht dazuerfinden.** Das ist die ganze Schwierigkeit hier: Zu
+ * einem Charakter lässt sich jede beliebige Welt behaupten, und ein Modell,
+ * das man frei erfinden lässt, liefert die generische – eine Stadt, eine
+ * Bedrohung, ein Geheimnis. Der Prompt verlangt deshalb, dass jede Festlegung
+ * ihren **Beleg in der Figur** hat: Der Beruf sagt etwas über die Wirtschaft,
+ * die Herkunft über Grenzen und Wege, die besonderen Merkmale über das, was
+ * in dieser Welt möglich ist. Die Welt soll erklären, **warum es diesen
+ * Menschen gibt** – nicht bloß einen Hintergrund abgeben, vor dem er steht.
+ *
+ * Die **Ansatzpunkte** gehen mit, sofern vorhanden: sie zeigen, worauf die
+ * Figur zuläuft, und eine Welt, in der das unmöglich wäre, ist die falsche.
+ * Sie sind hier aber nur Material – ein Szenario ist keine Handlung. Deshalb
+ * liefert dieser Prompt auch **keinen** Handlungsentwurf; der braucht mehrere
+ * Figuren und entsteht später in der Szenario-Detailansicht.
+ */
+export function buildScenarioFromCharacterPrompt(
+  character: GeneratedCharacter,
+  storyHooks?: string,
+  /**
+   * Das Setting-Feld aus den ursprünglichen Vorgaben, sofern vorhanden. Der
+   * beste verfügbare Hinweis aufs Genre – die Merkmalstabelle nennt es nie
+   * beim Namen, und aus dem Fließtext muss man es erschließen.
+   *
+   * „Weitere Wünsche" bleiben bewusst draußen: stammt die Figur aus einem
+   * Szenario, steht dort dessen kompletter Weltkontext. Der Vorschlag wäre
+   * dann eine Abschrift jenes Szenarios und keine Ableitung aus der Person.
+   */
+  setting?: string,
+): string {
+  const m = character.merkmale;
+
+  const merkmale = (Object.keys(TRAIT_LABELS) as Array<keyof CharacterTraits>)
+    .map((key) => {
+      const wert = String(m[key] ?? "").trim();
+      return wert && wert !== "0" ? `- ${TRAIT_LABELS[key]}: ${wert}` : null;
+    })
+    .filter(Boolean)
+    .join("\n");
+
+  const hooksBlock = storyHooks?.trim()
+    ? `\nOffene Ansatzpunkte für Geschichten mit dieser Figur:\n${storyHooks.trim()}\n`
+    : "";
+
+  const settingZeile = line("Ursprünglich angelegt als", setting);
+
+  const genres = GENRE_TEMPLATES.map((g) => `${g.id} (${g.label})`).join(", ");
+
+  return `Entwirf das Szenario – die Welt –, in die dieser Charakter gehört.
+
+Charakter: ${character.name}
+${character.kurzbeschreibung}
+${settingZeile}
+Merkmale:
+${merkmale}
+
+Beschreibung:
+${character.beschreibung}
+${hooksBlock}
+Deine Aufgabe: Leite aus dieser Person die Welt ab, in der sie lebt. Nicht irgendeine Welt, in der sie auch vorkommen könnte, sondern die, die sie hervorgebracht hat.
+
+Anforderungen an die einzelnen Felder:
+- **name**: Ein kurzer, prägnanter Titel für das Szenario (2–5 Wörter). Benenne die **Welt oder den Ort**, nicht die Person – der Titel muss auch dann noch passen, wenn fünf weitere Figuren dazukommen.
+- **genre**: Genau einer dieser Werte, unverändert: ${genres}.
+- **ort**: Wo diese Geschichte spielt. Konkret genug, dass man es sich vorstellen kann.
+- **zeit**: Epoche, Jahr oder Jahreszeit.
+- **regeln**: Was in dieser Welt gilt und für **alle** Figuren darin wahr ist – Technikstand, Magie, gesellschaftliche Ordnung, Tabus, Machtverhältnisse. Vollständige Sätze. Keine Aussage über diesen einen Charakter: was nur für ihn gilt, ist keine Regel der Welt.
+- **beschreibung**: 2–3 kurze Absätze (ca. 600–900 Zeichen) über die Welt – Atmosphäre, Alltag, was diesen Ort zu dieser Zeit ausmacht. Konkret und sinnlich statt allgemein.
+
+Für alle Felder gilt:
+- **Jede Festlegung muss ihren Anhalt im Charakter haben.** Beruf, Herkunft, Hintergrund und besondere Merkmale sagen dir, wie diese Welt wirtschaftet, wo ihre Grenzen verlaufen und was in ihr möglich ist. Erfinde nichts, was der Figur widerspricht.
+- Ergänze nur dort frei, wo der Charakter schweigt – und dann so, dass es zu ihm passt.
+- Die Welt ist **größer als diese eine Figur**. Sie soll Platz für weitere Charaktere lassen: beschreibe Verhältnisse, nicht ihre persönliche Lage.
+- Keine Handlung, kein Konflikt, keine Ereignisse – das kommt später und getrennt. Hier geht es um den Zustand der Welt.
+- Alles auf Deutsch, nüchtern und ohne Kitsch, ohne Markdown.`;
 }
 
 /**

@@ -39,6 +39,7 @@ import { CharacterImagesModal } from "../components/CharacterImagesModal";
 import { ImageLightbox } from "../components/ImageLightbox";
 import { TraitsTable } from "../components/TraitsTable";
 import { CharacterInputModal } from "../components/CharacterInputModal";
+import { ScenarioFromCharacterModal } from "../components/ScenarioFromCharacterModal";
 
 const controlClass =
   "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
@@ -501,6 +502,11 @@ export default function GalleryPage() {
           }
           onCharacterUpdated={applyUpdate}
           onAssignScenario={(scenarioId) => handleAssignScenario(selected.id, scenarioId)}
+          onScenarioCreated={(scenario) =>
+            setScenarios((gs) =>
+              [...gs, scenario].sort((a, b) => a.name.localeCompare(b.name)),
+            )
+          }
         />
       )}
     </div>
@@ -515,6 +521,7 @@ function DetailModal({
   onSaveContent,
   onCharacterUpdated,
   onAssignScenario,
+  onScenarioCreated,
 }: {
   character: StoredCharacter;
   scenarios: StoredScenario[];
@@ -526,6 +533,8 @@ function DetailModal({
   ) => Promise<void>;
   onCharacterUpdated: (updated: StoredCharacter) => void;
   onAssignScenario: (scenarioId: string | null) => Promise<void>;
+  /** Ein hier abgeleitetes Szenario in die Liste der Seite aufnehmen. */
+  onScenarioCreated: (scenario: StoredScenario) => void;
 }) {
   // Editierbare Kopie der Charakter-Inhalte (Name, Kurzbeschreibung, Text,
   // Merkmale). Persistiert erst über "Änderungen speichern".
@@ -561,6 +570,7 @@ function DetailModal({
 
   // Die ursprünglichen Formular-Vorgaben ebenso – reine Anzeige.
   const [inputOpen, setInputOpen] = useState(false);
+  const [scenarioDraftOpen, setScenarioDraftOpen] = useState(false);
 
   // Das Original des Primärbilds kommt aus keiner Listen-Antwort (nur das
   // Thumbnail) und wird für Vollbild, Bild-Export und PDF nachgeladen.
@@ -1051,6 +1061,21 @@ function DetailModal({
             <span className="text-xs text-foreground/50">
               {new Date(c.createdAt).toLocaleDateString("de-DE")}
             </span>
+            {/*
+              Die Gegenrichtung zu „+ Charakter für dieses Szenario" in der
+              Szenario-Detailansicht: dort prägt eine Welt eine neue Figur,
+              hier spannt eine Figur die Welt auf. Steht bei den anderen
+              Knöpfen, die etwas aus dem Charakter erzeugen, statt beim
+              Szenario-Auswahlfeld links – das ordnet einem **vorhandenen**
+              Szenario zu und legt keines an.
+            */}
+            <button
+              onClick={() => setScenarioDraftOpen(true)}
+              title="Leitet aus Beschreibung, Merkmalen und Ansatzpunkten ein neues Szenario ab und ordnet den Charakter ihm zu"
+              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              ✨ Szenario ableiten
+            </button>
             <button
               onClick={() => setInputOpen(true)}
               className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
@@ -1093,6 +1118,17 @@ function DetailModal({
           edited={edited}
           onChange={onCharacterUpdated}
           onClose={() => setImagesOpen(false)}
+        />
+      )}
+
+      {scenarioDraftOpen && (
+        <ScenarioFromCharacterModal
+          character={c}
+          edited={edited}
+          storyHooks={hooks}
+          onScenarioCreated={onScenarioCreated}
+          onAssign={(scenarioId) => onAssignScenario(scenarioId)}
+          onClose={() => setScenarioDraftOpen(false)}
         />
       )}
 

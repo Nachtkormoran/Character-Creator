@@ -287,6 +287,47 @@ Während ein Feld erzeugt wird, sind **alle** Knöpfe gesperrt – die Erzeugung
 liest die übrigen Felder mit, und zwei gleichzeitige Läufe säßen auf
 verschiedenen Ständen.
 
+**Szenario aus einem Charakter ableiten:** Die Gegenrichtung, Knopf „✨ Szenario
+ableiten" in der Fußzeile der Charakter-Detailansicht →
+`ScenarioFromCharacterModal` (`z-70`, gewöhnlicher Esc-Handler wie
+`CharacterInputModal`). Beide Richtungen müssen gehen, weil beides vorkommt:
+mal steht die Welt zuerst fest, mal fällt einem eine Person ein.
+
+Der Ablauf ist **zweistufig**: `POST /api/scenario-from-character` schlägt vor,
+der Vorschlag landet in derselben `ScenarioFields`-Maske, in der das Szenario
+später bearbeitet wird, und erst „Szenario anlegen" schreibt (über
+`POST /api/scenarios`) und ordnet den Charakter zu. Die Route **persistiert
+nichts** – wie alle Erzeugen-Routen.
+
+Der Charakter kommt **aus dem Request**, nicht über eine Id: anders als bei
+`scenario-plot` geht es hier um seinen **Inhalt**, und der ist in der
+Detailansicht womöglich ungespeichert bearbeitet (dieselbe Regel wie bei
+`regenerate-text`). Mitgegeben werden Beschreibung, vollständige Merkmale,
+Ansatzpunkte und `input.setting` – letzteres als bester Genre-Hinweis;
+`input.notes` bewusst **nicht**: stammt die Figur aus einem Szenario, stünde
+dort dessen kompletter Weltkontext, und der Vorschlag wäre eine Abschrift statt
+einer Ableitung.
+
+Es ist die **einzige Route mit Structured Output außer `generate-text`**
+(`scenarioDraftSchema`): es entstehen sechs Felder, und das Genre muss eine Id
+aus `GENRE_TEMPLATES` treffen – hier zwingt das JSON-Schema die Antwort ins
+vorhandene Vokabular, statt bloß Tokens zu kosten. `handlung` liefert der
+Entwurf **nicht**: der braucht mehrere Figuren, das frische Szenario hat eine.
+
+*Zwei Fallen, beide beobachtet und behoben:*
+- Das Modell kodiert Umlaute unter Structured Outputs **gelegentlich als
+  fehlerhaftes `\u`-Escape** (NUL-Zeichen plus Reste, dabei gehen Buchstaben
+  verloren: „Nordküste" → „Nordkfce"). Das ist **nicht reparierbar**, die
+  Zeichen sind weg. Die Route prüft deshalb auf Steuerzeichen, versucht es
+  **einmal neu** und antwortet sonst mit 502. Trat in ~3 von 8 Läufen auf; bei
+  `generate-text` nicht beobachtet, aber derselbe Mechanismus.
+- `ableiten` liest seine Eingaben aus einem **Ref**, nicht aus den
+  Abhängigkeiten. Hing es an `edited`, wechselte es beim Anlegen die Identität
+  (die Detailansicht rendert neu, weil das Szenario in die Liste und an den
+  Charakter wandert), der Start-Effekt lief erneut und schickte **nach** dem
+  Anlegen eine zweite Ableitung hinterher, die den fertigen Vorschlag aus der
+  Maske räumte.
+
 **Charakter für ein Szenario anlegen:** Der Knopf in der Szenario-Detailansicht
 führt auf `/?scenario=<id>`. Die Erstellen-Seite lädt das Szenario, belegt das
 Formular über `scenarioToInput` (`lib/scenarioInput.ts`) vor **und** wählt es
