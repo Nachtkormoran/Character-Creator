@@ -1,4 +1,4 @@
-import { DEFAULT_STORY_HOOK_ANCHOR } from "./schema";
+import { DEFAULT_STORY_HOOK_ANCHOR, TRAIT_LABELS } from "./schema";
 import type {
   CharacterInput,
   CharacterTraits,
@@ -245,14 +245,26 @@ ${zusatzBlock}
 Antworte mit nichts als dem Text selbst – keine Überschrift, keine Aufzählung, kein Markdown.`;
 }
 
-/** Was der Handlungsentwurf von einem Charakter braucht. */
+/**
+ * Was der Handlungsentwurf von einem Charakter braucht: **alles, was den
+ * Menschen ausmacht**.
+ *
+ * Ursprünglich standen hier nur Kurzbeschreibung und drei Merkmale. Das war zu
+ * wenig: Der lange Beschreibungstext enthält die **Vorgeschichte**, und aus
+ * Vorgeschichte entsteht Konflikt – die Merkmalstabelle liefert die Eckdaten,
+ * an denen sich Figuren konkret reiben (Herkunft, besondere Merkmale,
+ * Interessen). Beide gehen jetzt **immer** mit, auch wenn Ansatzpunkte
+ * vorhanden sind: die Ansatzpunkte sind eine Destillation des Textes und
+ * ersetzen ihn nicht.
+ */
 export interface PlotCharacter {
   name: string;
   kurzbeschreibung: string;
-  beruf: string;
-  wohnort: string;
-  persoenlichkeit: string;
-  /** Die Ansatzpunkte der Figur – hier das wichtigste Material. */
+  /** Der lange Fließtext – die Vorgeschichte. */
+  beschreibung: string;
+  /** Die vollständige Merkmalstabelle. */
+  merkmale: CharacterTraits;
+  /** Die Ansatzpunkte der Figur, sofern erzeugt. */
   storyHooks: string;
 }
 
@@ -296,24 +308,43 @@ export function buildScenarioPlotPrompt(
     ? `\nBeschreibung der Welt:\n${details.beschreibung.trim()}\n`
     : "";
 
+  /** Rückt einen mehrzeiligen Block ein, damit die Zuordnung zur Figur hält. */
+  const einrücken = (text: string, tiefe = "     ") =>
+    text
+      .split("\n")
+      .filter((z) => z.trim())
+      .map((z) => tiefe + z.trim())
+      .join("\n");
+
   const figuren = characters
     .map((c, i) => {
-      const kopf =
-        `${i + 1}. ${c.name}` +
-        [c.beruf, c.wohnort].filter(Boolean).map((v) => ` – ${v}`).join("");
+      const m = c.merkmale;
+      /**
+       * Die Merkmale laufen über `TRAIT_LABELS`, nicht als Aufzählung von
+       * Hand. Anders als in `buildImagePrompt` ist das hier richtig: ins Bild
+       * darf nur, was Aussehen ist (Hobbys gehören nicht hinein), in einen
+       * Handlungsentwurf gehört **jedes** Merkmal – ein später ergänztes
+       * genauso. Leere Werte bleiben draußen, sonst stünden bei
+       * Altbeständen Zeilen ohne Inhalt.
+       */
+      const merkmale = (
+        Object.keys(TRAIT_LABELS) as Array<keyof CharacterTraits>
+      )
+        .map((key) => {
+          const wert = String(m[key] ?? "").trim();
+          return wert && wert !== "0" ? `${TRAIT_LABELS[key]}: ${wert}` : null;
+        })
+        .filter(Boolean)
+        .join(" · ");
+
       const zeilen = [
         c.kurzbeschreibung && `   ${c.kurzbeschreibung}`,
-        c.persoenlichkeit && `   Wesen: ${c.persoenlichkeit}`,
-        // Eingerückt, damit erkennbar bleibt, welche Ansatzpunkte zu wem
-        // gehören – bei sechs Figuren sonst nicht mehr auseinanderzuhalten.
+        merkmale && `   Merkmale: ${merkmale}`,
+        c.beschreibung && `   Beschreibung:\n${einrücken(c.beschreibung)}`,
         c.storyHooks &&
-          `   Offene Ansatzpunkte:\n${c.storyHooks
-            .split("\n")
-            .filter((z) => z.trim())
-            .map((z) => `     ${z.trim()}`)
-            .join("\n")}`,
+          `   Offene Ansatzpunkte:\n${einrücken(c.storyHooks)}`,
       ].filter(Boolean);
-      return [kopf, ...zeilen].join("\n");
+      return [`${i + 1}. ${c.name}`, ...zeilen].join("\n");
     })
     .join("\n\n");
 
@@ -333,7 +364,8 @@ Anforderungen:
 - Drei bis vier kurze Absätze (insgesamt ca. 900–1400 Zeichen).
 - **Erfinde keine neuen Hauptfiguren.** Arbeite mit den Genannten. Nebenfiguren dürfen vorkommen, aber die Handlung muss von diesen Personen getragen werden.
 - Benenne, **wer was von wem will** und woran es sich entzündet. Ein Konflikt braucht mindestens zwei Personen mit unvereinbaren Absichten.
-- Greife die offenen Ansatzpunkte der Figuren auf und verbinde sie: Das Interessante entsteht dort, wo das Anliegen der einen die Wunde der anderen trifft.
+- Lies die Beschreibungen genau: Dort steht die Vorgeschichte, und dort liegen die Reibungsflächen zwischen den Figuren. Auch scheinbare Nebensachen aus den Merkmalen – Herkunft, eine Narbe, ein Hobby – taugen als Anknüpfungspunkt.
+- Sind offene Ansatzpunkte genannt, greife sie auf und verbinde sie: Das Interessante entsteht dort, wo das Anliegen der einen die Wunde der anderen trifft.
 - Nenne einen konkreten **Auslöser** – ein Ereignis, ein Termin, eine Nachricht –, der die Lage in Bewegung bringt.
 - Alles muss den Regeln des Szenarios gehorchen. Was dort gilt, gilt auch hier.
 - Kein fertiger Plot mit Auflösung: eine Ausgangslage mit offenem Ausgang. Schreibe nicht, wie es endet.

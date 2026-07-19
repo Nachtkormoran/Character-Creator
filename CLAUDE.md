@@ -255,6 +255,19 @@ Beschreibung, eigene Ansatzpunkte, die einander nie begegneten. Hier treffen
 sie aufeinander – die `storyHooks` der zugeordneten Charaktere sind das
 eigentliche Material des Prompts.
 
+Je Figur gehen **Kurzbeschreibung, der lange Beschreibungstext, die
+vollständige Merkmalstabelle und die Ansatzpunkte** mit – letztere, sofern
+erzeugt. Anfangs waren es nur Kurzbeschreibung und drei Merkmale; das war zu
+wenig, denn die Vorgeschichte steht im langen Text, und aus Vorgeschichte
+entsteht Konflikt. Text und Merkmale gehen **immer** mit, auch wenn Ansatzpunkte
+vorhanden sind: die sind eine Destillation und ersetzen die Quelle nicht. Kostet
+bei sechs Figuren rund 2000 zusätzliche Token, also Bruchteile eines Cents.
+
+Die Merkmale laufen dabei über `TRAIT_LABELS` statt als Aufzählung von Hand –
+anders als in `buildImagePrompt`, und das ist richtig so: ins Bild darf nur, was
+Aussehen ist, in einen Handlungsentwurf gehört **jedes** Merkmal, ein später
+ergänztes eingeschlossen. Leere Werte bleiben draußen.
+
 Drei Zuschnitte, die zusammengehören:
 - Die **Charaktere lädt die Route selbst** über die `scenarioId`, statt sie im
   Request entgegenzunehmen. Sonst hätte sie eine zweite Wahrheit über den

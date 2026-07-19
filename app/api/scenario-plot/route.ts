@@ -44,9 +44,15 @@ export async function POST(request: Request) {
     const rows = await prisma.character.findMany({
       where: { scenarioId },
       orderBy: { createdAt: "asc" },
+      // `description` ist der lange Text mit der Vorgeschichte – bei sechs
+      // Figuren rund 2000 zusätzliche Token. Bewusst in Kauf genommen: ohne
+      // ihn kennt der Entwurf die Welt im Detail und die Menschen darin nur
+      // als Stichworte. Bilder werden hier nicht geladen (die Größe wäre ein
+      // Vielfaches und für einen Text ohne Nutzen).
       select: {
         name: true,
         shortDescription: true,
+        description: true,
         traits: true,
         storyHooks: true,
       },
@@ -64,17 +70,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const characters: PlotCharacter[] = rows.map((r) => {
-      const t = normalizeTraits(JSON.parse(r.traits));
-      return {
-        name: r.name ?? "",
-        kurzbeschreibung: r.shortDescription ?? "",
-        beruf: t.beruf,
-        wohnort: t.wohnort,
-        persoenlichkeit: t.persoenlichkeit,
-        storyHooks: r.storyHooks ?? "",
-      };
-    });
+    const characters: PlotCharacter[] = rows.map((r) => ({
+      name: r.name ?? "",
+      kurzbeschreibung: r.shortDescription ?? "",
+      beschreibung: r.description,
+      // Auffüllen wie überall: Altbestände kennen später ergänzte Merkmale
+      // nicht, und der Prompt läuft über die vollständige Tabelle.
+      merkmale: normalizeTraits(JSON.parse(r.traits)),
+      storyHooks: r.storyHooks ?? "",
+    }));
 
     const openai = getOpenAI();
     const completion = await openai.chat.completions.create({
