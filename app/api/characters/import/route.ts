@@ -67,6 +67,7 @@ export async function POST(request: Request) {
           // Fehlende Merkmale auffüllen: die Datei kann aus einem Stand
           // stammen, der ein später ergänztes Merkmal noch nicht kannte.
           traits: JSON.stringify(normalizeTraits(character.merkmale)),
+          storyHooks: character.storyHooks || null,
           groupId: null,
           images: {
             create: images.map((b, i) => ({

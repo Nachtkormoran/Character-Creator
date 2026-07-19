@@ -60,6 +60,115 @@ ${nameAnforderung}
 }
 
 /**
+ * Baut den Prompt, mit dem der **Beschreibungstext** eines bereits
+ * gespeicherten Charakters neu erzeugt wird.
+ *
+ * Anders als `buildTextPrompt` entsteht hier kein neuer Charakter, sondern nur
+ * ein neuer Text zu einem bestehenden. Deshalb sind Name und Merkmale
+ * **Vorgabe, nicht Ergebnis**: die Merkmalstabelle bleibt unangetastet, und ein
+ * Text, der ihr widerspricht, wäre schlimmer als der alte. Der Charakter ist
+ * schon vergeben – neu geschrieben wird nur, wie über ihn erzählt wird.
+ *
+ * `zusatz` ist das freie Feld aus der Oberfläche (Stilwunsch, Perspektive,
+ * Schwerpunkt). Es steht bewusst **am Ende und als das Wichtigste**: wer es
+ * ausfüllt, will genau daran etwas ändern, sonst hätte er einfach nochmal auf
+ * denselben Knopf gedrückt.
+ */
+export function buildRegenerateTextPrompt(
+  input: CharacterInput,
+  character: GeneratedCharacter,
+  zusatz?: string,
+): string {
+  const m = character.merkmale;
+
+  const vorgaben =
+    line("Setting/Genre", input.setting) +
+    line("Herkunft/Ethnie", input.ethnicity) +
+    line("Hintergrund", input.background) +
+    line("Aussehen", input.appearance) +
+    line("Persönlichkeit", input.personality) +
+    line("Weitere Wünsche", input.notes);
+
+  const merkmale =
+    line("Name", character.name) +
+    line("Alter", String(m.alter)) +
+    line("Geschlecht", m.geschlecht) +
+    line("Größe/Körperbau", [m.groesse, m.koerperbau].filter(Boolean).join(", ")) +
+    line("Haare", [m.haarfarbe, m.frisur].filter(Boolean).join(", ")) +
+    line("Augen", m.augenfarbe) +
+    line("Hautton", m.hautton) +
+    line("Herkunft", m.herkunft) +
+    line("Wohnort", m.wohnort) +
+    line("Beruf", m.beruf) +
+    line("Besondere Merkmale", m.besondereMerkmale) +
+    line("Persönlichkeit", m.persoenlichkeit) +
+    line("Interessen", m.interessen);
+
+  const zusatzBlock = zusatz?.trim()
+    ? `\nBesonders wichtig – zusätzliche Wünsche für diesen Text (Stil, Perspektive, Schwerpunkt). Sie haben Vorrang vor den allgemeinen Anforderungen oben, solange sie den feststehenden Merkmalen nicht widersprechen:\n${zusatz.trim()}\n`
+    : "";
+
+  return `Schreibe den Beschreibungstext für einen bereits existierenden Charakter neu.
+
+Diese Merkmale stehen fest und dürfen sich nicht ändern. Der Text muss zu ihnen passen:
+${merkmale}
+Ursprüngliche Vorgaben zum Charakter (Kontext, keine Pflicht):
+${vorgaben || "- (keine)\n"}
+Anforderungen an den neuen Text:
+- 2–3 kurze Absätze (insgesamt ca. 700–1000 Zeichen) zu Aussehen, Persönlichkeit und Hintergrund.
+- Auf Deutsch, lebendig und plastisch, aber ohne Kitsch.
+- Ein wirklich neuer Text, keine Umformulierung Satz für Satz.
+${zusatzBlock}
+Antworte mit nichts als dem Text selbst – keine Überschrift, keine Anführungszeichen, keine Erklärung.`;
+}
+
+/**
+ * Baut den Prompt für drei Ansatzpunkte einer Geschichte.
+ *
+ * Grundlage sind Beschreibung **und** Merkmale, weil beide etwas beisteuern,
+ * was der andere nicht hat: der Text die Vorgeschichte, die Tabelle die harten
+ * Eckdaten (Beruf, Wohnort, Interessen). Die Ansatzpunkte sollen aus dem
+ * Charakter kommen, nicht aus einem allgemeinen Vorrat an Plot-Ideen.
+ *
+ * Ausgabe ist **Freitext**, kein strukturiertes JSON: das Ergebnis landet in
+ * einem Textfeld, das von Hand weitergeschrieben wird. Ein Schema für drei
+ * Absätze wäre nur Aufschlag – dieselbe Überlegung wie bei `buildNamePrompt`.
+ */
+export function buildStoryHooksPrompt(character: GeneratedCharacter): string {
+  const m = character.merkmale;
+
+  const eckdaten =
+    line("Alter", String(m.alter)) +
+    line("Geschlecht", m.geschlecht) +
+    line("Herkunft", m.herkunft) +
+    line("Wohnort", m.wohnort) +
+    line("Beruf", m.beruf) +
+    line("Besondere Merkmale", m.besondereMerkmale) +
+    line("Persönlichkeit", m.persoenlichkeit) +
+    line("Interessen und Hobbys", m.interessen);
+
+  return `Leite aus diesem Charakter drei Ansatzpunkte für eine interessante Geschichte ab.
+
+Name: ${character.name}
+${character.kurzbeschreibung ? `\nKurz: ${character.kurzbeschreibung}\n` : ""}
+Eckdaten:
+${eckdaten || "- (keine)\n"}
+Beschreibung:
+${character.beschreibung}
+
+Anforderungen:
+- Genau drei Ansatzpunkte, nummeriert (1., 2., 3.), je zwei bis vier Sätze.
+- Jeder beginnt mit einer knappen Überschrift von wenigen Worten, danach ein Doppelpunkt und der Text.
+- Reiner Fließtext ohne Markdown: keine Sternchen, keine Rauten, keine Fettschrift.
+- Jeder muss sich aus etwas Konkretem an diesem Charakter ergeben – aus einem Bruch in seiner Vorgeschichte, einem Widerspruch in seinem Wesen, einer Beziehung oder etwas Unerledigtem. Dieser Anknüpfungspunkt muss im Text erkennbar sein, aber nicht eigens ausgewiesen werden.
+- Drei verschiedene Richtungen, nicht drei Fassungen derselben Idee.
+- Ein Ansatzpunkt ist eine offene Ausgangslage mit einer Spannung, kein fertiges Handlungsgerüst und kein Ende.
+- Auf Deutsch, nüchtern und konkret.
+
+Antworte mit nichts als den drei Ansatzpunkten.`;
+}
+
+/**
  * Baut den Prompt für einen einzelnen Namensvorschlag.
  *
  * Bewusst **sehr knapp**: hier zählt jedes Token, und für einen Namen sind

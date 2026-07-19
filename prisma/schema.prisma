@@ -57,6 +57,12 @@ model Character {
   // (SQLite kennt keinen nativen JSON-Typ, daher als String gespeichert)
   traits      String
 
+  // Drei Ansatzpunkte für eine Geschichte, aus Beschreibung und Merkmalen
+  // abgeleitet. Freitext (drei Absätze), nicht strukturiert: sie werden
+  // gelesen und von Hand weitergeschrieben, nicht ausgewertet.
+  // Optional – Altbestände haben keine, und erzeugt wird nur auf Knopfdruck.
+  storyHooks  String?
+
   // Beliebig viele Bilder; genau eines davon ist das Primärbild.
   images      CharacterImage[]
 }

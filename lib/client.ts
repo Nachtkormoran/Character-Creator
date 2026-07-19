@@ -56,6 +56,28 @@ export function generateName(input: CharacterInput, traits?: CharacterTraits) {
   return postJson<{ name: string }>("/api/generate-name", { input, traits });
 }
 
+/**
+ * Erzeugt den Beschreibungstext eines bestehenden Charakters neu – aus seinen
+ * ursprünglichen Vorgaben plus einem freien Zusatzwunsch. Name und Merkmale
+ * bleiben unangetastet; zurück kommt nur der Text.
+ */
+export function regenerateDescription(
+  input: CharacterInput,
+  character: GeneratedCharacter,
+  zusatz: string,
+) {
+  return postJson<{ beschreibung: string }>("/api/regenerate-text", {
+    input,
+    character,
+    zusatz,
+  });
+}
+
+/** Drei Ansatzpunkte für eine Geschichte, als Freitext. */
+export function generateStoryHooks(character: GeneratedCharacter) {
+  return postJson<{ ansatzpunkte: string }>("/api/story-hooks", { character });
+}
+
 export function generateImage(
   character: GeneratedCharacter,
   imageStyle: string,
@@ -223,6 +245,7 @@ export async function getImage(
 export async function buildCharacterFile(
   c: StoredCharacter,
   character: GeneratedCharacter = c.character,
+  storyHooks: string = c.storyHooks,
 ): Promise<CharacterFile> {
   const images = await Promise.all(
     c.images.map(async (bild) => ({
@@ -242,6 +265,7 @@ export async function buildCharacterFile(
       kurzbeschreibung: character.kurzbeschreibung,
       beschreibung: character.beschreibung,
       merkmale: character.merkmale,
+      storyHooks,
     },
     images,
   };
@@ -277,9 +301,16 @@ export async function updateCharacterGroup(
   return data.character as StoredCharacter;
 }
 
+/**
+ * `storyHooks` ist optional, weil es außerhalb des Charakter-Objekts steht:
+ * die Ansatzpunkte gehören zum Charakter, sind aber **kein** Teil dessen, was
+ * das Modell bei der Erstgenerierung liefert (`GeneratedCharacter`). Bleiben sie
+ * weg, rührt der Teil-PATCH das gespeicherte Feld nicht an.
+ */
 export async function updateCharacterContent(
   id: string,
   character: GeneratedCharacter,
+  storyHooks?: string,
 ): Promise<StoredCharacter> {
   const res = await fetch(`/api/characters/${id}`, {
     method: "PATCH",
@@ -289,6 +320,7 @@ export async function updateCharacterContent(
       shortDescription: character.kurzbeschreibung,
       description: character.beschreibung,
       traits: character.merkmale,
+      ...(storyHooks !== undefined ? { storyHooks } : {}),
     }),
   });
   const data = await res.json().catch(() => ({}));

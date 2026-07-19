@@ -9,10 +9,12 @@ import {
   deleteCharacter,
   deleteGroup,
   generateName,
+  generateStoryHooks,
   getImage,
   importCharacterFile,
   listCharacters,
   listGroups,
+  regenerateDescription,
   updateCharacterContent,
   updateCharacterGroup,
 } from "@/lib/client";
@@ -159,8 +161,12 @@ export default function GalleryPage() {
     }
   }
 
-  async function handleSaveContent(id: string, character: GeneratedCharacter) {
-    const updated = await updateCharacterContent(id, character);
+  async function handleSaveContent(
+    id: string,
+    character: GeneratedCharacter,
+    storyHooks: string,
+  ) {
+    const updated = await updateCharacterContent(id, character, storyHooks);
     setCharacters((cs) => cs.map((x) => (x.id === id ? updated : x)));
     setSelected((s) => (s && s.id === id ? updated : s));
   }
@@ -487,8 +493,8 @@ export default function GalleryPage() {
           groups={groups}
           onClose={() => setSelected(null)}
           onDelete={() => handleDelete(selected.id)}
-          onSaveContent={(character) =>
-            handleSaveContent(selected.id, character)
+          onSaveContent={(character, storyHooks) =>
+            handleSaveContent(selected.id, character, storyHooks)
           }
           onCharacterUpdated={applyUpdate}
           onAssignGroup={(groupId) => handleAssignGroup(selected.id, groupId)}
@@ -511,7 +517,10 @@ function DetailModal({
   groups: StoredGroup[];
   onClose: () => void;
   onDelete: () => void;
-  onSaveContent: (character: GeneratedCharacter) => Promise<void>;
+  onSaveContent: (
+    character: GeneratedCharacter,
+    storyHooks: string,
+  ) => Promise<void>;
   onCharacterUpdated: (updated: StoredCharacter) => void;
   onAssignGroup: (groupId: string | null) => Promise<void>;
 }) {
@@ -520,6 +529,21 @@ function DetailModal({
   const [edited, setEdited] = useState<GeneratedCharacter>(c.character);
   const [savingEdits, setSavingEdits] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  /**
+   * Die Ansatzpunkte stehen neben `edited`, nicht darin: sie gehören zum
+   * Charakter, sind aber kein Feld von `GeneratedCharacter` – das beschreibt,
+   * was das Modell bei der Erstgenerierung liefert, und dazu zählen sie nicht.
+   * Sie teilen sich mit `edited` nur den Speichern-Knopf.
+   */
+  const [hooks, setHooks] = useState(c.storyHooks);
+  const [hooksBusy, setHooksBusy] = useState(false);
+  const [hooksError, setHooksError] = useState<string | null>(null);
+
+  // Text neu erzeugen: Zusatzwunsch (Stil, Perspektive, Schwerpunkt).
+  const [rewriteHint, setRewriteHint] = useState("");
+  const [rewriting, setRewriting] = useState(false);
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
 
   // Alles rund um Bilder liegt in der eigenen Bilder-Ansicht.
   const [imagesOpen, setImagesOpen] = useState(false);
@@ -603,6 +627,59 @@ function DetailModal({
   }
 
   /**
+   * Den Beschreibungstext neu erzeugen – aus den ursprünglichen Vorgaben plus
+   * dem Zusatzwunsch. Der neue Text landet als **ungespeicherte Änderung** im
+   * Bearbeitungs-Zustand: er ist nicht zwangsläufig besser als der alte, und
+   * über „Verwerfen" kommt der alte zurück, solange nicht gespeichert wurde.
+   *
+   * Grundlage sind die **bearbeiteten** Merkmale (`edited`), nicht die
+   * gespeicherten: wer gerade den Beruf geändert hat und dann den Text neu
+   * erzeugt, meint den neuen Beruf.
+   */
+  async function rewriteDescription() {
+    if (rewriting) return;
+    setRewriting(true);
+    setRewriteError(null);
+    try {
+      const { beschreibung } = await regenerateDescription(
+        c.input,
+        edited,
+        rewriteHint,
+      );
+      setField("beschreibung", beschreibung);
+    } catch (e) {
+      setRewriteError(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setRewriting(false);
+    }
+  }
+
+  /**
+   * Drei Ansatzpunkte für eine Geschichte ableiten. Ebenfalls erst einmal nur
+   * eine ungespeicherte Änderung – und ein zweiter Klick überschreibt, was im
+   * Feld steht. Deshalb die Rückfrage, sobald dort schon etwas steht: von Hand
+   * ergänzte Notizen wären sonst still weg.
+   */
+  async function deriveHooks() {
+    if (hooksBusy) return;
+    if (
+      hooks.trim() &&
+      !confirm("Die vorhandenen Ansatzpunkte werden ersetzt. Fortfahren?")
+    )
+      return;
+    setHooksBusy(true);
+    setHooksError(null);
+    try {
+      const { ansatzpunkte } = await generateStoryHooks(edited);
+      setHooks(ansatzpunkte);
+    } catch (e) {
+      setHooksError(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setHooksBusy(false);
+    }
+  }
+
+  /**
    * Charakter als Datei sichern – Texte, Merkmale, Vorgaben und alle Bilder in
    * Originalgröße. Grundlage sind die **bearbeiteten** Werte (`edited`), damit
    * ungespeicherte Änderungen nicht stillschweigend aus der Datei fallen.
@@ -612,7 +689,7 @@ function DetailModal({
     setExportingJson(true);
     setExportError(null);
     try {
-      const datei = await buildCharacterFile(c, edited);
+      const datei = await buildCharacterFile(c, edited, hooks);
       const blob = new Blob([JSON.stringify(datei, null, 2)], {
         type: "application/json",
       });
@@ -659,7 +736,9 @@ function DetailModal({
   const setTrait = (key: keyof CharacterTraits, value: string) =>
     setEdited((e) => ({ ...e, merkmale: withTrait(e.merkmale, key, value) }));
 
-  const dirty = JSON.stringify(edited) !== JSON.stringify(c.character);
+  const dirty =
+    JSON.stringify(edited) !== JSON.stringify(c.character) ||
+    hooks !== c.storyHooks;
   const nameValid = edited.name.trim().length > 0;
 
   async function saveEdits() {
@@ -668,7 +747,7 @@ function DetailModal({
     setEditError(null);
     const payload = { ...edited, name: edited.name.trim() };
     try {
-      await onSaveContent(payload);
+      await onSaveContent(payload, hooks);
       setEdited(payload);
     } catch (e) {
       setEditError(e instanceof Error ? e.message : "Fehler.");
@@ -758,7 +837,10 @@ function DetailModal({
               {savingEdits ? "Speichere …" : "Änderungen speichern"}
             </button>
             <button
-              onClick={() => setEdited(c.character)}
+              onClick={() => {
+                setEdited(c.character);
+                setHooks(c.storyHooks);
+              }}
               disabled={savingEdits}
               className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
             >
@@ -788,6 +870,40 @@ function DetailModal({
               ariaLabel="Beschreibung"
               className="text-[15px]"
             />
+
+            {/*
+              Text neu erzeugen. Steht unter dem Textfeld, nicht darüber: es ist
+              der Griff zum vorhandenen Text, keine Überschrift.
+            */}
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-black/10 bg-black/[0.02] p-2 dark:border-white/10 dark:bg-white/[0.03]">
+              <input
+                value={rewriteHint}
+                onChange={(e) => setRewriteHint(e.target.value)}
+                maxLength={1000}
+                placeholder="Zusätzliche Wünsche – z. B. nüchterner Stil, mehr über die Kindheit …"
+                aria-label="Zusätzliche Wünsche für den neuen Text"
+                className="min-w-40 flex-1 rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              />
+              <button
+                type="button"
+                onClick={rewriteDescription}
+                disabled={rewriting}
+                title="Erzeugt den Beschreibungstext neu – aus den ursprünglichen Vorgaben und der Merkmalstabelle. Name und Merkmale bleiben unverändert."
+                className="shrink-0 rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              >
+                {rewriting ? "Schreibt …" : "✨ Text neu erzeugen"}
+              </button>
+              {rewriteError ? (
+                <p className="w-full text-xs text-red-600 dark:text-red-400">
+                  {rewriteError}
+                </p>
+              ) : (
+                <p className="w-full text-xs text-foreground/50">
+                  Ersetzt den Text oben. Bis zum Speichern lässt er sich
+                  verwerfen.
+                </p>
+              )}
+            </div>
           </div>
           <div className="order-1 md:order-2">
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.03]">
@@ -829,6 +945,46 @@ function DetailModal({
             </p>
 
           </div>
+        </div>
+
+        {/*
+          Ansatzpunkte für eine Geschichte. Über die volle Breite und nicht in
+          der Beschreibungs-Spalte: es sind drei Absätze Fließtext, und neben
+          dem Bild stünde jeder davon als schmale Säule.
+        */}
+        <div className="mt-6">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+              Ansatzpunkte für eine Geschichte
+            </h3>
+            <button
+              type="button"
+              onClick={deriveHooks}
+              disabled={hooksBusy}
+              title="Leitet aus Beschreibung und Merkmalen drei Ausgangslagen für eine Geschichte ab"
+              className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              {hooksBusy
+                ? "Denkt nach …"
+                : hooks.trim()
+                  ? "✨ Neu ableiten"
+                  : "✨ Ableiten"}
+            </button>
+          </div>
+          <div className="rounded-md border border-black/10 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
+            <AutoTextarea
+              value={hooks}
+              onChange={setHooks}
+              ariaLabel="Ansatzpunkte für eine Geschichte"
+              placeholder="Noch keine Ansatzpunkte – der Knopf oben schlägt drei vor. Der Text lässt sich anschließend frei bearbeiten."
+              className="text-sm"
+            />
+          </div>
+          {hooksError && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+              {hooksError}
+            </p>
+          )}
         </div>
 
         <div className="mt-6">

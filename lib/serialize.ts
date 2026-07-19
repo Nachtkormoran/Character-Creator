@@ -42,6 +42,12 @@ export interface StoredCharacter {
   character: GeneratedCharacter;
   groupId: string | null;
   /**
+   * Drei Ansatzpunkte für eine Geschichte, als Freitext. Leerer String, solange
+   * keine erzeugt wurden – bewusst nicht `null`, damit die Anzeige und das
+   * Textfeld keinen Sonderfall brauchen.
+   */
+  storyHooks: string;
+  /**
    * Alle Bilder, neueste zuerst – **ohne** `imageData`. Die Originale sind je
    * ~2 MB; das Original holt sich die Anzeige bei Bedarf einzeln über
    * `GET /api/characters/[id]/images/[imageId]`.
@@ -88,6 +94,7 @@ export function serializeCharacter(
       merkmale: normalizeTraits(JSON.parse(row.traits)),
     },
     groupId: row.groupId,
+    storyHooks: row.storyHooks ?? "",
     images: (row.images ?? []).map(serializeImage),
   };
 }

@@ -65,7 +65,8 @@ neu erzeugten oder hochgeladenen Bild wieder scharf.
 
 **API-Routen:**
 - `POST /api/generate-text`, `POST /api/generate-image`,
-  `POST /api/generate-name` – OpenAI (persistieren nichts).
+  `POST /api/generate-name`, `POST /api/regenerate-text`,
+  `POST /api/story-hooks` – OpenAI (persistieren nichts).
 - `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional
   `groupId`, `imageData` und `thumbnail`; ein mitgegebenes Bild wird das erste
   und primäre). **Keine Route liefert `imageData` in einer Liste** (`omit`),
@@ -73,7 +74,7 @@ neu erzeugten oder hochgeladenen Bild wieder scharf.
   des Primärbilds.
 - `GET|PATCH|DELETE /api/characters/[id]` – **PATCH ist ein Teil-Update**
   (`.partial()`): jedes von `name`, `groupId`, `shortDescription`,
-  `description`, `traits` kann einzeln geändert werden. Alle nachträglichen
+  `description`, `traits`, `storyHooks` kann einzeln geändert werden. Alle nachträglichen
   Text-Bearbeitungen in der Galerie laufen darüber. **Bilder nicht** – die
   haben eigene Routen.
 - `POST /api/characters/[id]/images` – Bild hinzufügen (wird standardmäßig zum
@@ -101,7 +102,11 @@ Charakter und alle Bilder in **einer Transaktion** entstehen müssen; der Weg
 über `POST /api/characters` plus je Bild `POST …/images` ließe bei einem Fehler
 im dritten Bild einen halben Charakter stehen. Die Datei trägt bewusst **keine**
 `id`, `groupId` und `createdAt` – Begründung je Feld steht in
-`characterFile.ts`. Die Merkmale werden beim Import **lose** validiert und durch
+`characterFile.ts`. Die Ansatzpunkte (`storyHooks`) kamen später dazu und
+**ohne** Versionssprung: als optionales Feld mit `default("")` bleiben alte
+Dateien lesbar, und alte Stände dieser Anwendung überlesen das Feld in neuen
+Dateien. Eine erhöhte Version hätte hier nichts geschützt, sondern nur ältere
+Dateien abgelehnt. Die Merkmale werden beim Import **lose** validiert und durch
 `normalizeTraits` geschickt: eine Exportdatei ist ein Altbestand außerhalb der
 DB und kennt ein später ergänztes Merkmal nicht.
 
@@ -117,6 +122,43 @@ verbliebener Export-Knopf ist der fürs **PDF**. Der Bild-Export sitzt an der
 einzelnen Kachel, damit jedes Bild einzeln herunterladbar ist – bei mehr als
 einem Bild bekommt die Datei ihre Position angehängt (`Name_2.png`), sonst
 überschrieben sich die Downloads gegenseitig.
+
+**Text neu erzeugen & Ansatzpunkte:** Zwei Knöpfe in der Detailansicht der
+Galerie, beide **nur dort** – sie setzen einen fertigen Charakter voraus.
+
+„Text neu erzeugen" (`POST /api/regenerate-text`) schreibt den
+Beschreibungstext neu, aus den gespeicherten Vorgaben plus einem freien
+Zusatzwunsch aus dem Feld daneben (Stil, Perspektive, Schwerpunkt). Der
+Unterschied zu `/api/generate-text` ist der Zuschnitt: dort entsteht ein
+**ganzer** Charakter, hier nur der Text. Name und Merkmale sind **Vorgabe, nicht
+Ergebnis** – sie gehen in den Prompt ein und bleiben unangetastet, denn ein Text,
+der der Merkmalstabelle widerspricht, wäre schlechter als der alte. Grundlage
+sind dabei die **bearbeiteten** Merkmale (`edited`), nicht die gespeicherten:
+wer gerade den Beruf geändert hat und dann neu schreiben lässt, meint den neuen.
+
+„Ableiten" (`POST /api/story-hooks`) erzeugt drei Ansatzpunkte für eine
+Geschichte aus Beschreibung **und** Merkmalen – beide steuern bei, was der
+andere nicht hat (Text die Vorgeschichte, Tabelle die Eckdaten). Die
+Formular-Vorgaben gehen bewusst **nicht** mit: was aus ihnen wurde, steht längst
+im Text.
+
+Beide Routen liefern **Freitext**, kein Structured Output: eine Beschreibung ist
+ein String und drei Ansatzpunkte landen in einem Textfeld, das von Hand
+weitergeschrieben wird – ein JSON-Schema drumherum wäre reiner Token-Aufschlag
+(dieselbe Überlegung wie bei `generate-name`). Und beide **persistieren nichts**:
+das Ergebnis geht in den Bearbeitungs-Zustand der Detailansicht und wird erst
+über „Änderungen speichern" abgelegt. Das ist hier keine Nachlässigkeit, sondern
+der Punkt – ein neu erzeugter Text ist nicht zwangsläufig besser als der alte,
+und „Verwerfen" muss den alten zurückbringen. Aus demselben Grund fragt
+„Neu ableiten" nach, sobald im Feld schon etwas steht.
+
+Die Ansatzpunkte liegen in der eigenen Spalte `storyHooks` und **nicht** in
+`GeneratedCharacter`: dieser Typ beschreibt, was das Modell bei der
+Erstgenerierung liefert, und dazu zählen sie nicht (sie entstehen später, auf
+Knopfdruck). Deshalb führt die Detailansicht sie in einem eigenen State neben
+`edited` und teilt mit ihm nur den Speichern-Knopf; `updateCharacterContent`
+nimmt sie als **optionalen** dritten Parameter, und bleibt er weg, rührt der
+Teil-PATCH das Feld nicht an.
 
 **Vorgaben-Ansicht:** Die Formular-Eingaben, aus denen ein Charakter entstanden
 ist, liegen seit jeher in der Spalte `input` (JSON-String) und sind über
@@ -286,7 +328,8 @@ PDF-Export via `@react-pdf/renderer` (nur Browser, wird in der Galerie
 mitwachsende Textarea für die editierbaren Textfelder.
 
 **Datenmodell** (`prisma/schema.prisma`): `Character` (Felder `input` und
-`traits` als **JSON-Strings**, optionale `groupId`), `CharacterImage`
+`traits` als **JSON-Strings**, optionale `groupId`, optionale `storyHooks`),
+`CharacterImage`
 (`imageData` als Base64-Data-URL, `thumbnail` als verkleinerte Fassung davon,
 `isPrimary`; `onDelete: Cascade` – Bilder gehen mit dem Charakter),
 `Group` (`onDelete: SetNull` – beim Löschen der Gruppe bleiben

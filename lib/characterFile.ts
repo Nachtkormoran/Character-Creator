@@ -38,6 +38,14 @@ export const characterFileSchema = z.object({
     kurzbeschreibung: z.string().default(""),
     beschreibung: z.string().default(""),
     merkmale: z.record(z.string(), z.unknown()).default({}),
+    /**
+     * Optional und **ohne** Versionssprung ergänzt: ältere Dateien haben das
+     * Feld nicht (`default("")` fängt das ab), und ältere Stände dieser
+     * Anwendung überlesen es in neuen Dateien. Beide Richtungen bleiben also
+     * lesbar – eine Formatversion hätte hier nichts geschützt, nur den Import
+     * älterer Dateien abgelehnt.
+     */
+    storyHooks: z.string().default(""),
   }),
   /**
    * Bilder als Data-URLs, jeweils Original **und** Vorschau. Das Thumbnail

@@ -16,6 +16,7 @@ const patchSchema = z
     shortDescription: z.string().max(500),
     description: z.string().max(10000),
     traits: characterTraitsSchema,
+    storyHooks: z.string().max(4000),
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, {
@@ -54,6 +55,7 @@ export async function PATCH(request: Request, { params }: Context) {
       shortDescription?: string;
       description?: string;
       traits?: string;
+      storyHooks?: string;
     } = {};
     if (p.name !== undefined) data.name = p.name;
     if (p.groupId !== undefined) data.groupId = p.groupId;
@@ -61,6 +63,7 @@ export async function PATCH(request: Request, { params }: Context) {
       data.shortDescription = p.shortDescription;
     if (p.description !== undefined) data.description = p.description;
     if (p.traits !== undefined) data.traits = JSON.stringify(p.traits);
+    if (p.storyHooks !== undefined) data.storyHooks = p.storyHooks;
 
     await prisma.character.update({ where: { id }, data });
     return NextResponse.json({ character: await loadCharacter(id) });
