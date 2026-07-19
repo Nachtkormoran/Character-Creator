@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createScenario, listScenarios } from "@/lib/client";
+import {
+  createScenario,
+  generateScenarioDescription,
+  listScenarios,
+} from "@/lib/client";
 import {
   SCENARIO_LABELS,
   normalizeScenarioDetails,
@@ -27,6 +31,9 @@ export function genreLabel(id: string): string {
 function summary(details: ScenarioDetails): string {
   return (Object.keys(SCENARIO_LABELS) as Array<keyof ScenarioDetails>)
     .map((key) => {
+      // Die Beschreibung bleibt draußen: sie ist der längste Text von allen
+      // und würde die Zeile allein füllen. Hier stehen die Eckdaten.
+      if (key === "beschreibung") return null;
       const value = details[key]?.trim();
       if (!value) return null;
       if (key === "genre") return genreLabel(value);
@@ -51,6 +58,34 @@ export default function ScenariosPage() {
   const [details, setDetails] = useState<ScenarioDetails>(LEER);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  /**
+   * Beschreibung erzeugen. Ein zweiter Klick überschreibt, was im Feld steht –
+   * deshalb die Rückfrage, sobald dort schon etwas ist. Von Hand Geschriebenes
+   * wäre sonst still weg.
+   */
+  async function generateDescription() {
+    if (generating) return;
+    if (
+      details.beschreibung.trim() &&
+      !confirm("Die vorhandene Beschreibung wird ersetzt. Fortfahren?")
+    )
+      return;
+    setGenerating(true);
+    setFormError(null);
+    try {
+      const { beschreibung } = await generateScenarioDescription(
+        name.trim(),
+        details,
+      );
+      setDetails((d) => ({ ...d, beschreibung }));
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Fehler.");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   useEffect(() => {
     listScenarios()
@@ -131,6 +166,8 @@ export default function ScenariosPage() {
             details={details}
             onChange={setDetails}
             disabled={saving}
+            onGenerateBeschreibung={generateDescription}
+            generating={generating}
           />
 
           <div className="flex items-center gap-3">

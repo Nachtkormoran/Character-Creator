@@ -198,6 +198,54 @@ Antworte mit nichts als den drei Ansatzpunkten.`;
 }
 
 /**
+ * Baut den Prompt für die Beschreibung eines **Szenarios**.
+ *
+ * Grundlage sind die übrigen Festlegungen – Ort, Zeit, Genre, Regeln. Die
+ * Beschreibung ist deren Fließtext-Fassung, nicht eine weitere Quelle: was hier
+ * entsteht, darf den Feldern nie widersprechen, sonst stünden in derselben
+ * Maske zwei verschiedene Welten.
+ *
+ * Bewusst **ohne** die Charaktere des Szenarios. Ein Szenario beschreibt, was
+ * für alle darin gilt; würde es aus den vorhandenen Figuren geschrieben,
+ * beschriebe es den heutigen Bestand statt die Welt – und änderte sich mit
+ * jedem neuen Charakter.
+ */
+export function buildScenarioDescriptionPrompt(
+  name: string,
+  details: {
+    genre?: string;
+    ort?: string;
+    zeit?: string;
+    regeln?: string;
+  },
+  zusatz?: string,
+): string {
+  const vorgaben =
+    line("Name", name) +
+    line("Genre", details.genre) +
+    line("Ort", details.ort) +
+    line("Zeit", details.zeit) +
+    line("Regeln", details.regeln);
+
+  const zusatzBlock = zusatz?.trim()
+    ? `\nBesonders wichtig – zusätzliche Wünsche für diesen Text:\n${zusatz.trim()}\n`
+    : "";
+
+  return `Schreibe die Beschreibung eines Szenarios – der Welt, in der eine Geschichte spielt und in der mehrere Charaktere leben.
+
+Festlegungen:
+${vorgaben || "- (keine – entwirf eine stimmige Welt frei)\n"}
+Anforderungen:
+- 2–3 kurze Absätze (insgesamt ca. 600–900 Zeichen).
+- Beschreibe die Welt, nicht einzelne Personen und keine Handlung: Atmosphäre, Alltag, was diesen Ort zu dieser Zeit ausmacht, woran man ihn erkennt.
+- Alles muss zu den Festlegungen oben passen. Erfinde nichts, was ihnen widerspricht; ergänze nur Stimmiges, wo sie schweigen.
+- Konkret und sinnlich statt allgemein – ein Geräusch, ein Geruch, eine Gewohnheit sagen mehr als ein Adjektiv.
+- Auf Deutsch, nüchtern und ohne Kitsch.
+${zusatzBlock}
+Antworte mit nichts als dem Text selbst – keine Überschrift, keine Aufzählung, kein Markdown.`;
+}
+
+/**
  * Baut den Prompt für einen einzelnen Namensvorschlag.
  *
  * Bewusst **sehr knapp**: hier zählt jedes Token, und für einen Namen sind

@@ -27,10 +27,19 @@ export function ScenarioFields({
   details,
   onChange,
   disabled = false,
+  onGenerateBeschreibung,
+  generating = false,
 }: {
   details: ScenarioDetails;
   onChange: (details: ScenarioDetails) => void;
   disabled?: boolean;
+  /**
+   * Erzeugt die Beschreibung per KI. Die Anfrage selbst macht die aufrufende
+   * Seite – diese Komponente bleibt darstellend und kennt kein `fetch`.
+   * Fehlt der Handler, erscheint der Knopf nicht.
+   */
+  onGenerateBeschreibung?: () => void;
+  generating?: boolean;
 }) {
   const set = (key: keyof ScenarioDetails, value: string) =>
     onChange({ ...details, [key]: value });
@@ -43,7 +52,24 @@ export function ScenarioFields({
       {(Object.keys(SCENARIO_LABELS) as Array<keyof ScenarioDetails>).map(
         (key) => (
           <label key={key} className="flex flex-col gap-1">
-            <span className="text-sm font-medium">{SCENARIO_LABELS[key]}</span>
+            <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
+              {SCENARIO_LABELS[key]}
+              {key === "beschreibung" && onGenerateBeschreibung && (
+                <button
+                  type="button"
+                  onClick={onGenerateBeschreibung}
+                  disabled={disabled || generating}
+                  title="Erzeugt die Beschreibung aus Genre, Ort, Zeit und Regeln"
+                  className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                >
+                  {generating
+                    ? "Schreibt …"
+                    : details.beschreibung.trim()
+                      ? "✨ Neu erzeugen"
+                      : "✨ Erzeugen"}
+                </button>
+              )}
+            </span>
 
             {key === "genre" ? (
               <select
@@ -65,7 +91,7 @@ export function ScenarioFields({
                 value={details[key]}
                 onChange={(e) => set(key, e.target.value)}
                 disabled={disabled}
-                rows={key === "regeln" ? 5 : 2}
+                rows={key === "ort" ? 2 : 6}
                 className={`${controlClass} resize-y`}
               />
             ) : (

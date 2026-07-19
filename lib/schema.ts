@@ -320,6 +320,7 @@ export const scenarioDetailsSchema = z.object({
   ort: z.string().trim().max(300).optional().default(""),
   zeit: z.string().trim().max(200).optional().default(""),
   regeln: z.string().trim().max(4000).optional().default(""),
+  beschreibung: z.string().trim().max(4000).optional().default(""),
 });
 
 export type ScenarioDetails = z.infer<typeof scenarioDetailsSchema>;
@@ -335,6 +336,9 @@ export const SCENARIO_LABELS: Record<keyof ScenarioDetails, string> = {
   ort: "Ort",
   zeit: "Zeit",
   regeln: "Regeln",
+  // Steht **hinter** den übrigen Feldern, weil sie ihre Grundlage sind: die
+  // Beschreibung wird aus ihnen erzeugt, nicht umgekehrt.
+  beschreibung: "Beschreibung",
 };
 
 /**
@@ -348,12 +352,15 @@ export const SCENARIO_HINTS: Record<keyof ScenarioDetails, string> = {
   zeit: "Epoche, Jahr oder Jahreszeit – z. B. Spätherbst 1923.",
   regeln:
     "Was in diesem Szenario gilt und für alle Figuren darin wahr ist – Technikstand, Magie, gesellschaftliche Ordnung, Tabus.",
+  beschreibung:
+    "Fließtext über die Welt des Szenarios. Lässt sich aus den Feldern darüber erzeugen und danach frei bearbeiten.",
 };
 
 /** Felder, die im Formular mehrzeilig sind. Alles andere ist einzeilig. */
 export const SCENARIO_MULTILINE: ReadonlySet<keyof ScenarioDetails> = new Set([
   "ort",
   "regeln",
+  "beschreibung",
 ]);
 
 /**

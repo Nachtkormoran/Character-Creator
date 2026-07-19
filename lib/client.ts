@@ -410,6 +410,22 @@ export async function createScenario(
   return data.scenario as StoredScenario;
 }
 
+/**
+ * Beschreibung eines Szenarios aus seinen übrigen Festlegungen erzeugen.
+ * Persistiert nichts – der Text geht ins Formularfeld.
+ */
+export function generateScenarioDescription(
+  name: string,
+  details: ScenarioDetails,
+  zusatz = "",
+) {
+  return postJson<{ beschreibung: string }>("/api/scenario-description", {
+    name,
+    details,
+    zusatz,
+  });
+}
+
 /** Einzelnes Szenario samt seiner Charaktere (ohne Bild-Originale). */
 export async function getScenario(
   id: string,

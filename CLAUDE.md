@@ -67,6 +67,7 @@ neu erzeugten oder hochgeladenen Bild wieder scharf.
 **API-Routen:**
 - `POST /api/generate-text`, `POST /api/generate-image`,
   `POST /api/generate-name`, `POST /api/regenerate-text`,
+  `POST /api/scenario-description`,
   `POST /api/story-hooks` – OpenAI (persistieren nichts).
 - `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional
   `scenarioId`, `imageData` und `thumbnail`; ein mitgegebenes Bild wird das erste
@@ -199,6 +200,21 @@ fehlende Felder beim Lesen auf – Altbestände kennen ein neues Feld nicht.
 
 Der **Name** bleibt dagegen eine echte Spalte: nach ihm wird sortiert, und er
 ist die Identität des Szenarios, nicht eine seiner Eigenschaften.
+
+*Praxistest:* Das Feld `beschreibung` kam nach dem Bereich dazu und kostete
+genau das – vier Zeilen in `schema.ts`, keine Migration, keine Änderung an
+Formular oder Detailansicht. Extra-Arbeit entstand nur durch die Eigenheiten
+**dieses** Feldes: der Erzeugen-Knopf und der Ausschluss aus der
+Zusammenfassungszeile der Übersicht (ein 1200-Zeichen-Text füllte sie allein).
+
+Die **Beschreibung** lässt sich per KI erzeugen (`POST
+/api/scenario-description`), aus Genre, Ort, Zeit und Regeln. Sie steht deshalb
+**hinter** ihnen: sie ist deren Fließtext-Fassung, nicht eine weitere Quelle,
+und darf ihnen nie widersprechen. Der Prompt bekommt bewusst **nicht** die
+Charaktere des Szenarios – sonst beschriebe der Text den heutigen Bestand statt
+die Welt und änderte sich mit jeder neuen Figur. Wie überall persistiert die
+Route nichts: das Ergebnis geht ins Formularfeld, und ein zweiter Klick fragt
+nach, bevor er eine von Hand geschriebene Beschreibung ersetzt.
 
 **Zwei Wege zum Anlegen**, beide gewollt: das Feld in der Galerie schickt nur
 einen Namen (man ordnet gerade einen Charakter zu und will nicht in ein

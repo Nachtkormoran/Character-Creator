@@ -4,7 +4,12 @@ import { use, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { deleteScenario, getScenario, updateScenario } from "@/lib/client";
+import {
+  deleteScenario,
+  generateScenarioDescription,
+  getScenario,
+  updateScenario,
+} from "@/lib/client";
 import { normalizeScenarioDetails, type ScenarioDetails } from "@/lib/schema";
 import { primaryImage, type StoredCharacter } from "@/lib/serialize";
 import { ScenarioFields } from "../../components/ScenarioFields";
@@ -32,6 +37,34 @@ export default function ScenarioDetailPage({
   const [saved, setSaved] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  /**
+   * Beschreibung erzeugen. Landet als **ungespeicherte Änderung** im Formular –
+   * wie überall sonst muss „Verwerfen" den alten Text zurückbringen können.
+   * Die Rückfrage schützt eine von Hand geschriebene Beschreibung.
+   */
+  async function generateDescription() {
+    if (generating) return;
+    if (
+      details.beschreibung.trim() &&
+      !confirm("Die vorhandene Beschreibung wird ersetzt. Fortfahren?")
+    )
+      return;
+    setGenerating(true);
+    setSaveError(null);
+    try {
+      const { beschreibung } = await generateScenarioDescription(
+        name.trim(),
+        details,
+      );
+      setDetails((d) => ({ ...d, beschreibung }));
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   useEffect(() => {
     getScenario(id)
@@ -157,6 +190,8 @@ export default function ScenarioDetailPage({
           details={details}
           onChange={setDetails}
           disabled={saving}
+          onGenerateBeschreibung={generateDescription}
+          generating={generating}
         />
       </section>
 
