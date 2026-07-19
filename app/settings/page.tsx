@@ -237,7 +237,7 @@ function BackupSection() {
     if (
       !confirm(
         `„${file.name}" einspielen?\n\n` +
-          "ACHTUNG: Alle aktuellen Charaktere, Gruppen und Einstellungen werden " +
+          "ACHTUNG: Alle aktuellen Charaktere, Szenarien und Einstellungen werden " +
           "dabei gelöscht und durch den Inhalt der Datei ersetzt.\n\n" +
           "Vorher wird automatisch eine Sicherheitskopie des jetzigen Standes " +
           "neben der Datenbank abgelegt.",
@@ -252,7 +252,7 @@ function BackupSection() {
       const r = await importDatabase(file);
       setMessage(
         `Eingespielt: ${r.characters} Charaktere, ${r.images} Bilder, ` +
-          `${r.groups} Gruppen, ${r.settings} Einstellungen. ` +
+          `${r.scenarios} Szenarien, ${r.settings} Einstellungen. ` +
           `Sicherheitskopie: ${r.safetyCopy}`,
       );
     } catch (err) {
@@ -267,7 +267,7 @@ function BackupSection() {
       <div>
         <h2 className="font-medium">Sicherung</h2>
         <p className="text-sm text-foreground/60">
-          Die gesamte Datenbank – Charaktere samt Bildern, Gruppen und
+          Die gesamte Datenbank – Charaktere samt Bildern, Szenarien und
           Einstellungen – als Datei sichern oder wieder einspielen.
         </p>
       </div>

@@ -21,8 +21,8 @@ Export/Import).
 Wenn nur drei umgesetzt würden, mit dem größten Nutzen. Alle drei stehen
 unverändert seit dem letzten Stand – dazwischen ist anderes passiert:
 
-1. **Text nachträglich anpassen / neu erzeugen** – der einzige Teil der
-   KI-Ausgabe, der sich noch nicht überarbeiten lässt.
+1. **Szenario-Kontext** – s. u. Die Umbenennung ist erledigt, die gemeinsamen
+   Festlegungen fehlen noch.
 2. **Kosten wirklich messen statt schätzen** – s. u., kleiner Aufwand mit
    sofort sichtbarem Nutzen.
 3. **Bilder vergleichen** – jetzt, wo es mehrere pro Charakter gibt: zwei
@@ -31,10 +31,9 @@ unverändert seit dem letzten Stand – dazwischen ist anderes passiert:
 
 ## Inhaltliche Tiefe (Text / Merkmale)
 
-- ⭐ **Text nachträglich anpassen / neu erzeugen** – aktuell lässt sich nur das
-  Bild neu erzeugen. Nützlich: Beschreibung regenerieren oder gezielt
-  nachschärfen („kürzer", „länger", „düsterer", „humorvoller"). Manuelles
-  Editieren geht bereits, das Nachgenerieren per KI nicht.
+- **Kurzbeschreibung mitziehen** – „Text neu erzeugen" schreibt nur den
+  Fließtext neu; die Kurzbeschreibung darüber bleibt die alte und kann danach
+  daneben liegen. Bewusst so zugeschnitten, aber einen Knopf wert.
 - **Mehr strukturierte Felder** – z. B. Motivation/Ziele, Ängste, Geheimnisse,
   Eigenheiten/Sprechweise, Fähigkeiten. Optional als eigene Abschnitte.
   **Der Weg ist inzwischen erprobt:** „Interessen und Hobbies", „Wohnort" und
@@ -81,8 +80,11 @@ unverändert seit dem letzten Stand – dazwischen ist anderes passiert:
   **Entwurf liegt vor:** `RELATIONS.md` – Datenmodell (eine Zeile je Beziehung,
   Umkehrung über eine Typtabelle), Kreis-Layout als SVG ohne Bibliothek,
   Vorschlag in zwei Schritten. Noch nicht umgesetzt.
-- **Projekt-/Gruppen-Kontext** – pro Gruppe ein gemeinsames Setting/Welt-
-  beschreibung, das alle Charaktere dieses Projekts beeinflusst.
+- **Szenario-Kontext** – pro Szenario gemeinsame Festlegungen (Ort, Zeit,
+  Genre, Regeln), die für alle enthaltenen Charaktere gelten und in die
+  Generierung einfließen. **Als Nächstes dran** – die Umbenennung von
+  „Gruppe" zu „Szenario" war der erste Schritt dahin: der Behälter trägt jetzt
+  einen Namen, der beides meint, das Bündeln **und** das Festlegen.
 - **Route `/gallery` → `/characters`** – die Seite heißt inzwischen
   „Charaktere", die Adresse noch nicht. Kosmetik; bricht bestehende
   Lesezeichen.
@@ -91,7 +93,7 @@ unverändert seit dem letzten Stand – dazwischen ist anderes passiert:
 
 - **Export als Markdown** – JSON und PDF stehen; ein lesbares Textformat für
   Notiz-Programme fehlt noch.
-- **Ganze Gruppe exportieren** – z. B. alle Figuren eines Projekts als
+- **Ganzes Szenario exportieren** – z. B. alle Figuren eines Projekts als
   Sammel-PDF oder als mehrere Charakter-Dateien auf einmal. Das Dateiformat in
   `lib/characterFile.ts` ist auf **einen** Charakter je Datei ausgelegt; für
   eine Sammeldatei bräuchte es eine Version 2 (oder ein ZIP).
@@ -121,6 +123,17 @@ unverändert seit dem letzten Stand – dazwischen ist anderes passiert:
 
 ## Umgesetzt
 
+- **„Gruppe" heißt jetzt „Szenario"** – Oberfläche, Code und Datenbank
+  (`Group` → `Scenario`, `groupId` → `scenarioId`). Der neue Name meint beides:
+  die Auswahl von Personen für eine Geschichte **und** die Festlegungen, die
+  für alle darin gelten. Letztere fehlen noch – s. „Szenario-Kontext".
+- **Text neu erzeugen** – Knopf unter der Beschreibung in der Detailansicht,
+  mit Feld für Zusatzwünsche (Stil, Perspektive, Schwerpunkt). Name und
+  Merkmale bleiben unangetastet und gehen als Vorgabe in den Prompt.
+- **Ansatzpunkte für eine Geschichte** – drei Ausgangslagen aus Beschreibung
+  und Merkmalen, in einem frei bearbeitbaren Feld unter der Beschreibung. Die
+  Wahl „Bindung" (eng/mittel/frei) steuert, ob dabei Neues erfunden werden
+  darf; ohne sie driftete das Modell in Aufhänger, die an jede Figur passen.
 - **Einzelne Charaktere exportieren/importieren** – eine JSON-Datei je
   Charakter (Texte, Merkmale, Vorgaben, alle Bilder im Original). Der Import
   ist **additiv** und legt immer neu an, im Gegensatz zur Datenbank-Sicherung.
@@ -170,4 +183,4 @@ unverändert seit dem letzten Stand – dazwischen ist anderes passiert:
 - **Genre-Vorlagen** – `lib/templates.ts`, belegen das Setting-Feld vor.
 - **Light/Dark-Umschalter** – Hell/Dunkel/System im Header.
 - **Bild neu erzeugen / ersetzen / hochladen** – inkl. Herunterskalierung.
-- **Gruppen / Projekte** – Zuordnung und Filterung.
+- **Szenarien** – Zuordnung und Filterung.

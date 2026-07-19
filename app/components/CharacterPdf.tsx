@@ -15,7 +15,7 @@ export interface CharacterPdfData {
   beschreibung: string;
   merkmale: CharacterTraits;
   imageData: string | null;
-  groupName: string | null;
+  scenarioName: string | null;
   createdAt?: string;
 }
 
@@ -122,7 +122,7 @@ function CharacterPdfDocument({ data }: { data: CharacterPdfData }) {
             ) : null}
             <Text style={styles.meta}>
               {[
-                data.groupName ? `Gruppe: ${data.groupName}` : null,
+                data.scenarioName ? `Szenario: ${data.scenarioName}` : null,
                 data.createdAt
                   ? `Erstellt: ${new Date(data.createdAt).toLocaleDateString("de-DE")}`
                   : null,

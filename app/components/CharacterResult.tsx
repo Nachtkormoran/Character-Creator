@@ -9,7 +9,7 @@ import {
   type CharacterTraits,
   type GeneratedCharacter,
 } from "@/lib/schema";
-import type { StoredGroup } from "@/lib/serialize";
+import type { StoredScenario } from "@/lib/serialize";
 import { AutoTextarea } from "./AutoTextarea";
 import { ReferenceImagePicker } from "./ReferenceImagePicker";
 import { ImageLightbox } from "./ImageLightbox";
@@ -32,9 +32,9 @@ export function CharacterResult({
   onExtraPromptChange,
   referenceImage,
   onReferenceImageChange,
-  groups,
-  groupId,
-  onGroupChange,
+  scenarios,
+  scenarioId,
+  onScenarioChange,
   onGenerateImage,
   onSave,
   saving,
@@ -56,9 +56,9 @@ export function CharacterResult({
   onExtraPromptChange: (value: string) => void;
   referenceImage: string | null;
   onReferenceImageChange: (dataUrl: string | null) => void;
-  groups: StoredGroup[];
-  groupId: string | null;
-  onGroupChange: (value: string | null) => void;
+  scenarios: StoredScenario[];
+  scenarioId: string | null;
+  onScenarioChange: (value: string | null) => void;
   onGenerateImage: () => void;
   onSave: () => void;
   saving: boolean;
@@ -299,15 +299,15 @@ export function CharacterResult({
         </button>
 
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-foreground/60">Gruppe:</span>
+          <span className="text-foreground/60">Szenario:</span>
           <select
-            value={groupId ?? ""}
-            onChange={(e) => onGroupChange(e.target.value || null)}
+            value={scenarioId ?? ""}
+            onChange={(e) => onScenarioChange(e.target.value || null)}
             disabled={saving || saved}
             className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
           >
             <option value="">— keine —</option>
-            {groups.map((g) => (
+            {scenarios.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
               </option>

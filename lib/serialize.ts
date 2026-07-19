@@ -1,7 +1,7 @@
 import type {
   Character,
   CharacterImage,
-  Group,
+  Scenario,
 } from "@/app/generated/prisma/client";
 import { normalizeTraits } from "./schema";
 import type { CharacterInput, GeneratedCharacter } from "./schema";
@@ -40,7 +40,7 @@ export interface StoredCharacter {
   createdAt: string;
   input: CharacterInput;
   character: GeneratedCharacter;
-  groupId: string | null;
+  scenarioId: string | null;
   /**
    * Drei Ansatzpunkte für eine Geschichte, als Freitext. Leerer String, solange
    * keine erzeugt wurden – bewusst nicht `null`, damit die Anzeige und das
@@ -93,20 +93,20 @@ export function serializeCharacter(
       // sonst scheitert später jede Validierung gegen das Schema.
       merkmale: normalizeTraits(JSON.parse(row.traits)),
     },
-    groupId: row.groupId,
+    scenarioId: row.scenarioId,
     storyHooks: row.storyHooks ?? "",
     images: (row.images ?? []).map(serializeImage),
   };
 }
 
-/** Client-Repräsentation einer Gruppe (inkl. Anzahl zugeordneter Charaktere). */
-export interface StoredGroup {
+/** Client-Repräsentation einer Szenario (inkl. Anzahl zugeordneter Charaktere). */
+export interface StoredScenario {
   id: string;
   name: string;
   count: number;
 }
 
-export function serializeGroup(row: Group & { _count?: { characters: number } }): StoredGroup {
+export function serializeScenario(row: Scenario & { _count?: { characters: number } }): StoredScenario {
   return {
     id: row.id,
     name: row.name,

@@ -12,8 +12,13 @@ import { prisma } from "./prisma";
  * Nur serverseitig verwenden (Node-Runtime, Dateisystemzugriff).
  */
 
-/** Tabellen, die eine gültige Sicherung enthalten muss. */
-const REQUIRED_TABLES = ["Character", "Group", "Setting"] as const;
+/**
+ * Tabellen, die eine gültige Sicherung enthalten muss.
+ *
+ * `Scenario` fehlt hier bewusst: die Tabelle hieß bis zur Umbenennung `Group`,
+ * und beide Namen sind gültig. Welcher vorliegt, entscheidet sich beim Lesen.
+ */
+const REQUIRED_TABLES = ["Character", "Setting"] as const;
 
 /** SQLite-Dateien beginnen mit dieser Signatur. */
 const SQLITE_MAGIC = Buffer.from("SQLite format 3\0", "utf8");
@@ -47,7 +52,7 @@ export async function exportDatabase(): Promise<Buffer> {
 export interface ImportResult {
   characters: number;
   images: number;
-  groups: number;
+  scenarios: number;
   settings: number;
   /** Pfad der Sicherheitskopie, die vor dem Überschreiben angelegt wurde. */
   safetyCopy: string;
@@ -81,7 +86,7 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
       adapter: new PrismaBetterSqlite3({ url: `file:${uploadPath}` }),
     });
     let characters: Array<Record<string, unknown>>;
-    let groups: Array<Record<string, unknown>>;
+    let scenarios: Array<Record<string, unknown>>;
     let settings: Array<Record<string, unknown>>;
     let images: Array<Record<string, unknown>>;
     try {
@@ -97,8 +102,26 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
       }
 
       characters = await source.$queryRawUnsafe("SELECT * FROM Character");
-      groups = await source.$queryRawUnsafe('SELECT * FROM "Group"');
       settings = await source.$queryRawUnsafe("SELECT * FROM Setting");
+
+      // Die Tabelle hieß bis zur Umbenennung `Group` (und die Spalte am
+      // Charakter `groupId`). Sicherungen von davor tragen die alten Namen –
+      // dieselbe Lage wie bei `CharacterImage` weiter unten, und dieselbe
+      // Antwort: lesen, was da ist, statt die Datei abzulehnen. Eine
+      // Sicherung ist ein Altbestand; sie kann nicht nachträglich mitwandern.
+      const scenarioTable = tables.has("Scenario")
+        ? "Scenario"
+        : tables.has("Group")
+          ? "Group"
+          : null;
+      if (!scenarioTable) {
+        throw new Error(
+          'Der Datei fehlt die Tabelle "Scenario" (früher "Group"). Stammt sie aus dieser App?',
+        );
+      }
+      scenarios = await source.$queryRawUnsafe(
+        `SELECT * FROM "${scenarioTable}"`,
+      );
 
       // Sicherungen von vor der Mehrbild-Umstellung haben keine
       // `CharacterImage`-Tabelle: dort steckt das Portrait noch in
@@ -132,11 +155,11 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
     // Alles-oder-nichts: bricht etwas ab, bleibt der alte Stand erhalten.
     await prisma.$transaction([
       prisma.character.deleteMany(),
-      prisma.group.deleteMany(),
+      prisma.scenario.deleteMany(),
       prisma.setting.deleteMany(),
-      // Gruppen zuerst – Charaktere verweisen per groupId darauf.
-      ...groups.map((g) =>
-        prisma.group.create({
+      // Szenarien zuerst – Charaktere verweisen per scenarioId darauf.
+      ...scenarios.map((g) =>
+        prisma.scenario.create({
           data: {
             id: g.id as string,
             createdAt: new Date(g.createdAt as string | number),
@@ -151,11 +174,15 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
             createdAt: new Date(c.createdAt as string | number),
             updatedAt: new Date(c.updatedAt as string | number),
             name: (c.name as string | null) ?? null,
-            groupId: (c.groupId as string | null) ?? null,
+            // Alte Sicherungen tragen die Zuordnung noch als `groupId`.
+            scenarioId:
+              ((c.scenarioId ?? c.groupId) as string | null) ?? null,
             input: c.input as string,
             shortDescription: (c.shortDescription as string | null) ?? null,
             description: c.description as string,
             traits: c.traits as string,
+            // Sicherungen von vor den Ansatzpunkten haben die Spalte nicht.
+            storyHooks: (c.storyHooks as string | null) ?? null,
           },
         }),
       ),
@@ -186,7 +213,7 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
     return {
       characters: characters.length,
       images: images.length,
-      groups: groups.length,
+      scenarios: scenarios.length,
       settings: settings.length,
       safetyCopy: path.basename(safetyCopy),
     };

@@ -23,9 +23,14 @@ model Setting {
   updatedAt DateTime @updatedAt
 }
 
-// Gruppe / Projekt, dem Charaktere zugeordnet werden können
-// (z. B. verschiedene Buch- oder Spieleprojekte).
-model Group {
+// Szenario: eine Auswahl von Personen für eine Geschichte, zusammen mit
+// Festlegungen, die für alle darin gelten (Ort, Zeit, Genre …).
+//
+// Bislang nur ein Name – der Behälter ist die eine Hälfte, die gemeinsamen
+// Festlegungen kommen mit dem Ausbau dazu. Hieß früher `Group`; umbenannt,
+// weil „Gruppe" nur das Bündeln ausdrückte und nicht, dass das Szenario
+// selbst etwas festlegt.
+model Scenario {
   id         String      @id @default(cuid())
   createdAt  DateTime    @default(now())
   name       String
@@ -39,10 +44,10 @@ model Character {
 
   name        String?
 
-  // Optionale Zuordnung zu einer Gruppe/einem Projekt.
-  // Wird die Gruppe gelöscht, bleibt der Charakter erhalten (groupId -> null).
-  groupId     String?
-  group       Group?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  // Optionale Zuordnung zu einem Szenario.
+  // Wird das Szenario gelöscht, bleibt der Charakter erhalten (-> null).
+  scenarioId  String?
+  scenario    Scenario? @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
 
   // Ursprüngliche Formular-Eingaben als JSON-String
   input       String

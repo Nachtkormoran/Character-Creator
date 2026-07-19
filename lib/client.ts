@@ -11,7 +11,7 @@ import type {
   Settings,
   StoryHookAnchor,
 } from "./schema";
-import type { StoredCharacter, StoredGroup } from "./serialize";
+import type { StoredCharacter, StoredScenario } from "./serialize";
 
 /**
  * Erzeugt das Vorschaubild. Schlägt das fehl (etwa weil Canvas das Bild nicht
@@ -130,14 +130,14 @@ export async function saveCharacter(
   input: CharacterInput,
   character: GeneratedCharacter,
   imageData: string | null,
-  groupId: string | null = null,
+  scenarioId: string | null = null,
 ) {
   return postJson<{ character: StoredCharacter }>("/api/characters", {
     input,
     character,
     imageData,
     thumbnail: imageData ? await safeThumbnail(imageData) : null,
-    groupId,
+    scenarioId,
   });
 }
 
@@ -298,14 +298,14 @@ export async function importCharacterFile(
   );
 }
 
-export async function updateCharacterGroup(
+export async function updateCharacterScenario(
   id: string,
-  groupId: string | null,
+  scenarioId: string | null,
 ): Promise<StoredCharacter> {
   const res = await fetch(`/api/characters/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ groupId }),
+    body: JSON.stringify({ scenarioId }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Zuordnung fehlgeschlagen.");
@@ -347,12 +347,12 @@ export async function deleteCharacter(id: string): Promise<void> {
   }
 }
 
-// --- Gruppen -------------------------------------------------------------
+// --- Szenarien -------------------------------------------------------------
 
 export interface ImportResult {
   characters: number;
   images: number;
-  groups: number;
+  scenarios: number;
   settings: number;
   safetyCopy: string;
 }
@@ -382,28 +382,28 @@ export async function importDatabase(file: File): Promise<ImportResult> {
   return data.result as ImportResult;
 }
 
-export async function listGroups(): Promise<StoredGroup[]> {
-  const res = await fetch("/api/groups", { cache: "no-store" });
+export async function listScenarios(): Promise<StoredScenario[]> {
+  const res = await fetch("/api/scenarios", { cache: "no-store" });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || "Gruppen laden fehlgeschlagen.");
-  return data.groups as StoredGroup[];
+  if (!res.ok) throw new Error(data?.error || "Szenarien laden fehlgeschlagen.");
+  return data.scenarios as StoredScenario[];
 }
 
-export async function createGroup(name: string): Promise<StoredGroup> {
-  const res = await fetch("/api/groups", {
+export async function createScenario(name: string): Promise<StoredScenario> {
+  const res = await fetch("/api/scenarios", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || "Gruppe anlegen fehlgeschlagen.");
-  return data.group as StoredGroup;
+  if (!res.ok) throw new Error(data?.error || "Szenario anlegen fehlgeschlagen.");
+  return data.scenario as StoredScenario;
 }
 
-export async function deleteGroup(id: string): Promise<void> {
-  const res = await fetch(`/api/groups/${id}`, { method: "DELETE" });
+export async function deleteScenario(id: string): Promise<void> {
+  const res = await fetch(`/api/scenarios/${id}`, { method: "DELETE" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data?.error || "Gruppe löschen fehlgeschlagen.");
+    throw new Error(data?.error || "Szenario löschen fehlgeschlagen.");
   }
 }

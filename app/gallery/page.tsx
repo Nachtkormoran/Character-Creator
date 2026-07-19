@@ -5,18 +5,18 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   buildCharacterFile,
-  createGroup,
+  createScenario,
   deleteCharacter,
-  deleteGroup,
+  deleteScenario,
   generateName,
   generateStoryHooks,
   getImage,
   importCharacterFile,
   listCharacters,
-  listGroups,
+  listScenarios,
   regenerateDescription,
   updateCharacterContent,
-  updateCharacterGroup,
+  updateCharacterScenario,
 } from "@/lib/client";
 import { characterFileName } from "@/lib/characterFile";
 import { downloadBlob, safeFileName } from "@/lib/download";
@@ -32,7 +32,7 @@ import {
 import {
   primaryImage,
   type StoredCharacter,
-  type StoredGroup,
+  type StoredScenario,
 } from "@/lib/serialize";
 import { AutoTextarea } from "../components/AutoTextarea";
 import { CharacterImagesModal } from "../components/CharacterImagesModal";
@@ -80,7 +80,7 @@ function searchableText(c: StoredCharacter): string {
 
 export default function GalleryPage() {
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
-  const [groups, setGroups] = useState<StoredGroup[]>([]);
+  const [scenarios, setScenarios] = useState<StoredScenario[]>([]);
   const [importing, setImporting] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -88,31 +88,31 @@ export default function GalleryPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<StoredCharacter | null>(null);
 
-  // Filter: "all" | "none" | groupId
+  // Filter: "all" | "none" | scenarioId
   const [filter, setFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>("newest");
-  const [newGroupName, setNewGroupName] = useState("");
-  const [creatingGroup, setCreatingGroup] = useState(false);
-  const [groupError, setGroupError] = useState<string | null>(null);
+  const [newScenarioName, setNewScenarioName] = useState("");
+  const [creatingScenario, setCreatingScenario] = useState(false);
+  const [scenarioError, setScenarioError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([listCharacters(), listGroups()])
+    Promise.all([listCharacters(), listScenarios()])
       .then(([chars, grps]) => {
         setCharacters(chars);
-        setGroups(grps);
+        setScenarios(grps);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Fehler."))
       .finally(() => setLoading(false));
   }, []);
 
-  // Charakter-Anzahl je Gruppe (clientseitig, immer aktuell)
-  const groupCounts = useMemo(() => {
+  // Charakter-Anzahl je Szenario (clientseitig, immer aktuell)
+  const scenarioCounts = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const c of characters) if (c.groupId) m[c.groupId] = (m[c.groupId] ?? 0) + 1;
+    for (const c of characters) if (c.scenarioId) m[c.scenarioId] = (m[c.scenarioId] ?? 0) + 1;
     return m;
   }, [characters]);
-  const noneCount = characters.filter((c) => !c.groupId).length;
+  const noneCount = characters.filter((c) => !c.scenarioId).length;
 
   // Suchtext je Charakter einmal vorberechnen – die Beschreibungen sind lang.
   const searchIndex = useMemo(() => {
@@ -126,13 +126,13 @@ export default function GalleryPage() {
     const terms = normalize(query).split(/\s+/).filter(Boolean);
 
     const matching = characters.filter((c) => {
-      const inGroup =
+      const inScenario =
         filter === "all"
           ? true
           : filter === "none"
-            ? c.groupId === null
-            : c.groupId === filter;
-      if (!inGroup) return false;
+            ? c.scenarioId === null
+            : c.scenarioId === filter;
+      if (!inScenario) return false;
       if (terms.length === 0) return true;
       const haystack = searchIndex.get(c.id) ?? "";
       return terms.every((t) => haystack.includes(t));
@@ -180,27 +180,27 @@ export default function GalleryPage() {
     setSelected((s) => (s && s.id === updated.id ? updated : s));
   }
 
-  async function handleAssignGroup(id: string, groupId: string | null) {
-    const updated = await updateCharacterGroup(id, groupId);
+  async function handleAssignScenario(id: string, scenarioId: string | null) {
+    const updated = await updateCharacterScenario(id, scenarioId);
     setCharacters((cs) => cs.map((x) => (x.id === id ? updated : x)));
     setSelected((s) => (s && s.id === id ? updated : s));
   }
 
-  async function handleCreateGroup(e: React.FormEvent) {
+  async function handleCreateScenario(e: React.FormEvent) {
     e.preventDefault();
-    const name = newGroupName.trim();
-    if (!name || creatingGroup) return;
-    setCreatingGroup(true);
-    setGroupError(null);
+    const name = newScenarioName.trim();
+    if (!name || creatingScenario) return;
+    setCreatingScenario(true);
+    setScenarioError(null);
     try {
-      const group = await createGroup(name);
-      setGroups((gs) => [...gs, group].sort((a, b) => a.name.localeCompare(b.name)));
-      setNewGroupName("");
-      setFilter(group.id);
+      const scenario = await createScenario(name);
+      setScenarios((gs) => [...gs, scenario].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewScenarioName("");
+      setFilter(scenario.id);
     } catch (err) {
-      setGroupError(err instanceof Error ? err.message : "Fehler.");
+      setScenarioError(err instanceof Error ? err.message : "Fehler.");
     } finally {
-      setCreatingGroup(false);
+      setCreatingScenario(false);
     }
   }
 
@@ -247,27 +247,27 @@ export default function GalleryPage() {
     setImporting(false);
   }
 
-  async function handleDeleteGroup(id: string) {
-    const group = groups.find((g) => g.id === id);
+  async function handleDeleteScenario(id: string) {
+    const scenario = scenarios.find((g) => g.id === id);
     if (
       !confirm(
-        `Gruppe „${group?.name ?? ""}" löschen? Die zugeordneten Charaktere bleiben erhalten.`,
+        `Szenario „${scenario?.name ?? ""}" löschen? Die zugeordneten Charaktere bleiben erhalten.`,
       )
     )
       return;
-    const prevGroups = groups;
+    const prevScenarios = scenarios;
     const prevChars = characters;
-    setGroups((gs) => gs.filter((g) => g.id !== id));
-    // Charaktere dieser Gruppe lokal auf "ohne Gruppe" setzen
+    setScenarios((gs) => gs.filter((g) => g.id !== id));
+    // Charaktere dieser Szenario lokal auf "ohne Szenario" setzen
     setCharacters((cs) =>
-      cs.map((c) => (c.groupId === id ? { ...c, groupId: null } : c)),
+      cs.map((c) => (c.scenarioId === id ? { ...c, scenarioId: null } : c)),
     );
-    setSelected((s) => (s && s.groupId === id ? { ...s, groupId: null } : s));
+    setSelected((s) => (s && s.scenarioId === id ? { ...s, scenarioId: null } : s));
     if (filter === id) setFilter("all");
     try {
-      await deleteGroup(id);
+      await deleteScenario(id);
     } catch {
-      setGroups(prevGroups);
+      setScenarios(prevScenarios);
       setCharacters(prevChars);
     }
   }
@@ -315,7 +315,7 @@ export default function GalleryPage() {
         </p>
       )}
 
-      {/* Gruppen-Filter & -Verwaltung */}
+      {/* Szenario-Filter & -Verwaltung */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-black/10 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]">
         <label className="flex items-center gap-2 text-sm">
           <span className="text-foreground/60">Anzeigen:</span>
@@ -325,10 +325,10 @@ export default function GalleryPage() {
             className={controlClass}
           >
             <option value="all">Alle Charaktere ({characters.length})</option>
-            <option value="none">Ohne Gruppe ({noneCount})</option>
-            {groups.map((g) => (
+            <option value="none">Ohne Szenario ({noneCount})</option>
+            {scenarios.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.name} ({groupCounts[g.id] ?? 0})
+                {g.name} ({scenarioCounts[g.id] ?? 0})
               </option>
             ))}
           </select>
@@ -352,7 +352,7 @@ export default function GalleryPage() {
         {/*
           Die Suche füllt den Rest der Zeile und gibt bei Platzmangel als erste
           nach (`flex-1` statt fester Breite). Mit `w-64` rutschte die
-          Gruppen-Anlage schon auf eine zweite Zeile, obwohl rechts noch Platz
+          Szenario-Anlage schon auf eine zweite Zeile, obwohl rechts noch Platz
           war – die feste Breite gab ihn nicht her.
         */}
         <div className="relative flex min-w-48 flex-1 items-center">
@@ -379,7 +379,7 @@ export default function GalleryPage() {
         </div>
 
         {/*
-          Die beiden Gruppen-Bedienelemente bleiben als Block zusammen. Sobald
+          Die beiden Szenario-Bedienelemente bleiben als Block zusammen. Sobald
           der Löschen-Knopf dazukommt, passen fünf Elemente nicht mehr in die
           Zeile (der Rahmen ist `max-w-5xl`); dann rutscht der ganze Block nach
           unten statt nur das Eingabefeld. Kein `ml-auto` nötig – die Suche
@@ -389,33 +389,33 @@ export default function GalleryPage() {
           {filter !== "all" && filter !== "none" && (
             <button
               type="button"
-              onClick={() => handleDeleteGroup(filter)}
+              onClick={() => handleDeleteScenario(filter)}
               className="rounded-md border border-red-500/40 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
             >
-              Gruppe löschen
+              Szenario löschen
             </button>
           )}
 
-          <form onSubmit={handleCreateGroup} className="flex items-center gap-2">
+          <form onSubmit={handleCreateScenario} className="flex items-center gap-2">
             <input
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              placeholder="Neue Gruppe …"
+              value={newScenarioName}
+              onChange={(e) => setNewScenarioName(e.target.value)}
+              placeholder="Neues Szenario …"
               maxLength={80}
               className={`${controlClass} w-36`}
             />
             <button
               type="submit"
-              disabled={creatingGroup || !newGroupName.trim()}
+              disabled={creatingScenario || !newScenarioName.trim()}
               className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
             >
-              {creatingGroup ? "…" : "Anlegen"}
+              {creatingScenario ? "…" : "Anlegen"}
             </button>
           </form>
         </div>
-        {groupError && (
+        {scenarioError && (
           <span className="w-full text-xs text-red-600 dark:text-red-400">
-            {groupError}
+            {scenarioError}
           </span>
         )}
       </div>
@@ -493,14 +493,14 @@ export default function GalleryPage() {
         <DetailModal
           key={selected.id}
           character={selected}
-          groups={groups}
+          scenarios={scenarios}
           onClose={() => setSelected(null)}
           onDelete={() => handleDelete(selected.id)}
           onSaveContent={(character, storyHooks) =>
             handleSaveContent(selected.id, character, storyHooks)
           }
           onCharacterUpdated={applyUpdate}
-          onAssignGroup={(groupId) => handleAssignGroup(selected.id, groupId)}
+          onAssignScenario={(scenarioId) => handleAssignScenario(selected.id, scenarioId)}
         />
       )}
     </div>
@@ -509,15 +509,15 @@ export default function GalleryPage() {
 
 function DetailModal({
   character: c,
-  groups,
+  scenarios,
   onClose,
   onDelete,
   onSaveContent,
   onCharacterUpdated,
-  onAssignGroup,
+  onAssignScenario,
 }: {
   character: StoredCharacter;
-  groups: StoredGroup[];
+  scenarios: StoredScenario[];
   onClose: () => void;
   onDelete: () => void;
   onSaveContent: (
@@ -525,7 +525,7 @@ function DetailModal({
     storyHooks: string,
   ) => Promise<void>;
   onCharacterUpdated: (updated: StoredCharacter) => void;
-  onAssignGroup: (groupId: string | null) => Promise<void>;
+  onAssignScenario: (scenarioId: string | null) => Promise<void>;
 }) {
   // Editierbare Kopie der Charakter-Inhalte (Name, Kurzbeschreibung, Text,
   // Merkmale). Persistiert erst über "Änderungen speichern".
@@ -597,7 +597,7 @@ function DetailModal({
   // Anzeigequelle ist das Thumbnail des Primärbilds; der Rückfall auf das
   // Original greift nur, wenn ein Bild ohne Thumbnail gespeichert wurde.
   const preview = primary?.thumbnail ?? cachedImage;
-  const [assigningGroup, setAssigningGroup] = useState(false);
+  const [assigningScenario, setAssigningScenario] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingJson, setExportingJson] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -720,7 +720,7 @@ function DetailModal({
       const { renderCharacterPdfBlob } = await import(
         "../components/CharacterPdf"
       );
-      const groupName = groups.find((g) => g.id === c.groupId)?.name ?? null;
+      const scenarioName = scenarios.find((g) => g.id === c.scenarioId)?.name ?? null;
       const imageData = await ensureFullImage();
       const blob = await renderCharacterPdfBlob({
         name: edited.name,
@@ -728,7 +728,7 @@ function DetailModal({
         beschreibung: edited.beschreibung,
         merkmale: edited.merkmale,
         imageData,
-        groupName,
+        scenarioName,
         createdAt: c.createdAt,
       });
       downloadBlob(blob, `${safeFileName(edited.name)}.pdf`);
@@ -767,12 +767,12 @@ function DetailModal({
     }
   }
 
-  async function assignGroup(groupId: string | null) {
-    setAssigningGroup(true);
+  async function assignScenario(scenarioId: string | null) {
+    setAssigningScenario(true);
     try {
-      await onAssignGroup(groupId);
+      await onAssignScenario(scenarioId);
     } finally {
-      setAssigningGroup(false);
+      setAssigningScenario(false);
     }
   }
 
@@ -1032,15 +1032,15 @@ function DetailModal({
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4 dark:border-white/10">
           <label className="flex items-center gap-2 text-sm">
-            <span className="text-foreground/60">Gruppe:</span>
+            <span className="text-foreground/60">Szenario:</span>
             <select
-              value={c.groupId ?? ""}
-              onChange={(e) => assignGroup(e.target.value || null)}
-              disabled={assigningGroup}
+              value={c.scenarioId ?? ""}
+              onChange={(e) => assignScenario(e.target.value || null)}
+              disabled={assigningScenario}
               className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
             >
               <option value="">— keine —</option>
-              {groups.map((g) => (
+              {scenarios.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
                 </option>

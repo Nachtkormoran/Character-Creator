@@ -7,7 +7,7 @@ import { CharacterResult } from "./components/CharacterResult";
 import {
   generateImage,
   generateText,
-  listGroups,
+  listScenarios,
   saveCharacter,
 } from "@/lib/client";
 import {
@@ -15,7 +15,7 @@ import {
   type CharacterInput,
   type GeneratedCharacter,
 } from "@/lib/schema";
-import type { StoredGroup } from "@/lib/serialize";
+import type { StoredScenario } from "@/lib/serialize";
 
 export default function Home() {
   // Ansicht: Eingabeformular oder Ergebnis
@@ -46,13 +46,13 @@ export default function Home() {
    */
   const [savedNotice, setSavedNotice] = useState<string | null>(null);
 
-  const [groups, setGroups] = useState<StoredGroup[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [scenarios, setScenarios] = useState<StoredScenario[]>([]);
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
 
-  // Gruppen laden, damit man den Charakter direkt beim Erstellen zuordnen kann.
+  // Szenarien laden, damit man den Charakter direkt beim Erstellen zuordnen kann.
   useEffect(() => {
-    listGroups()
-      .then(setGroups)
+    listScenarios()
+      .then(setScenarios)
       .catch(() => {});
   }, []);
 
@@ -98,7 +98,7 @@ export default function Home() {
     setImageError(null);
     setTextError(null);
     setSaved(false);
-    setSelectedGroupId(null);
+    setSelectedScenarioId(null);
     setExtraPrompt("");
   }
 
@@ -130,7 +130,7 @@ export default function Home() {
         { ...input, imageStyle },
         character,
         imageData,
-        selectedGroupId,
+        selectedScenarioId,
       );
       setSaved(true);
       // Ansicht schließen: sie bietet sonst weiter einen Speichern-Knopf an,
@@ -219,9 +219,9 @@ export default function Home() {
           onExtraPromptChange={setExtraPrompt}
           referenceImage={referenceImage}
           onReferenceImageChange={setReferenceImage}
-          groups={groups}
-          groupId={selectedGroupId}
-          onGroupChange={setSelectedGroupId}
+          scenarios={scenarios}
+          scenarioId={selectedScenarioId}
+          onScenarioChange={setSelectedScenarioId}
           onGenerateImage={handleGenerateImage}
           onSave={handleSave}
           saving={saving}

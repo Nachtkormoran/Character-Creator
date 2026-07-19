@@ -12,7 +12,7 @@ type Context = { params: Promise<{ id: string }> };
 const patchSchema = z
   .object({
     name: z.string().trim().min(1, "Der Name darf nicht leer sein.").max(120),
-    groupId: z.string().nullable(),
+    scenarioId: z.string().nullable(),
     shortDescription: z.string().max(500),
     description: z.string().max(10000),
     traits: characterTraitsSchema,
@@ -51,14 +51,14 @@ export async function PATCH(request: Request, { params }: Context) {
     const p = parsed.data;
     const data: {
       name?: string;
-      groupId?: string | null;
+      scenarioId?: string | null;
       shortDescription?: string;
       description?: string;
       traits?: string;
       storyHooks?: string;
     } = {};
     if (p.name !== undefined) data.name = p.name;
-    if (p.groupId !== undefined) data.groupId = p.groupId;
+    if (p.scenarioId !== undefined) data.scenarioId = p.scenarioId;
     if (p.shortDescription !== undefined)
       data.shortDescription = p.shortDescription;
     if (p.description !== undefined) data.description = p.description;

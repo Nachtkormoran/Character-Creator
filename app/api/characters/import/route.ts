@@ -68,7 +68,7 @@ export async function POST(request: Request) {
           // stammen, der ein später ergänztes Merkmal noch nicht kannte.
           traits: JSON.stringify(normalizeTraits(character.merkmale)),
           storyHooks: character.storyHooks || null,
-          groupId: null,
+          scenarioId: null,
           images: {
             create: images.map((b, i) => ({
               imageData: b.imageData,

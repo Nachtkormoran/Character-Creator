@@ -71,8 +71,8 @@ export type CharacterFile = z.infer<typeof characterFileSchema>;
  * - `id` – der Import legt immer neu an. Eine mitgeführte Id lüde dazu ein,
  *   beim Wiedereinspielen einen bestehenden Charakter zu überschreiben; genau
  *   das soll additiv gerade nicht passieren.
- * - `groupId` – eine Gruppen-Id aus einer fremden Datenbank bedeutet hier
- *   nichts. Importierte Charaktere landen ohne Gruppe und werden zugeordnet.
+ * - `scenarioId` – eine Szenario-Id aus einer fremden Datenbank bedeutet hier
+ *   nichts. Importierte Charaktere landen ohne Szenario und werden zugeordnet.
  * - `createdAt` – maßgeblich ist, wann der Charakter in *diese* Datenbank kam.
  *   Sonst sortierte er sich unter „Neueste zuerst" in die Vergangenheit ein,
  *   also genau dorthin, wo man ihn nach dem Import nicht sucht.

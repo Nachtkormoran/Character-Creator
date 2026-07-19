@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Web-App zur KI-gestützten Erstellung menschlicher Charaktere (für Buch/Spiel):
 Vorgaben im Formular → OpenAI erzeugt Fließtext + strukturierte Merkmale
 (Tabelle) → Portrait via `gpt-image-1` → speichern in SQLite, verwalten in
-einer Galerie mit Gruppen/Projekten.
+einer Galerie mit Szenarien.
 
 ## Befehle
 
@@ -68,12 +68,12 @@ neu erzeugten oder hochgeladenen Bild wieder scharf.
   `POST /api/generate-name`, `POST /api/regenerate-text`,
   `POST /api/story-hooks` – OpenAI (persistieren nichts).
 - `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional
-  `groupId`, `imageData` und `thumbnail`; ein mitgegebenes Bild wird das erste
+  `scenarioId`, `imageData` und `thumbnail`; ein mitgegebenes Bild wird das erste
   und primäre). **Keine Route liefert `imageData` in einer Liste** (`omit`),
   sonst wären es mehrere MB pro Aufruf; für die Anzeige genügt das Thumbnail
   des Primärbilds.
 - `GET|PATCH|DELETE /api/characters/[id]` – **PATCH ist ein Teil-Update**
-  (`.partial()`): jedes von `name`, `groupId`, `shortDescription`,
+  (`.partial()`): jedes von `name`, `scenarioId`, `shortDescription`,
   `description`, `traits`, `storyHooks` kann einzeln geändert werden. Alle nachträglichen
   Text-Bearbeitungen in der Galerie laufen darüber. **Bilder nicht** – die
   haben eigene Routen.
@@ -84,7 +84,7 @@ neu erzeugten oder hochgeladenen Bild wieder scharf.
   PATCH `{ isPrimary: true }` wählt das Primärbild; DELETE löscht das Bild.
   Alle drei schreibenden Routen geben den vollständigen, aktualisierten
   Charakter zurück, damit der Client seinen Zustand einfach ersetzen kann.
-- `GET|POST /api/groups`, `DELETE /api/groups/[id]` – Gruppen/Projekte.
+- `GET|POST /api/scenarios`, `DELETE /api/scenarios/[id]` – Szenarien.
 - `GET|PATCH /api/settings` – App-Einstellungen (`imageModel`, `imageQuality`).
 - `GET|POST /api/backup` – Datenbank sichern / wiederherstellen. **POST
   ersetzt den gesamten Bestand** (Bestätigung passiert in der UI).
@@ -101,7 +101,7 @@ Canvas gibt es nur im Browser). Der **Import** ist eine eigene Route, weil
 Charakter und alle Bilder in **einer Transaktion** entstehen müssen; der Weg
 über `POST /api/characters` plus je Bild `POST …/images` ließe bei einem Fehler
 im dritten Bild einen halben Charakter stehen. Die Datei trägt bewusst **keine**
-`id`, `groupId` und `createdAt` – Begründung je Feld steht in
+`id`, `scenarioId` und `createdAt` – Begründung je Feld steht in
 `characterFile.ts`. Die Ansatzpunkte (`storyHooks`) kamen später dazu und
 **ohne** Versionssprung: als optionales Feld mit `default("")` bleiben alte
 Dateien lesbar, und alte Stände dieser Anwendung überlesen das Feld in neuen
@@ -243,12 +243,12 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   Transaktion, die zuerst alle anderen Markierungen entfernt. Löschen des
   Primärbilds lässt das neueste verbliebene nachrücken.
 - `serialize.ts` – DB-Zeile ↔ Client-Form (`StoredCharacter`, `StoredImage`,
-  `StoredGroup`). `primaryImage(c)` leitet das anzuzeigende Bild ab – bewusst
+  `StoredScenario`). `primaryImage(c)` leitet das anzuzeigende Bild ab – bewusst
   abgeleitet statt als eigenes Feld mitgeschickt, sonst läge das Thumbnail des
   Primärbilds doppelt in jeder Antwort (Listen-Antwort: 465 KB statt 914 KB).
 - `client.ts` – **einziger** Weg, wie Client-Komponenten die API ansprechen
   (typisierte fetch-Helfer für Generierung, CRUD, Umbenennen, Bild/Inhalt
-  aktualisieren, Gruppen).
+  aktualisieren, Szenarien).
 - `backup.ts` – Export/Import der SQLite-Datei. Export per **`VACUUM INTO`**
   (konsistenter Snapshot; ein blankes Kopieren der Datei kann bei parallelen
   Schreibzugriffen unvollständig sein). Import kopiert **Zeilen** in einer
@@ -345,11 +345,11 @@ PDF-Export via `@react-pdf/renderer` (nur Browser, wird in der Galerie
 mitwachsende Textarea für die editierbaren Textfelder.
 
 **Datenmodell** (`prisma/schema.prisma`): `Character` (Felder `input` und
-`traits` als **JSON-Strings**, optionale `groupId`, optionale `storyHooks`),
+`traits` als **JSON-Strings**, optionale `scenarioId`, optionale `storyHooks`),
 `CharacterImage`
 (`imageData` als Base64-Data-URL, `thumbnail` als verkleinerte Fassung davon,
 `isPrimary`; `onDelete: Cascade` – Bilder gehen mit dem Charakter),
-`Group` (`onDelete: SetNull` – beim Löschen der Gruppe bleiben
+`Scenario` (`onDelete: SetNull` – beim Löschen des Szenarios bleiben
 Charaktere erhalten) und `Setting` (Key-Value für App-Einstellungen). SQLite
 lokal.
 

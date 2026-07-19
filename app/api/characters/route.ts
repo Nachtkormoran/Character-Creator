@@ -14,7 +14,7 @@ const saveSchema = z.object({
   character: generatedCharacterSchema,
   imageData: z.string().nullable().optional(),
   thumbnail: z.string().nullable().optional(),
-  groupId: z.string().nullable().optional(),
+  scenarioId: z.string().nullable().optional(),
 });
 
 // Alle gespeicherten Charaktere (neueste zuerst).
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { input, character, imageData, thumbnail, groupId } = parsed.data;
+    const { input, character, imageData, thumbnail, scenarioId } = parsed.data;
     const row = await prisma.character.create({
       data: {
         name: character.name,
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         shortDescription: character.kurzbeschreibung,
         description: character.beschreibung,
         traits: JSON.stringify(character.merkmale),
-        groupId: groupId ?? null,
+        scenarioId: scenarioId ?? null,
         images: imageData
           ? {
               create: {
