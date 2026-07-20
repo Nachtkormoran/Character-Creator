@@ -24,6 +24,26 @@ function kuerzen(text: string, max: number): string {
   return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
 }
 
+/**
+ * Der **erste Satz** eines Feldes.
+ *
+ * Ort und Zeit sind seit der mehrdimensionalen Ableitung mehrere Sätze lang:
+ * der Ort nennt einen Rahmen und zwei bis drei Schauplätze darin, die Zeit
+ * einen Zeitraum und was sich in ihm verschiebt. In `setting` – ein einzeiliges
+ * Feld mit 200 Zeichen – passt davon nur der Anfang, und ein blankes Abschneiden
+ * bei 200 Zeichen ließe den Ort das ganze Feld füllen und die Zeit ganz
+ * herausfallen. Der erste Satz ist bei beiden Feldern der Rahmen; die
+ * Schauplätze und Verschiebungen stehen danach und gehören ohnehin eher in
+ * `notes`.
+ */
+function ersterSatz(text: string): string {
+  const t = text.trim();
+  // Punkt, Frage- oder Ausrufezeichen gefolgt von Leerraum – oder ein Umbruch,
+  // falls das Modell die Schauplätze als Liste untereinander geschrieben hat.
+  const treffer = t.match(/^[\s\S]*?[.!?](?=\s)|^[^\n]+/);
+  return (treffer ? treffer[0] : t).trim();
+}
+
 export interface ScenarioPrefill {
   /**
    * Vorbelegte Formularfelder – **einschließlich des Genres**. Das war einmal
@@ -56,8 +76,8 @@ export function scenarioToInput(
 ): ScenarioPrefill {
   const settingTeile = [
     details.genre ? genreLabel(details.genre) : "",
-    details.ort,
-    details.zeit,
+    ersterSatz(details.ort),
+    ersterSatz(details.zeit),
   ]
     .map((t) => t.trim())
     .filter(Boolean);

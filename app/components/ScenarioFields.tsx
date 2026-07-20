@@ -38,8 +38,8 @@ const WUERFEL: Partial<
  * ausfällt, damit die Maske beim Erzeugen nicht springt.
  */
 const MINDESTZEILEN: Partial<Record<keyof ScenarioDetails, number>> = {
-  ort: 2,
-  zeit: 2,
+  ort: 4,
+  zeit: 3,
   regeln: 3,
   beschreibung: 8,
   handlung: 8,

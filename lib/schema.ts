@@ -362,8 +362,18 @@ export function normalizeInputGenre(raw: unknown): CharacterInput {
  */
 export const scenarioDetailsSchema = z.object({
   genre: z.string().trim().max(60).optional().default(""),
-  ort: z.string().trim().max(300).optional().default(""),
-  zeit: z.string().trim().max(200).optional().default(""),
+  // Ort und Zeit waren auf 300 bzw. 200 Zeichen bemessen, als dort ein
+  // Schauplatz und ein Datum standen („Ein Fischerdorf an der Nordküste",
+  // „Spätherbst 1923"). Seit die Ableitung ein **Gebiet mit mehreren Orten**
+  // und einen **Zeitraum samt dem, was sich in ihm verschiebt** liefert, sind
+  // es mehrere Sätze – gemessen 400–800 Zeichen für den Ort.
+  //
+  // Dieselbe Lehre wie bei `storyHooks`: Ein zu enges Limit schlägt nicht früh
+  // zu, sondern spät. Es hielt weder das Formular noch die Erzeugung auf,
+  // sondern erst das Speichern – mit „Too big: expected string to have <=300
+  // characters", wenn die Arbeit längst getan war.
+  ort: z.string().trim().max(2000).optional().default(""),
+  zeit: z.string().trim().max(1000).optional().default(""),
   regeln: z.string().trim().max(4000).optional().default(""),
   beschreibung: z.string().trim().max(4000).optional().default(""),
   handlung: z.string().trim().max(4000).optional().default(""),
@@ -397,8 +407,8 @@ export const SCENARIO_LABELS: Record<keyof ScenarioDetails, string> = {
  */
 export const SCENARIO_HINTS: Record<keyof ScenarioDetails, string> = {
   genre: "Bestimmt später Namen, Hintergründe und Berufe der Charaktere.",
-  ort: "Wo spielt es? Stadt, Region, Welt – so genau, wie es schon feststeht.",
-  zeit: "Epoche, Jahr oder Jahreszeit – z. B. Spätherbst 1923.",
+  ort: "Wo spielt es? Gern ein Gebiet mit mehreren Schauplätzen – Region, Stadt, und die Orte darin, an denen etwas passiert.",
+  zeit: "Wann spielt es, und über welchen Zeitraum? Epoche oder Jahr als Rahmen – z. B. Spätherbst 1923, über zwei Winter hinweg.",
   regeln:
     "Was in diesem Szenario gilt und für alle Figuren darin wahr ist – Technikstand, Magie, gesellschaftliche Ordnung, Tabus.",
   beschreibung:
@@ -407,9 +417,16 @@ export const SCENARIO_HINTS: Record<keyof ScenarioDetails, string> = {
     "Wer gerät hier mit wem worüber aneinander? Lässt sich aus den Festlegungen und den zugeordneten Charakteren erzeugen – dafür muss das Szenario gespeichert sein und Figuren enthalten.",
 };
 
-/** Felder, die im Formular mehrzeilig sind. Alles andere ist einzeilig. */
+/**
+ * Felder, die im Formular mehrzeilig sind. Alles andere ist einzeilig.
+ *
+ * `zeit` kam später dazu: Solange dort ein Zeitpunkt stand („Spätherbst 1923"),
+ * genügte eine Zeile. Seit die Ableitung einen **Zeitraum** samt dem, was sich
+ * in ihm verschiebt, liefert, sind es zwei bis drei Sätze.
+ */
 export const SCENARIO_MULTILINE: ReadonlySet<keyof ScenarioDetails> = new Set([
   "ort",
+  "zeit",
   "regeln",
   "beschreibung",
   "handlung",
@@ -459,8 +476,16 @@ export const scenarioDraftSchema = z.object({
   name: z
     .string()
     .describe("Kurzer, prägnanter Titel des Szenarios (2–5 Wörter)"),
-  ort: z.string().describe("Wo die Geschichte spielt"),
-  zeit: z.string().describe("Epoche, Jahr oder Jahreszeit"),
+  ort: z
+    .string()
+    .describe(
+      "Ein Gebiet mit mehreren Orten: der Rahmen (Land, Region, Stadt) und darin zwei bis drei konkrete Schauplätze, jeder mit einem Detail, das ihn kippen lässt",
+    ),
+  zeit: z
+    .string()
+    .describe(
+      "Ein Zeitraum, kein Zeitpunkt: Epoche oder Jahr als Rahmen, die Spanne (Wochen bis Jahrzehnte) und was sich in ihr verschiebt",
+    ),
   regeln: z
     .string()
     .describe("Was in dieser Welt gilt und für alle Figuren wahr ist"),

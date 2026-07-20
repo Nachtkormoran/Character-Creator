@@ -127,6 +127,77 @@ Dateien abgelehnt. Die Merkmale werden beim Import **lose** validiert und durch
 `normalizeTraits` geschickt: eine Exportdatei ist ein Altbestand außerhalb der
 DB und kennt ein später ergänztes Merkmal nicht.
 
+**Szenarien exportieren:** `lib/scenarioFile.ts` (`kind` +
+`version` wie beim Charakter), Knopf in der Szenario-Detailansicht, daneben
+eine Checkbox **„Charaktere mitexportieren (n)"**. Damit gibt es drei
+Dateiformate, und die Abgrenzung ist der Zuschnitt: `backup.ts` sichert
+**alles** und ersetzt beim Einspielen, `characterFile.ts` ist **eine** Figur,
+und dieses hier liegt dazwischen – eine Welt und, wenn gewünscht, ihre
+Besetzung. Genau das, was man weitergibt, wenn jemand anders in derselben Welt
+weiterspielen soll.
+
+Die Charaktere stecken als `characterPayloadSchema` darin – **dieselbe Form wie
+in einer Einzeldatei, nur ohne deren Kopf**. Dafür wurde die Nutzlast aus
+`characterFileSchema` herausgezogen; `kind` und `version` gehören zur *Datei*
+und nicht zu jedem Eintrag darin, sonst könnte eine Datei in sich
+widersprüchliche Versionen tragen. Die Form ist damit weiter an genau einer
+Stelle beschrieben: Wer dort ein Feld ergänzt, ergänzt es in beiden Formaten
+zugleich. Geprüft, dass alte Charakterdateien danach unverändert lesen.
+
+Die Festlegungen werden – anders als die Merkmale – **streng** über
+`scenarioDetailsSchema` validiert. Das ist kein Widerspruch zur losen Prüfung
+dort, sondern folgt aus dem Schema: Alle Szenario-Felder sind
+`.optional().default("")`, ein später ergänztes fehlt in alten Dateien also
+folgenlos. Genau die Eigenschaft, die den Merkmalen fehlt.
+
+Ist die Checkbox abgewählt, steht `characters: []` in der Datei – kein
+Sonderfall, sondern eine vollständige Datei über eine Welt ohne Besetzung. Die
+Checkbox steht **an** (die Besetzung wegzulassen ist der seltenere Fall) und
+wird ausgegraut, wenn dem Szenario niemand zugeordnet ist; ein Häkchen, das
+nichts bewirken kann, wäre ein falsches Versprechen. Exportiert wird der
+**bearbeitete** Stand, nicht der gespeicherte – dieselbe Regel wie bei
+„Text neu erzeugen" und der Ableitung.
+
+Wie beim Charakter braucht der Export **keine Route**: Alles liegt im Client,
+nur die Bild-Originale holt `buildScenarioFile` je Figur einzeln nach – und
+zwar **nacheinander**, nicht über `Promise.all`: Mehrere Figuren mit mehreren
+Bildern legten sonst Dutzende Megabyte gleichzeitig in den Speicher. Deshalb
+nennt die Checkbox die Zahl der Figuren: Sie ist der Unterschied zwischen einer
+kleinen und einer sehr großen Datei.
+
+**Der Import** (`POST /api/scenarios/import`, Knopf „Szenario importieren" auf
+`/scenarios`) ist die Gegenrichtung und wie der Charakter-Import **additiv**:
+Die Datei trägt keine Id, ein zweiter Import derselben Datei ergibt bewusst ein
+zweites Szenario.
+
+**Alles in einer Transaktion** – beim Charakter war das schon nötig (ein Fehler
+im dritten Bild hinterließe einen halben Charakter), hier gilt es doppelt: Ein
+Szenario ohne seine Figuren wäre nicht bloß unvollständig, sondern falsch. Wer
+eine Welt **mit** Besetzung einspielt, bekäme sonst eine Welt zurück, deren
+Zusammensetzung niemand so gewählt hat.
+
+Die Figuren werden dem **neuen** Szenario zugeordnet, nie einem gleichnamigen
+bestehenden. Ein Import legt an, er verschmilzt nicht: Zwei Welten mit
+demselben Namen können verschiedene Welten sein, und eine Zuordnung nach
+Namensgleichheit zöge Figuren in ein Szenario, das niemand ausgewählt hat.
+
+Je Figur gilt dasselbe wie beim Einzel-Import: Merkmale über `normalizeTraits`
+auffüllen (die Datei kann ein später ergänztes Merkmal nicht kennen) und **genau
+ein** `isPrimary` erzwingen – die Regel aus `characterImages.ts`, die die
+Datenbank nicht hält; ohne Markierung in der Datei gewinnt das erste Bild.
+
+Der Knopf nimmt bewusst **keine** Mehrfachauswahl, anders als der
+Charakter-Import: Eine Szenario-Datei bringt eine ganze Welt samt Besetzung
+mit, und bei Dateien von vielen Megabyte ist der Reihe nach verständlicher. Die
+Erfolgsmeldung nennt die Zahl der mitgekommenen Figuren – sie beantwortet die
+Frage, die man bei einer fremden Datei hat: War die Besetzung dabei?
+
+*Gegen den Dev-Server geprüft* (Testdaten danach entfernt): zwei Figuren hängen
+am neuen Szenario, das Bild mit `isPrimary` bleibt das primäre, Merkmale werden
+auf 15 Felder aufgefüllt, `storyHooks` bleibt erhalten, ein leeres `input`
+bekommt `genre: "gegenwart"`. Abgewiesen werden eine Charakterdatei
+(falsches `kind`), eine zu neue Formatversion und ein leerer Name.
+
 **Mehrere Bilder pro Charakter:** Ein Charakter hat beliebig viele Bilder
 (`CharacterImage`), genau eines ist `isPrimary` und wird überall groß gezeigt
 (Karte, Detailansicht, PDF, Export). Die Bilder-Ansicht ist bewusst **nicht**
@@ -454,6 +525,110 @@ müssen – dafür ist das JSON-Schema da, nicht um Tokens zu kosten. `handlung`
 liefert der Entwurf **nicht**: der braucht mehrere Figuren, das frische Szenario
 hat eine.
 
+**Der Prompt widersprach sich selbst, und das Modell löste es auf die
+naheliegende Weise auf.** Er forderte „**jede** Festlegung muss ihren Anhalt im
+Charakter haben" und zugleich „keine Aussage über diesen einen Charakter". Genau
+eine Sorte Antwort erfüllt beides wörtlich: eine Eigenschaft der Figur nehmen,
+den Namen abstreifen und sie als Weltzustand hinschreiben. Aus der
+Goldschmiedin wurde „Handwerk ist angesehen, die Zünfte bestimmen den Markt" –
+die Regeln der Welt waren eine Umschrift ihres Steckbriefs.
+
+Behoben wurde das durch **Streichen des Widerspruchs, nicht durch ein schärferes
+Verbot** – die Erfahrung mit „Bindung vs. Richtung" (s. o.) sagt, dass eine
+bloß im Prompttext behauptete Rangordnung nicht hält. Drei Änderungen:
+- Die **Richtung der Ableitung ist umgedreht**: nicht „leite die Regeln aus ihm
+  ab" (Herkunft), sondern „diese Person ist dein **Zeuge**, nicht dein Thema –
+  was muss gelten, damit es einen solchen Menschen geben kann?" (Voraussetzung).
+- Statt der Geschmacksangabe „größer als die Figur" steht ein **prüfbares
+  Kriterium**: „Wäre der Satz noch wahr, wenn diese Figur morgen wegzöge und nie
+  wiederkäme?"
+- Die fette Forderung ist von *Herkunft* auf *Verträglichkeit* zurückgenommen:
+  Die Welt darf dem Charakter nicht widersprechen, muss aber nicht aus ihm
+  bestehen. Das meiste ergibt sich aus Genre, Ort und Zeit.
+
+**Ort und Zeit haben jetzt mehrere Dimensionen.** Vorher verlangte der Prompt
+vom Ort nur „konkret genug, dass man es sich vorstellen kann" – eine Latte, die
+„Ein Fischerdorf an der Nordküste" bereits reißt, weshalb das Modell dort
+aufhörte. Der Ort ist jetzt ein **Gebiet mit mehreren Orten** (Rahmen + zwei bis
+drei Schauplätze, jeder mit einem Riss), die Zeit ein **Zeitraum statt eines
+Zeitpunkts** (Rahmen + Spanne + was sich in ihr verschiebt). Eine Geschichte
+spielt selten an einem Punkt in Raum und Zeit.
+
+**Beide Felder brauchten dafür mehr Platz** (`scenarioDetailsSchema`): `ort` von
+300 auf **2000** Zeichen, `zeit` von 200 auf **1000**. Die alten Grenzen waren
+für einen Schauplatz und ein Datum bemessen; gemessen liegt ein abgeleiteter Ort
+bei 400–800 Zeichen. Dieselbe Lehre wie bei den Ansatzpunkten, und derselbe
+Fehler noch einmal gemacht: Ein zu enges Limit schlägt nicht früh zu, sondern
+spät – es hielt weder das Formular noch die Erzeugung auf, sondern erst das
+Speichern, mit „Too big: expected string to have <=300 characters", als die
+Arbeit längst getan war.
+
+Als Folge zieht `scenarioToInput` für das Feld `setting` jetzt den **ersten
+Satz** von Ort und Zeit statt des ganzen Feldes (`ersterSatz`). `setting` ist
+einzeilig und fasst 200 Zeichen; ein 600-Zeichen-Ort hätte es allein gefüllt und
+die Zeit ganz herausgedrängt. Der erste Satz ist bei beiden Feldern der Rahmen –
+die Schauplätze und Verschiebungen stehen dahinter und gehören ohnehin eher in
+`notes`.
+
+Dazu kam eine strukturelle Ursache: Ort und Beschreibung entstehen im **selben
+Aufruf**, „konkret und sinnlich" forderte der Prompt aber nur von der
+Beschreibung – die sinnliche Arbeit floss also dorthin, und der Ort blieb deren
+Überschrift. Im normalen Weg ist das anders, dort entsteht die Beschreibung
+**nach** einem feststehenden Ort. Beide Felder tragen ihre Anforderung nun
+zusätzlich im `.describe()` von `scenarioDraftSchema`: Unter Structured Outputs
+sieht das Modell diese Beschreibungen. `zeit` ist deshalb auch in
+`SCENARIO_MULTILINE` gewandert.
+
+**Würfel-Einträge als Formbeispiel** (`lib/scenarioSamples.ts`, Checkbox in der
+Maske, Default **an**): Für Ort und Regeln steht der Hausstandard längst
+geschrieben – 900 Orte und 900 Regelsätze, gebaut nach einer Regel, die in den
+Kopfkommentaren der Listen steht („Ein Ort ohne Riss ist eine Kulisse"). Der
+Prompt kannte ihn nicht und umschrieb ihn mit eigenen Worten. Drei echte
+Einträge je Feld zeigen die Tonlage genauer als drei Sätze über die Tonlage.
+
+Gezogen wird aus der Liste des **Genres** (Formbeispiel aus der falschen Welt
+wäre ein Stilbruch) und **in der Route**, nicht im Prompt-Baukasten: So bleibt
+`buildScenarioFromCharacterPrompt` bei gleichen Eingaben derselbe und lässt sich
+vergleichen – und der zweite Anlauf nach kaputten Umlauten schickt denselben
+Prompt, nicht andere Beispiele. Der Warnsatz „übernimm nichts davon inhaltlich"
+steht **vor und hinter** dem Block: Es ist der einzige Teil des Prompts, der
+fertig formuliertes Material derselben Sorte enthält, die auch die Antwort sein
+soll – die größte Versuchung zum Abschreiben, die es hier gibt.
+
+**Der Auto-Start ist dafür entfallen, und der Ablauf ist jetzt dreistufig:
+einstellen, ableiten, anlegen.** Vorher lief die Ableitung beim Öffnen von
+selbst los – mit guter Begründung, solange es nichts zu entscheiden gab: Der
+Knopf, der hierher führt, heißt bereits „Szenario ableiten", und eine leere
+Maske mit einem weiteren Knopf wäre ein Klick ohne Entscheidung gewesen.
+
+Diese Begründung ist mit der Checkbox hinfällig geworden. Es **gibt** jetzt eine
+Entscheidung, und beim Auto-Start kam sie zwangsläufig zu spät: Wer die Maske zu
+Gesicht bekam, sah bereits das Ergebnis. Ein Schalter, der erst nach seiner
+Wirkung erscheint, ist keiner – er täuscht eine Wahl vor, die man nur durch
+einen zweiten, kostenpflichtigen Aufruf einlösen kann. Der zusätzliche Klick
+kauft also die Wahl, die vorher nur wie eine aussah.
+
+Der Startzustand zeigt deshalb, was gleich passiert (und dass nichts gespeichert
+wird), darunter die Option und einen betonten „✨ Ableiten"-Knopf. Danach heißt
+die Haupthandlung „Szenario anlegen" und die Ableitung wird zum Nebenknopf
+„✨ Neu ableiten": Es gibt keinen Zustand, in dem beide betont wären – anlegen
+ohne Vorschlag geht nicht, und nach dem Vorschlag ist ein weiterer Lauf die
+Ausnahme.
+
+Die Checkbox steht in **eigener Zeile über dem Knopf**, nicht daneben. Zuerst
+saß sie neben „Neu ableiten", in einer umbrechenden Reihe aus drei Knöpfen und
+als kleine graue Schrift – dort war sie schlicht nicht zu finden.
+
+**Und sie erscheint nur im Startzustand.** Neben dem fertigen Entwurf hätte sie
+zwar eine echte Funktion (sie wirkt auf „Neu ableiten"), liest sich dort aber
+falsch: Wer auf ausgefüllte Felder schaut, bezieht einen Schalter daneben auf
+das, was dasteht – während er einen Lauf beschreibt, den es noch nicht gibt.
+Möglich wurde das Ausblenden erst durch den Wegfall des Auto-Starts: Seither
+kostet der Weg zurück nichts (Dialog schließen, Knopf erneut drücken, kein
+Modellaufruf), und der Entwurf, den man dabei verliert, wäre beim Neu-Ableiten
+ohnehin ersetzt worden. Was für den laufenden Dialog eingestellt ist, steht im
+`title` von „Neu ableiten".
+
 *Zwei Fallen, beide beobachtet und behoben:*
 - Das Modell kodiert Umlaute unter Structured Outputs **gelegentlich als
   fehlerhaftes `\u`-Escape** (NUL-Zeichen plus Reste, dabei gehen Buchstaben
@@ -466,7 +641,10 @@ hat eine.
   (die Detailansicht rendert neu, weil das Szenario in die Liste und an den
   Charakter wandert), der Start-Effekt lief erneut und schickte **nach** dem
   Anlegen eine zweite Ableitung hinterher, die den fertigen Vorschlag aus der
-  Maske räumte.
+  Maske räumte. **Auch die Beispiel-Checkbox liegt deshalb im Ref**: `ableiten`
+  hat leere Abhängigkeiten, eine direkt gelesene State-Variable bliebe für immer
+  auf ihrem Startwert – das Häkchen ließe sich umstellen, ohne dass sich etwas
+  ändert.
 
 **Charakter für ein Szenario anlegen:** Der Knopf in der Szenario-Detailansicht
 führt auf `/?scenario=<id>`. Die Erstellen-Seite lädt das Szenario, belegt das
@@ -482,7 +660,8 @@ brauchte **keine Route eine Änderung** – `setting` und `notes` fließen läng
 `buildTextPrompt`.
 
 Die Aufteilung folgt den Feldtypen: `setting` ist ein **einzeiliges** Feld mit
-200 Zeichen und bekommt Genre, Ort und Zeit als Gerüst; `notes` ist ein
+200 Zeichen und bekommt Genre, Ort und Zeit als Gerüst – von Ort und Zeit je nur
+den **ersten Satz**, seit die Ableitung dort mehrere liefert (s. o.); `notes` ist ein
 **Textfeld** mit 2000 Zeichen und der einzige Platz für Regeln und
 Weltbeschreibung. Nicht belegt werden `background`, `personality` und
 `appearance` – das sind Eigenschaften der Person, nicht der Welt, und ein
@@ -869,6 +1048,20 @@ lokal.
   Backdrop lagen. Das Stoppen der Ausbreitung passiert dabei **unabhängig**
   davon, ob geschlossen wird – sonst käme ausgerechnet die abgefangene
   Markierungs-Geste bei der Ebene darunter an und schlösse dort.
+
+  **Dieselbe Verschachtelung verschiebt die inneren Ebenen aus dem Blick.**
+  Jede Ebene ist `fixed inset-0`, also eigentlich am Sichtfenster verankert –
+  aber jede äußere trägt `backdrop-blur-sm`, und ein `backdrop-filter` macht
+  ein Element zum **Bezugsrahmen für `position: fixed`-Nachfahren** (wie
+  `transform` und `filter`). Das `fixed` der inneren Ebene bezieht sich damit
+  auf den gescrollten Container der äußeren. Wer in der Detailansicht nach
+  unten gescrollt hat – und das muss, wer ihre Fußzeilen-Knöpfe erreichen will
+  – bekam den neuen Dialog **oberhalb des Sichtbaren** und sah gar nichts.
+  Alle vier inneren Ebenen rufen deshalb `useOpenAtTop` (`app/components/`),
+  das beim Öffnen einmal `scrollIntoView` auslöst. Die Ursache bleibt stehen:
+  Ein Portal an `document.body` würde die Verschachtelung auflösen, an der die
+  gesamte Ereignis-Logik hängt, und ohne Weichzeichner verlöre man den Effekt,
+  für den er da ist.
 
   Für Esc reicht das nicht:
   Ein Handler, der vom Offen-Zustand der Ebene darüber abhängt und deshalb neu

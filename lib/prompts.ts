@@ -1,5 +1,6 @@
 import { DEFAULT_STORY_HOOK_ANCHOR, TRAIT_LABELS } from "./schema";
 import { DEFAULT_GENRE, genreLabel } from "./templates";
+import type { ScenarioSamples } from "./scenarioSamples";
 import type {
   CharacterInput,
   CharacterTraits,
@@ -476,6 +477,12 @@ export function buildScenarioFromCharacterPrompt(
    * wie Ort, Zeit und Regeln auszufallen haben.
    */
   genre?: string,
+  /**
+   * Würfel-Einträge des Genres als **Formbeispiel** – s. `scenarioSamples.ts`.
+   * Gezogen wird in der Route, nicht hier: So bleibt dieser Prompt bei
+   * gleichen Eingaben derselbe und lässt sich vergleichen.
+   */
+  beispiele?: ScenarioSamples | null,
 ): string {
   const m = character.merkmale;
 
@@ -497,6 +504,28 @@ export function buildScenarioFromCharacterPrompt(
     genre ? genreLabel(genre) : undefined,
   );
 
+  // Formbeispiele aus den Würfel-Listen des Genres. Der Warnsatz steht
+  // **zweimal** – davor und danach –, weil dies der einzige Block im Prompt
+  // ist, der konkretes, fertig formuliertes Material enthält: Was hier steht,
+  // ist genau die Sorte Text, die auch die Antwort sein soll, und damit die
+  // größte Versuchung zum Abschreiben im ganzen Prompt.
+  const beispielBlock = beispiele
+    ? `
+Beispiele für die **Form** dieser drei Felder – aus einer Zufallsliste, sie haben mit diesem Charakter nichts zu tun:
+
+Orte:
+${beispiele.orte.map((s) => `- ${s}`).join("\n")}
+
+Zeiten:
+${beispiele.zeiten.map((s) => `- ${s}`).join("\n")}
+
+Regeln:
+${beispiele.regeln.map((s) => `- ${s}`).join("\n")}
+
+Beachte an ihnen die Machart: Jeder Ort nennt etwas Kaputtes, Verschwiegenes oder Unfertiges. Jede Regel gilt für alle und nennt niemanden beim Namen. **Übernimm nichts davon inhaltlich** – kein Ort, keine Zahl, kein Motiv aus diesen Zeilen darf in deiner Antwort auftauchen. Sie zeigen dir den Ton, nicht die Welt.
+`
+    : "";
+
   return `Entwirf das Szenario – die Welt –, in die dieser Charakter gehört.
 
 Charakter: ${character.name}
@@ -508,19 +537,19 @@ ${merkmale}
 Beschreibung:
 ${character.beschreibung}
 ${hooksBlock}
-Deine Aufgabe: Leite aus dieser Person die Welt ab, in der sie lebt. Nicht irgendeine Welt, in der sie auch vorkommen könnte, sondern die, die sie hervorgebracht hat.
+Deine Aufgabe: Diese Person ist dein **Zeuge**, nicht dein Thema. Frage bei jeder Festlegung: Was muss in dieser Welt gelten, damit es einen solchen Menschen überhaupt geben kann? Schreib dann diese Bedingung auf – und nicht den Menschen.
 
 Anforderungen an die einzelnen Felder:
 - **name**: Ein kurzer, prägnanter Titel für das Szenario (2–5 Wörter). Benenne die **Welt oder den Ort**, nicht die Person – der Titel muss auch dann noch passen, wenn fünf weitere Figuren dazukommen.
-- **ort**: Wo diese Geschichte spielt. Konkret genug, dass man es sich vorstellen kann. Es muss zum oben genannten Genre passen.
-- **zeit**: Epoche, Jahr oder Jahreszeit.
-- **regeln**: Was in dieser Welt gilt und für **alle** Figuren darin wahr ist – Technikstand, Magie, gesellschaftliche Ordnung, Tabus, Machtverhältnisse. Vollständige Sätze. Keine Aussage über diesen einen Charakter: was nur für ihn gilt, ist keine Regel der Welt.
+- **ort**: Kein einzelner Schauplatz, sondern ein **Gebiet mit mehreren Orten**. Nenne zuerst den Rahmen (Land, Region, Stadt) in einem Satz: wovon er lebt und wo seine Grenzen verlaufen. Dann **zwei bis drei konkrete Orte** darin, an denen gespielt wird, je in einem Satz – und jeder mit einem Detail, das ihn kippen lässt: etwas Kaputtes, Verschwiegenes oder Unfertiges. Orte, die zueinander in Spannung stehen, sind besser als drei gleiche. Alles muss zum oben genannten Genre passen.
+- **zeit**: Kein Zeitpunkt, sondern ein **Zeitraum**. Nenne die Epoche oder das Jahr als Rahmen und dazu die Spanne, über die sich Geschichten hier erstrecken – wenige Wochen, eine Saison, Jahre oder Jahrzehnte. Sag außerdem, **was sich in dieser Spanne verschiebt**: was am Anfang noch gilt und am Ende nicht mehr. Ein Zeitraum, in dem nichts in Bewegung ist, ist ein Zeitpunkt mit mehr Wörtern.
+- **regeln**: Was in dieser Welt gilt und für **alle** Figuren darin wahr ist – Technikstand, Magie, gesellschaftliche und politische Ordnung, Tabus, Machtverhältnisse. Vollständige Sätze, jeder für sich verständlich.
 - **beschreibung**: 2–3 kurze Absätze (ca. 600–900 Zeichen) über die Welt – Atmosphäre, Alltag, was diesen Ort zu dieser Zeit ausmacht. Konkret und sinnlich statt allgemein.
-
+${beispielBlock}
 Für alle Felder gilt:
 - **Das Genre ist vorgegeben und nicht verhandelbar.** Ort, Zeit, Regeln und Beschreibung müssen erkennbar in diesem Genre spielen – auch dann, wenn der Charakter für sich genommen ebenso gut in ein anderes passen würde.
-- **Jede Festlegung muss ihren Anhalt im Charakter haben.** Beruf, Herkunft, Hintergrund und besondere Merkmale sagen dir, wie diese Welt wirtschaftet, wo ihre Grenzen verlaufen und was in ihr möglich ist. Erfinde nichts, was der Figur widerspricht.
-- Ergänze nur dort frei, wo der Charakter schweigt – und dann so, dass es zu ihm passt.
+- **Prüfe jede Regel und jeden Ort so:** Wäre der Satz noch wahr, wenn diese Figur morgen wegzöge und nie wiederkäme? Wenn nein, streich ihn und schreib stattdessen die Bedingung auf, die dahintersteht. Aus „Handwerk wird hier hoch geachtet" wird so etwas, das auch ohne diese Handwerkerin gilt – oder es fällt weg.
+- **Die Welt darf dem Charakter nicht widersprechen, muss aber nicht aus ihm bestehen.** Beruf, Herkunft und Hintergrund grenzen ein, was möglich ist; das meiste ergibt sich aus Genre, Ort und Zeit. Nimm dir dort die Freiheit, die die Figur dir lässt.
 - Die Welt ist **größer als diese eine Figur**. Sie soll Platz für weitere Charaktere lassen: beschreibe Verhältnisse, nicht ihre persönliche Lage.
 - Keine Handlung, kein Konflikt, keine Ereignisse – das kommt später und getrennt. Hier geht es um den Zustand der Welt.
 - Alles auf Deutsch, nüchtern und ohne Kitsch, ohne Markdown.`;

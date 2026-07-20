@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getOpenAI, hatKaputteZeichen, TEXT_MODEL } from "@/lib/openai";
 import { buildScenarioFromCharacterPrompt } from "@/lib/prompts";
 import { generatedCharacterSchema, scenarioDraftSchema } from "@/lib/schema";
+import { scenarioSamples } from "@/lib/scenarioSamples";
 import { DEFAULT_GENRE, GENRE_TEMPLATES } from "@/lib/templates";
 
 export const runtime = "nodejs";
@@ -49,6 +50,13 @@ const bodySchema = z.object({
    * zurück.
    */
   genre: z.string().trim().max(40).optional().default(DEFAULT_GENRE),
+  /**
+   * Würfel-Einträge des Genres als Formbeispiel mitschicken (Checkbox in der
+   * Maske). Default **an**: Die Ableitung startet beim Öffnen von selbst, und
+   * der erste Lauf soll die bessere Fassung sein – abschalten kann man vor dem
+   * „Neu ableiten".
+   */
+  beispiele: z.boolean().optional().default(true),
 });
 
 export async function POST(request: Request) {
@@ -62,7 +70,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { character, storyHooks, setting } = parsed.data;
+    const { character, storyHooks, setting, beispiele } = parsed.data;
     // Eine Id, die es nicht gibt, wäre in der Maske eine leere Auswahl – und
     // ließe später Würfel und Namenslisten ins Leere laufen.
     const genre = GENRE_TEMPLATES.some((g) => g.id === parsed.data.genre)
@@ -70,11 +78,15 @@ export async function POST(request: Request) {
       : DEFAULT_GENRE;
 
     const openai = getOpenAI();
+    // Einmal gezogen, nicht je Versuch: Der zweite Anlauf nach kaputten
+    // Umlauten soll denselben Prompt schicken – sonst wäre unklar, ob eine
+    // abweichende Antwort am Fehler lag oder an anderen Beispielen.
     const prompt = buildScenarioFromCharacterPrompt(
       character,
       storyHooks,
       setting,
       genre,
+      beispiele ? scenarioSamples(genre) : null,
     );
 
     const versuch = () =>

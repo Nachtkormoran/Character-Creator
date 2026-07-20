@@ -20,6 +20,7 @@ import type { StoredCharacter } from "@/lib/serialize";
 import { ImageLightbox } from "./ImageLightbox";
 import { ReferenceImagePicker } from "./ReferenceImagePicker";
 import { useBackdropClose } from "./useBackdropClose";
+import { useOpenAtTop } from "./useOpenAtTop";
 
 /**
  * Bilder-Ansicht eines Charakters.
@@ -69,6 +70,10 @@ export function CharacterImagesModal({
   const [ownLoadingId, setOwnLoadingId] = useState<string | null>(null);
   /** Id des Bildes, dessen Original gerade für den Download geladen wird. */
   const [exportingId, setExportingId] = useState<string | null>(null);
+
+  /** Öffnet im Blick, nicht oberhalb davon – Begründung in `useOpenAtTop`. */
+  const dialog = useRef<HTMLDivElement>(null);
+  useOpenAtTop(dialog);
 
   // Spiegeln den Zustand für den Esc-Handler unten mit – Begründung dort.
   const lightboxRef = useRef(false);
@@ -224,6 +229,7 @@ export function CharacterImagesModal({
       {...backdrop}
     >
       <div
+        ref={dialog}
         className="my-8 w-full max-w-4xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
         onClick={(e) => e.stopPropagation()}
       >

@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  buildScenarioFile,
   deleteScenario,
   findPlotPersons,
   generateScenarioDescription,
@@ -12,6 +13,8 @@ import {
   getScenario,
   updateScenario,
 } from "@/lib/client";
+import { downloadBlob, safeFileName } from "@/lib/download";
+import { scenarioFileName } from "@/lib/scenarioFile";
 import {
   SCENARIO_LABELS,
   normalizeScenarioDetails,
@@ -46,6 +49,16 @@ export default function ScenarioDetailPage({
   const [saved, setSaved] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  /**
+   * Export. `mitCharakteren` steht auf **an**: Ein Szenario weiterzugeben und
+   * seine Besetzung dabei wegzulassen ist der seltenere Fall – und der
+   * teurere Weg (Bild-Originale, einige Dutzend MB) ist derselbe, den man
+   * sonst von Hand über je einen Charakter-Export nachbauen müsste.
+   */
+  const [mitCharakteren, setMitCharakteren] = useState(true);
+  const [exportiert, setExportiert] = useState(false);
+  const [exportFehler, setExportFehler] = useState<string | null>(null);
   const [generatingField, setGeneratingField] = useState<
     keyof ScenarioDetails | null
   >(null);
@@ -211,6 +224,44 @@ export default function ScenarioDetailPage({
       setSaveError(e instanceof Error ? e.message : "Fehler.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  /**
+   * Das Szenario als Datei sichern – wahlweise mit seiner Besetzung.
+   *
+   * Wie beim Charakter-Export **ohne eigene Route**: Festlegungen und Texte
+   * liegen längst im Client, nur die Bild-Originale holt `buildScenarioFile`
+   * einzeln nach (die Listen-Antworten führen sie aus Größengründen nicht mit).
+   *
+   * Exportiert wird der **bearbeitete** Stand, so wie er auf dem Bildschirm
+   * steht – dieselbe Regel wie bei „Text neu erzeugen", der Ableitung und dem
+   * Handlungsentwurf: Wer gerade die Regeln umgeschrieben hat und dann
+   * exportiert, meint die neuen. Speichern und Exportieren sind zwei
+   * verschiedene Handlungen, und die Datei ist keine Kopie der Datenbank,
+   * sondern dessen, was man vor sich hat.
+   *
+   * Die Charaktere sind davon nicht betroffen: Sie lassen sich auf dieser Seite
+   * gar nicht bearbeiten, es gibt also nur einen Stand.
+   */
+  async function exportieren() {
+    setExportiert(true);
+    setExportFehler(null);
+    try {
+      const datei = await buildScenarioFile(
+        { name: name.trim(), details },
+        mitCharakteren ? characters : [],
+      );
+      const blob = new Blob([JSON.stringify(datei, null, 2)], {
+        type: "application/json",
+      });
+      downloadBlob(blob, scenarioFileName(safeFileName(name.trim())));
+    } catch (e) {
+      setExportFehler(
+        e instanceof Error ? e.message : "Export fehlgeschlagen.",
+      );
+    } finally {
+      setExportiert(false);
     }
   }
 
@@ -450,10 +501,53 @@ export default function ScenarioDetailPage({
         )}
       </section>
 
-      <div className="flex justify-end border-t border-black/10 pt-4 dark:border-white/10">
+      <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-4 dark:border-white/10">
+        <button
+          onClick={exportieren}
+          disabled={exportiert}
+          title="Schreibt Festlegungen und – wenn angehakt – die zugeordneten Charaktere samt Bildern in eine Datei"
+          className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+        >
+          {exportiert ? "Sammle Daten …" : "Als Datei exportieren"}
+        </button>
+
+        {/*
+          Die Checkbox steht **neben** dem Knopf und nicht darüber: Anders als
+          bei der Ableitung gibt es hier keinen Startzustand, in dem man sie
+          allein anträfe – der Export ist ein einzelner Klick, und die Wahl
+          gehört unmittelbar an ihn.
+
+          Ausgegraut, sobald das Szenario leer ist: Ein Häkchen, das nichts
+          bewirken kann, wäre ein falsches Versprechen.
+        */}
+        <label
+          className={`flex items-center gap-2 text-sm ${
+            characters.length === 0
+              ? "cursor-not-allowed text-foreground/40"
+              : "cursor-pointer text-foreground/70"
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={mitCharakteren && characters.length > 0}
+            onChange={(e) => setMitCharakteren(e.target.checked)}
+            disabled={exportiert || characters.length === 0}
+            className="size-4 accent-foreground"
+          />
+          {characters.length === 0
+            ? "Keine Charaktere zugeordnet"
+            : `Charaktere mitexportieren (${characters.length})`}
+        </label>
+
+        {exportFehler && (
+          <span className="text-sm text-red-600 dark:text-red-400">
+            {exportFehler}
+          </span>
+        )}
+
         <button
           onClick={entfernen}
-          className="rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
+          className="ml-auto rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
         >
           Szenario löschen
         </button>

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   INPUT_LABELS,
   inputDisplayValue,
   type CharacterInput,
 } from "@/lib/schema";
 import { useBackdropClose } from "./useBackdropClose";
+import { useOpenAtTop } from "./useOpenAtTop";
 
 /**
  * Zeigt die Vorgaben, mit denen ein Charakter ursprünglich erzeugt wurde.
@@ -44,6 +45,10 @@ export function CharacterInputModal({
 
   const backdrop = useBackdropClose(onClose, { stopPropagation: true });
 
+  /** Öffnet im Blick, nicht oberhalb davon – Begründung in `useOpenAtTop`. */
+  const dialog = useRef<HTMLDivElement>(null);
+  useOpenAtTop(dialog);
+
   const keys = Object.keys(INPUT_LABELS) as (keyof CharacterInput)[];
   const belegt = keys.filter((k) => inputDisplayValue(k, input) !== "").length;
 
@@ -53,6 +58,7 @@ export function CharacterInputModal({
       {...backdrop}
     >
       <div
+        ref={dialog}
         className="my-8 w-full max-w-2xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
         onClick={(e) => e.stopPropagation()}
       >

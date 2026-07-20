@@ -11,13 +11,23 @@ import {
 import type { StoredCharacter, StoredScenario } from "@/lib/serialize";
 import { ScenarioFields } from "./ScenarioFields";
 import { useBackdropClose } from "./useBackdropClose";
+import { useOpenAtTop } from "./useOpenAtTop";
 
 /**
  * Leitet aus einem Charakter ein **Szenario** ab – die Gegenrichtung zu
  * „Charakter für dieses Szenario anlegen" in der Szenario-Detailansicht.
  *
- * Der Ablauf ist bewusst **zweistufig**: erst schlägt das Modell vor, dann
- * legt der Nutzer an. Der Vorschlag landet in derselben Maske
+ * Der Ablauf ist **dreistufig**: einstellen, ableiten, anlegen. Die ersten
+ * beiden Stufen waren einmal eine – die Ableitung lief beim Öffnen von selbst
+ * los, weil der Knopf, der hierher führt, bereits „Szenario ableiten" heißt und
+ * eine leere Maske mit einem zweiten Knopf ein Klick ohne Entscheidung gewesen
+ * wäre. Seit es die Beispiel-Option gibt, gibt es eine Entscheidung, und der
+ * Auto-Start machte sie unmöglich: Wer die Maske zu Gesicht bekam, sah bereits
+ * das Ergebnis. Der zusätzliche Klick kauft die Wahl, die vorher nur so aussah
+ * wie eine.
+ *
+ * Danach schlägt das Modell vor, und erst dann legt der Nutzer an. Der
+ * Vorschlag landet in derselben Maske
  * (`ScenarioFields`), in der das Szenario später bearbeitet wird – wer hier
  * etwas ändert, muss es nicht anschließend nochmal aufsuchen. Erst „Szenario
  * anlegen" schreibt in die Datenbank. Ein ungefragt entstandenes Szenario
@@ -72,6 +82,17 @@ export function ScenarioFromCharacterModal({
   const [saving, setSaving] = useState(false);
   /** Gesetzt, sobald angelegt – die Maske wird dann zur Erfolgsmeldung. */
   const [created, setCreated] = useState<StoredScenario | null>(null);
+  /**
+   * Würfel-Einträge des Genres als Formbeispiel in den Prompt geben.
+   *
+   * **An als Default**, obwohl es eine Option ist: Die Ableitung startet beim
+   * Öffnen von selbst, es gibt also kein „davor", in dem man sie einschalten
+   * könnte. Wäre sie aus, liefe der erste Lauf – der, den die meisten
+   * übernehmen – ohne sie, und das Häkchen wäre ein Angebot, das man nur durch
+   * einen zweiten, kostenpflichtigen Aufruf einlösen kann. So beschreibt es
+   * umgekehrt korrekt, wie der Entwurf entstanden ist, der gerade dasteht.
+   */
+  const [beispiele, setBeispiele] = useState(true);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -88,37 +109,56 @@ export function ScenarioFromCharacterModal({
    */
   const backdrop = useBackdropClose(onClose, { stopPropagation: true });
 
+  /**
+   * Der Knopf, der hierher führt, steht in der Fußzeile der Detailansicht – man
+   * hat also gescrollt, um ihn zu erreichen, und ohne dies öffnete der Dialog
+   * oberhalb des Sichtbaren.
+   */
+  const dialog = useRef<HTMLDivElement>(null);
+  useOpenAtTop(dialog);
+
   const setting = c.input?.setting ?? "";
 
   /**
    * Die Eingaben der Ableitung liegen in einem Ref, nicht in den
    * Abhängigkeiten von `ableiten`.
    *
-   * Der Grund ist kein Stil, sondern ein beobachteter Fehler: Hängt
-   * `ableiten` an `edited`, ändert es seine Identität, sobald die
-   * Detailansicht darüber neu rendert – und das tut sie beim Anlegen, weil
-   * das neue Szenario dort in die Liste und an den Charakter wandert. Der
-   * Effekt weiter unten lief dadurch ein zweites Mal an und schickte
-   * **nach** dem Anlegen noch eine Ableitung hinterher, die den fertigen
-   * Vorschlag wieder aus der Maske räumte. Mit dem Ref bleibt `ableiten`
-   * stabil, der Effekt hat leere Abhängigkeiten und kann nicht erneut
-   * zünden.
+   * Ursprünglich war das die Abwehr eines beobachteten Fehlers: Solange die
+   * Ableitung beim Öffnen von selbst startete, hing an `ableiten` ein Effekt.
+   * Hing `ableiten` seinerseits an `edited`, wechselte es beim Anlegen die
+   * Identität (die Detailansicht rendert neu, weil das Szenario in die Liste
+   * und an den Charakter wandert), der Effekt lief erneut und schickte **nach**
+   * dem Anlegen eine zweite Ableitung hinterher, die den fertigen Vorschlag aus
+   * der Maske räumte.
+   *
+   * **Der Auto-Start ist inzwischen weg** (s. Kopfkommentar), und mit ihm der
+   * Effekt – dieser Fehler kann so nicht mehr auftreten. Das Ref bleibt
+   * trotzdem: Es hält `ableiten` über alle Renderdurchläufe stabil und liest
+   * dabei immer die aktuellen Werte, auch die der Checkbox. Ohne es müsste
+   * jeder neue Eingabewert in die Abhängigkeitsliste, und ein vergessener
+   * stünde als veralteter Wert im Prompt, ohne dass etwas auffiele.
    */
-  const eingaben = useRef({ edited, storyHooks, setting, genre });
+  const eingaben = useRef({ edited, storyHooks, setting, genre, beispiele });
   useEffect(() => {
-    eingaben.current = { edited, storyHooks, setting, genre };
+    eingaben.current = { edited, storyHooks, setting, genre, beispiele };
   });
 
   const ableiten = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
-      const { edited, storyHooks, setting, genre } = eingaben.current;
+      // Auch die Checkbox kommt aus dem Ref und nicht aus dem State: `ableiten`
+      // hat leere Abhängigkeiten (Begründung oben), eine direkt gelesene
+      // State-Variable bliebe für immer auf ihrem Startwert stehen – das
+      // Häkchen ließe sich umstellen, ohne dass sich etwas ändert.
+      const { edited, storyHooks, setting, genre, beispiele } =
+        eingaben.current;
       const { draft } = await generateScenarioFromCharacter(
         edited,
         storyHooks,
         setting,
         genre,
+        beispiele,
       );
       const { name: vorschlag, ...rest } = draft;
       setName(vorschlag);
@@ -132,19 +172,6 @@ export function ScenarioFromCharacterModal({
       setBusy(false);
     }
   }, []);
-
-  /**
-   * Beim Öffnen sofort loslegen: Der Knopf, der hierher führt, heißt „Szenario
-   * ableiten" – erst eine leere Maske und dann noch einen Knopf zu zeigen,
-   * wäre ein Klick ohne Entscheidung. `useRef` verhindert den zweiten Lauf im
-   * StrictMode, der sonst einen Aufruf verschenken würde.
-   */
-  const gestartet = useRef(false);
-  useEffect(() => {
-    if (gestartet.current) return;
-    gestartet.current = true;
-    void ableiten();
-  }, [ableiten]);
 
   const nameValid = name.trim().length > 0;
   const hatVorschlag = nameValid || details.ort.trim() !== "";
@@ -186,6 +213,7 @@ export function ScenarioFromCharacterModal({
       {...backdrop}
     >
       <div
+        ref={dialog}
         className="my-8 w-full max-w-2xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
         onClick={(e) => e.stopPropagation()}
       >
@@ -194,11 +222,23 @@ export function ScenarioFromCharacterModal({
             <h2 className="text-xl font-semibold">
               Szenario aus {edited.name || "diesem Charakter"}
             </h2>
-            <p className="mt-1 text-sm text-foreground/60">
-              Die Welt, die diese Figur hervorgebracht hat – abgeleitet aus
-              Beschreibung, Merkmalen und Ansatzpunkten. Alles lässt sich vor
-              dem Anlegen ändern.
-            </p>
+            {/*
+              Der Untertitel folgt dem Zustand des Dialogs. Er stand einmal
+              fest, als es nur einen gab; „Alles lässt sich vor dem Anlegen
+              ändern" ist nach dem Anlegen aber keine Zusage mehr, sondern eine
+              Erinnerung an eine verpasste Gelegenheit – und der Satz stand
+              ausgerechnet über der Erfolgsmeldung.
+
+              Im Erfolgsfall trägt die grüne Meldung darunter die Aussage; ein
+              zweiter Satz darüber wiederholte sie nur.
+            */}
+            {!created && (
+              <p className="mt-1 text-sm text-foreground/60">
+                Die Welt, die diese Figur hervorgebracht hat – abgeleitet aus
+                Beschreibung, Merkmalen und Ansatzpunkten. Alles lässt sich vor
+                dem Anlegen ändern.
+              </p>
+            )}
           </div>
           <button
             onClick={(e) => {
@@ -242,6 +282,31 @@ export function ScenarioFromCharacterModal({
               <p className="rounded-lg border border-dashed border-black/15 px-4 py-8 text-center text-sm text-foreground/60 dark:border-white/15">
                 Die Welt wird entworfen … einen Moment.
               </p>
+            ) : !hatVorschlag ? (
+              /*
+                Startzustand. Früher lief die Ableitung hier von selbst los –
+                der Knopf, der hierher führt, heißt schließlich „Szenario
+                ableiten", und eine leere Maske mit einem weiteren Knopf wäre
+                ein Klick ohne Entscheidung gewesen.
+
+                Seit es die Beispiel-Option gibt, stimmt das nicht mehr: Es
+                **gibt** eine Entscheidung, und beim Auto-Start kam sie
+                zwangsläufig zu spät – wer die Maske sah, sah schon das
+                Ergebnis. Ein Schalter, der erst nach der Wirkung erscheint,
+                ist keiner.
+              */
+              <div className="rounded-lg border border-dashed border-black/15 px-4 py-6 text-sm text-foreground/70 dark:border-white/15">
+                <p>
+                  Aus Beschreibung, Merkmalen und Ansatzpunkten von{" "}
+                  {edited.name || "dieser Figur"} entsteht ein Vorschlag für
+                  Ort, Zeit, Regeln und Beschreibung einer Welt. Das Genre wird
+                  übernommen, nicht neu gewählt.
+                </p>
+                <p className="mt-2 text-foreground/50">
+                  Gespeichert wird nichts, bevor du „Szenario anlegen&ldquo;
+                  drückst.
+                </p>
+              </div>
             ) : (
               <>
                 <label className="flex flex-col gap-1">
@@ -273,36 +338,96 @@ export function ScenarioFromCharacterModal({
               </p>
             )}
 
-            <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-4 dark:border-white/10">
-              <button
-                onClick={anlegen}
-                disabled={!nameValid || busy || saving}
-                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
-              >
-                {saving ? "Lege an …" : "Szenario anlegen"}
-              </button>
-              <button
-                onClick={() => {
-                  if (
-                    hatVorschlag &&
-                    !confirm("Der Vorschlag wird ersetzt. Fortfahren?")
-                  )
-                    return;
-                  void ableiten();
-                }}
-                disabled={busy || saving}
-                title="Erzeugt einen neuen Vorschlag – kostet einen weiteren Modellaufruf"
-                className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
-              >
-                {busy ? "Entwirft …" : "✨ Neu ableiten"}
-              </button>
-              <button
-                onClick={onClose}
-                disabled={saving}
-                className="ml-auto text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
-              >
-                Abbrechen
-              </button>
+            <div className="flex flex-col gap-3 border-t border-black/10 pt-4 dark:border-white/10">
+              {/*
+                Die Option steht **nur im Startzustand**, nicht mehr neben dem
+                fertigen Entwurf.
+
+                Sie hätte dort eine echte Funktion – sie wirkt auf „Neu
+                ableiten". Aber sie liest sich falsch: Wer auf ausgefüllte
+                Felder schaut, bezieht einen Schalter daneben auf das, was
+                dasteht, während er einen Lauf beschreibt, den es noch nicht
+                gibt. Und seit der Auto-Start weg ist, kostet der Weg zurück
+                nichts: Dialog schließen, „Szenario ableiten" erneut drücken,
+                und man steht wieder hier – ohne Modellaufruf. Der Entwurf, den
+                man dabei verliert, wäre beim Neu-Ableiten ohnehin ersetzt
+                worden.
+
+                Eigene Zeile **über** dem Knopf, nicht daneben: Zuerst stand sie
+                in einer umbrechenden Reihe aus drei Knöpfen, als kleine graue
+                Schrift – dort war sie nicht zu finden. Ein Schalter, den man
+                suchen muss, ist keiner.
+              */}
+              {!hatVorschlag && (
+                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={beispiele}
+                    onChange={(e) => setBeispiele(e.target.checked)}
+                    disabled={busy || saving}
+                    className="mt-0.5 size-4 shrink-0 accent-foreground"
+                  />
+                  <span>
+                    Würfel-Beispiele als Stilvorlage
+                    <span className="block text-xs text-foreground/50">
+                      Gibt dem Modell je drei zufällige Orte, Zeiten und Regeln
+                      des Genres mit – als Machart, nicht als Inhalt.
+                    </span>
+                  </span>
+                </label>
+              )}
+
+              <div className="flex flex-wrap items-center gap-3">
+                {/*
+                  Vor dem ersten Lauf ist „Ableiten" die Haupthandlung, danach
+                  „Szenario anlegen". Es gibt keinen Zustand, in dem beide
+                  betont wären: Anlegen ohne Vorschlag geht nicht, und nach dem
+                  Vorschlag ist ein weiterer Lauf die Ausnahme.
+                */}
+                {hatVorschlag ? (
+                  <>
+                    <button
+                      onClick={anlegen}
+                      disabled={!nameValid || busy || saving}
+                      className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                    >
+                      {saving ? "Lege an …" : "Szenario anlegen"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!confirm("Der Vorschlag wird ersetzt. Fortfahren?"))
+                          return;
+                        void ableiten();
+                      }}
+                      disabled={busy || saving}
+                      title={`Erzeugt einen neuen Vorschlag – kostet einen weiteren Modellaufruf. ${
+                        beispiele
+                          ? "Mit Würfel-Beispielen als Stilvorlage"
+                          : "Ohne Würfel-Beispiele"
+                      } (umstellen: Dialog schließen und neu öffnen).`}
+                      className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                    >
+                      {busy ? "Entwirft …" : "✨ Neu ableiten"}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => void ableiten()}
+                    disabled={busy || saving}
+                    title="Fragt das Modell – kostet einen Modellaufruf"
+                    className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    {busy ? "Entwirft …" : "✨ Ableiten"}
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  disabled={saving}
+                  className="ml-auto text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
+                >
+                  Abbrechen
+                </button>
+              </div>
             </div>
           </div>
         )}

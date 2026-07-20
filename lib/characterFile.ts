@@ -27,11 +27,7 @@ export const CHARACTER_FILE_VERSION = 1;
  * „Altbestände und neue Merkmale" beschrieben ist. Eine Exportdatei ist ein
  * Altbestand, der nur außerhalb der Datenbank liegt.
  */
-export const characterFileSchema = z.object({
-  kind: z.literal(CHARACTER_FILE_KIND),
-  version: z.number(),
-  /** Nur informativ, damit die Datei beim Draufschauen etwas sagt. */
-  exportedAt: z.string().optional(),
+export const characterPayloadSchema = z.object({
   input: characterInputSchema,
   character: z.object({
     name: z.string(),
@@ -62,6 +58,27 @@ export const characterFileSchema = z.object({
     )
     .default([]),
 });
+
+/**
+ * Ein Charakter **ohne** Dateikopf. Herausgezogen, weil er auch in einer
+ * Szenario-Datei vorkommt (`scenarioFile.ts`): Dort steht eine ganze Liste
+ * davon, und `kind`/`version` gehören zur **Datei**, nicht zu jedem Eintrag
+ * darin – wären sie je Charakter wiederholt, könnte eine Datei in sich
+ * widersprüchliche Versionen tragen.
+ *
+ * Die Form bleibt damit an genau einer Stelle beschrieben: Wer hier ein Feld
+ * ergänzt, ergänzt es in beiden Dateiformaten zugleich.
+ */
+export type CharacterPayload = z.infer<typeof characterPayloadSchema>;
+
+export const characterFileSchema = z
+  .object({
+    kind: z.literal(CHARACTER_FILE_KIND),
+    version: z.number(),
+    /** Nur informativ, damit die Datei beim Draufschauen etwas sagt. */
+    exportedAt: z.string().optional(),
+  })
+  .extend(characterPayloadSchema.shape);
 
 export type CharacterFile = z.infer<typeof characterFileSchema>;
 

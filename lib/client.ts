@@ -2,7 +2,13 @@ import {
   CHARACTER_FILE_KIND,
   CHARACTER_FILE_VERSION,
   type CharacterFile,
+  type CharacterPayload,
 } from "./characterFile";
+import {
+  SCENARIO_FILE_KIND,
+  SCENARIO_FILE_VERSION,
+  type ScenarioFile,
+} from "./scenarioFile";
 import { makeThumbnail } from "./image";
 import { DEFAULT_GENRE } from "./templates";
 import type {
@@ -258,10 +264,7 @@ export async function deleteCharacterImage(
  * Holt das Original eines Bildes (~2 MB). Keine der Listen-Routen liefert es
  * mit; Vollbild, Bild-Export und PDF laden es hierüber nach.
  */
-export async function getImage(
-  id: string,
-  imageId: string,
-): Promise<string> {
+export async function getImage(id: string, imageId: string): Promise<string> {
   const res = await fetch(`/api/characters/${id}/images/${imageId}`, {
     cache: "no-store",
   });
@@ -284,11 +287,11 @@ export async function getImage(
  * Das Thumbnail geht zusätzlich mit, weil der Server es nicht erzeugen kann
  * (Canvas gibt es nur im Browser).
  */
-export async function buildCharacterFile(
+export async function buildCharacterPayload(
   c: StoredCharacter,
   character: GeneratedCharacter = c.character,
   storyHooks: string = c.storyHooks,
-): Promise<CharacterFile> {
+): Promise<CharacterPayload> {
   const images = await Promise.all(
     c.images.map(async (bild) => ({
       imageData: await getImage(c.id, bild.id),
@@ -298,9 +301,6 @@ export async function buildCharacterFile(
   );
 
   return {
-    kind: CHARACTER_FILE_KIND,
-    version: CHARACTER_FILE_VERSION,
-    exportedAt: new Date().toISOString(),
     input: c.input,
     character: {
       name: character.name,
@@ -310,6 +310,59 @@ export async function buildCharacterFile(
       storyHooks,
     },
     images,
+  };
+}
+
+export async function buildCharacterFile(
+  c: StoredCharacter,
+  character: GeneratedCharacter = c.character,
+  storyHooks: string = c.storyHooks,
+): Promise<CharacterFile> {
+  return {
+    kind: CHARACTER_FILE_KIND,
+    version: CHARACTER_FILE_VERSION,
+    exportedAt: new Date().toISOString(),
+    ...(await buildCharacterPayload(c, character, storyHooks)),
+  };
+}
+
+/**
+ * Baut die Exportdatei eines **Szenarios** zusammen.
+ *
+ * `characters` bestimmt die Besetzung in der Datei: Wird die Checkbox im
+ * Export abgewählt, kommt eine leere Liste an, und die Datei beschreibt nur die
+ * Welt. Die Entscheidung fällt also in der Oberfläche und nicht hier – diese
+ * Funktion exportiert genau das, was sie bekommt.
+ *
+ * Die Bild-Originale werden je Charakter einzeln nachgeholt (`getImage`), wie
+ * beim Einzel-Export. Bei mehreren Figuren mit mehreren Bildern sind das
+ * entsprechend viele Anfragen und **einige Dutzend MB** – deshalb sagt die
+ * Oberfläche vorher, wie viele Figuren mitgehen.
+ */
+export async function buildScenarioFile(
+  /**
+   * Bewusst **kein** ganzes `StoredScenario`: In die Datei gehen nur Name und
+   * Festlegungen, und `id`, `createdAt` und `count` gehören ausdrücklich nicht
+   * hinein (Begründung in `scenarioFile.ts`). Mit dem engeren Typ kann die
+   * aufrufende Seite den **bearbeiteten** Stand übergeben, ohne die übrigen
+   * Felder erfinden zu müssen.
+   */
+  scenario: { name: string; details: ScenarioDetails },
+  characters: StoredCharacter[],
+): Promise<ScenarioFile> {
+  return {
+    kind: SCENARIO_FILE_KIND,
+    version: SCENARIO_FILE_VERSION,
+    exportedAt: new Date().toISOString(),
+    scenario: { name: scenario.name, details: scenario.details },
+    // Nacheinander statt `Promise.all`: Jeder Charakter zieht seine
+    // Bild-Originale einzeln, und mehrere Figuren gleichzeitig legten
+    // Dutzende Megabyte parallel in den Speicher. Ein Export darf ein paar
+    // Sekunden dauern.
+    characters: await characters.reduce<Promise<CharacterPayload[]>>(
+      async (bisher, c) => [...(await bisher), await buildCharacterPayload(c)],
+      Promise.resolve([]),
+    ),
   };
 }
 
@@ -327,6 +380,33 @@ export async function importCharacterFile(
     "/api/characters/import",
     inhalt,
   );
+}
+
+/**
+ * Spielt eine **Szenario**-Exportdatei ein: Welt und, sofern in der Datei,
+ * ihre Besetzung. Beides entsteht serverseitig in einer Transaktion, die
+ * Charaktere hängen anschließend am neuen Szenario.
+ *
+ * Wie beim Charakter wird hier nur die Datei gelesen und weitergereicht – die
+ * Prüfung macht die Route über `scenarioFileSchema`, damit sie an genau einer
+ * Stelle passiert.
+ */
+export async function importScenarioFile(file: File): Promise<{
+  scenario: StoredScenario;
+  characters: number;
+  images: number;
+}> {
+  let inhalt: unknown;
+  try {
+    inhalt = JSON.parse(await file.text());
+  } catch {
+    throw new Error(`„${file.name}" ist keine lesbare JSON-Datei.`);
+  }
+  return postJson<{
+    scenario: StoredScenario;
+    characters: number;
+    images: number;
+  }>("/api/scenarios/import", inhalt);
 }
 
 export async function updateCharacterScenario(
@@ -393,7 +473,10 @@ export interface ImportResult {
 }
 
 /** Lädt die komplette Datenbank als Datei herunter. */
-export async function exportDatabase(): Promise<{ blob: Blob; filename: string }> {
+export async function exportDatabase(): Promise<{
+  blob: Blob;
+  filename: string;
+}> {
   const res = await fetch("/api/backup", { cache: "no-store" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -420,7 +503,8 @@ export async function importDatabase(file: File): Promise<ImportResult> {
 export async function listScenarios(): Promise<StoredScenario[]> {
   const res = await fetch("/api/scenarios", { cache: "no-store" });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || "Szenarien laden fehlgeschlagen.");
+  if (!res.ok)
+    throw new Error(data?.error || "Szenarien laden fehlgeschlagen.");
   return data.scenarios as StoredScenario[];
 }
 
@@ -440,7 +524,8 @@ export async function createScenario(
     body: JSON.stringify({ name, ...(details ? { details } : {}) }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || "Szenario anlegen fehlgeschlagen.");
+  if (!res.ok)
+    throw new Error(data?.error || "Szenario anlegen fehlgeschlagen.");
   return data.scenario as StoredScenario;
 }
 
@@ -459,12 +544,18 @@ export function generateScenarioFromCharacter(
   setting = "",
   /** Das Genre aus den Vorgaben – es wird übernommen, nicht neu erzeugt. */
   genre = DEFAULT_GENRE,
+  /**
+   * Würfel-Einträge des Genres als Formbeispiel mitschicken. Standardmäßig an;
+   * die Maske bietet eine Checkbox zum Abschalten.
+   */
+  beispiele = true,
 ) {
   return postJson<{ draft: ScenarioDraft }>("/api/scenario-from-character", {
     character,
     storyHooks,
     setting,
     genre,
+    beispiele,
   });
 }
 

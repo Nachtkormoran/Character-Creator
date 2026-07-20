@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { PlotPerson } from "@/lib/schema";
 import { useBackdropClose } from "./useBackdropClose";
+import { useOpenAtTop } from "./useOpenAtTop";
 
 /**
  * Rückfrage, bevor aus einer im Handlungsentwurf gefundenen Person ein
@@ -35,6 +36,10 @@ export function PlotPersonModal({
 }) {
   const backdrop = useBackdropClose(onClose, { stopPropagation: true });
 
+  /** Öffnet im Blick, nicht oberhalb davon – Begründung in `useOpenAtTop`. */
+  const dialog = useRef<HTMLDivElement>(null);
+  useOpenAtTop(dialog);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -64,7 +69,10 @@ export function PlotPersonModal({
       {...backdrop}
       className="fixed inset-0 z-70 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
     >
-      <div className="my-8 w-full max-w-lg rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/10">
+      <div
+        ref={dialog}
+        className="my-8 w-full max-w-lg rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/10"
+      >
         <h2 className="text-lg font-semibold">
           Charakter für {person.name} anlegen?
         </h2>

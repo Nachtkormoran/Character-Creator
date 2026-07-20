@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   createScenario,
   generateScenarioDescription,
+  importScenarioFile,
   listScenarios,
 } from "@/lib/client";
 import {
@@ -55,6 +56,11 @@ export default function ScenariosPage() {
   const [generatingField, setGeneratingField] = useState<
     keyof ScenarioDetails | null
   >(null);
+
+  // Import einer Szenario-Datei.
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   /**
    * Stichwörter für die Erzeugung, je Feld. Hier ist das nur die Beschreibung.
@@ -115,6 +121,50 @@ export default function ScenariosPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  /**
+   * Eine Szenario-Exportdatei einspielen.
+   *
+   * Das neue Szenario wird **einsortiert**, nicht angehängt: Die Liste ist
+   * alphabetisch, und ein Eintrag am Ende stünde für den Nutzer an einer
+   * Stelle, an der er ihn nicht sucht. (Beim Charakter-Import ist es
+   * andersherum – dort sortiert die Galerie nach „Neueste zuerst", und der
+   * frisch importierte gehört nach oben.)
+   *
+   * Die Meldung nennt die Zahl der mitgekommenen Figuren. Sie ist die einzige
+   * Stelle, an der man sie erfährt, ohne das Szenario zu öffnen – und die
+   * Antwort auf die Frage, die man beim Import einer fremden Datei hat:
+   * War die Besetzung dabei?
+   */
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Zurücksetzen, damit dieselbe Datei erneut gewählt werden kann.
+    e.target.value = "";
+    if (!file) return;
+
+    setImporting(true);
+    setImportMessage(null);
+    setImportError(null);
+    try {
+      const { scenario, characters } = await importScenarioFile(file);
+      setScenarios((s) =>
+        [...s, scenario].sort((a, b) => a.name.localeCompare(b.name, "de")),
+      );
+      setImportMessage(
+        characters === 0
+          ? `Szenario „${scenario.name}" importiert – ohne Charaktere.`
+          : `Szenario „${scenario.name}" importiert, mit ${characters} ${
+              characters === 1 ? "Charakter" : "Charakteren"
+            }.`,
+      );
+    } catch (err) {
+      setImportError(
+        `${file.name}: ${err instanceof Error ? err.message : "Fehler."}`,
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function resetForm() {
     setName("");
     setDetails(LEER);
@@ -151,17 +201,58 @@ export default function ScenariosPage() {
             fest, was für sie alle gilt.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setFormOpen((o) => !o);
-            if (formOpen) resetForm();
-          }}
-          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
-        >
-          {formOpen ? "Abbrechen" : "+ Neues Szenario"}
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {/*
+            Wie in der Galerie ein `<label>` um ein verstecktes Datei-Feld: Ein
+            Knopf, der eine Dateiauswahl öffnet, ist die einzige Bedienung, die
+            der Browser nicht über einen gewöhnlichen `onClick` erlaubt.
+
+            **Ohne `multiple`** – anders als beim Charakter-Import. Eine
+            Szenario-Datei bringt eine ganze Welt samt Besetzung mit; mehrere
+            auf einmal einzuspielen ist kein Bedürfnis, das je aufgetreten
+            wäre, und der Fortschritt bei Dateien von vielen Megabyte ließe sich
+            schlechter zeigen als der Reihe nach.
+          */}
+          <label
+            title="Eine zuvor exportierte Szenario-Datei einspielen – Welt und, falls enthalten, ihre Charaktere kommen zum Bestand hinzu"
+            className={`rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition dark:border-white/15 ${
+              importing
+                ? "cursor-not-allowed opacity-50"
+                : "cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+            }`}
+          >
+            {importing ? "Importiere …" : "Szenario importieren"}
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              disabled={importing}
+              onChange={handleImport}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              setFormOpen((o) => !o);
+              if (formOpen) resetForm();
+            }}
+            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
+          >
+            {formOpen ? "Abbrechen" : "+ Neues Szenario"}
+          </button>
+        </div>
       </div>
+
+      {importMessage && (
+        <p className="rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-800 dark:text-green-300">
+          {importMessage}
+        </p>
+      )}
+      {importError && (
+        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+          {importError}
+        </p>
+      )}
 
       {formOpen && (
         <form
