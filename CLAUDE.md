@@ -57,12 +57,23 @@ Komponenten sprechen die Routen ausschließlich über die typisierten Helfer in
 `chat.completions.parse` + `zodResponseFormat` → strukturiertes
 `GeneratedCharacter`) → Anzeige Text + Merkmals-Tabelle → `POST
 /api/generate-image` (liefert Base64-Data-URL) → `POST /api/characters`
-(Prisma) speichern. **Nach dem Speichern schließt die Ergebnis-Ansicht**
-(zurück zum Formular, mit grünem Hinweis + Link zur Galerie). Das ist kein
-Komfort, sondern nötig: die Ansicht kennt keine Charakter-ID, jeder weitere
-Klick auf „Speichern" wäre ein **neues** `POST` und damit ein Duplikat. Der
-Knopf allein reicht als Schutz nicht – `setSaved(false)` macht ihn nach jedem
-neu erzeugten oder hochgeladenen Bild wieder scharf.
+(Prisma) speichern. **Nach dem Speichern führt der Weg in die Galerie**
+(`router.push("/gallery")`). Dass die Ergebnis-Ansicht dabei verschwindet, ist
+kein Komfort, sondern nötig: sie kennt keine Charakter-ID, jeder weitere Klick
+auf „Speichern" wäre ein **neues** `POST` und damit ein Duplikat. Der Knopf
+allein reicht als Schutz nicht – `setSaved(false)` macht ihn nach jedem neu
+erzeugten oder hochgeladenen Bild wieder scharf.
+
+Vorher schloss die Ansicht **zurück zum Formular**, mit grünem Hinweis und Link
+zur Galerie. Das war der falsche Ort: Nach dem Speichern will man den Charakter
+sehen, nicht den nächsten anfangen. Die Meldung ist mit dem Rücksprung
+entfallen – die Galerie sortiert absteigend nach `createdAt`, der neue
+Charakter steht also oben und ist seine eigene Bestätigung.
+
+Das gilt **auch für den Weg über ein Szenario** (`/?scenario=<id>`), wo der
+alte Hinweis „Zum Szenario" anbot. Die Galerie zeigt die Figur in beiden
+Fällen; ein Ziel, das je nach Herkunft wechselt, wäre schwerer vorherzusagen
+als eines, das immer dasselbe ist.
 
 **API-Routen:**
 - `POST /api/generate-text`, `POST /api/generate-image`,
@@ -76,9 +87,10 @@ neu erzeugten oder hochgeladenen Bild wieder scharf.
   des Primärbilds.
 - `GET|PATCH|DELETE /api/characters/[id]` – **PATCH ist ein Teil-Update**
   (`.partial()`): jedes von `name`, `scenarioId`, `shortDescription`,
-  `description`, `traits`, `storyHooks` kann einzeln geändert werden. Alle nachträglichen
-  Text-Bearbeitungen in der Galerie laufen darüber. **Bilder nicht** – die
-  haben eigene Routen.
+  `description`, `traits`, `storyHooks` und `genre` kann einzeln geändert
+  werden. Alle nachträglichen Text-Bearbeitungen in der Galerie laufen darüber.
+  `genre` ist dabei der einzige Schlüssel, der in der Spalte `input` landet und
+  nicht in einer eigenen – s. u. **Bilder nicht** – die haben eigene Routen.
 - `POST /api/characters/[id]/images` – Bild hinzufügen (wird standardmäßig zum
   Primärbild).
 - `GET|PATCH|DELETE /api/characters/[id]/images/[imageId]` – **GET ist der
@@ -141,11 +153,45 @@ der der Merkmalstabelle widerspricht, wäre schlechter als der alte. Grundlage
 sind dabei die **bearbeiteten** Merkmale (`edited`), nicht die gespeicherten:
 wer gerade den Beruf geändert hat und dann neu schreiben lässt, meint den neuen.
 
-„Ableiten" (`POST /api/story-hooks`) erzeugt drei Ansatzpunkte für eine
+„Ableiten" (`POST /api/story-hooks`) erzeugt **einen** Ansatzpunkt für eine
 Geschichte aus Beschreibung **und** Merkmalen – beide steuern bei, was der
 andere nicht hat (Text die Vorgeschichte, Tabelle die Eckdaten). Die
 Formular-Vorgaben gehen bewusst **nicht** mit: was aus ihnen wurde, steht längst
 im Text.
+
+Die Ansatzpunkte sind eine **Liste**, und jeder Klick hängt einen an. Vorher
+waren es drei auf einmal in einem Textfeld – ein Block, der nur ganz zu haben
+war, während der häufigste Fall ist, dass zwei taugen und einer nicht. Jetzt
+löscht ein ✕ an der Karte einen einzelnen, sofort und ohne Rückfrage; die
+Rückfrage vor dem Ableiten ist dafür entfallen, weil der Knopf nichts mehr
+ersetzen kann. „Sofort" heißt dabei **in der Ansicht**, nicht in der Datenbank:
+Wie Text, Merkmale und Genre wird die Liste erst über „Änderungen speichern"
+abgelegt, und „Verwerfen" holt die gespeicherte zurück.
+
+**Gespeichert bleibt ein String** (Spalte `storyHooks`), die Einträge durch eine
+Leerzeile getrennt; zerlegt und zusammengesetzt wird in `lib/storyHooks.ts`
+(`splitHooks` / `joinHooks`). Kein JSON-Array, obwohl das Projekt das sonst tut
+(`traits`, `input`, `details`): Die Verbraucher dieses Feldes – die Prompts von
+`scenario-plot` und `scenario-from-character` sowie die Exportdatei – wollen
+Fließtext. Ein Array müsste an jeder Stelle wieder zu Text werden, und alte
+Sicherungen und Exportdateien würden ungültig. **Die Liste ist eine Sache der
+Oberfläche.** `joinHooks` ebnet Leerzeilen **innerhalb** eines Eintrags zu
+einfachen Umbrüchen ein – ohne das zerfiele ein Eintrag, in den jemand einen
+Absatz tippt, beim nächsten Laden in zwei. `splitHooks` streift eine führende
+Nummer ab: Bestände von vor der Liste sind nummeriert („1. Titel: …"), und in
+einer Liste, aus der einzeln gelöscht wird, wäre die Nummer sofort falsch.
+
+Die **vorhandenen** Ansatzpunkte gehen als Ausschlussliste in den Prompt („keine
+Vorlage … setze an einer anderen Stelle an"). Ohne sie liefert der zweite Klick
+die erste Idee in anderen Worten. Sie kommen aus dem Client und nicht aus der
+Datenbank, weil die Liste ungespeichert bearbeitet sein kann – dieselbe Regel
+wie bei `regenerate-text`.
+
+Das Zeichenlimit für `storyHooks` liegt im PATCH und in
+`scenario-from-character` bei **20000**, vorher 4000. Das war für drei bemessen;
+gemessen liegen zehn Ansatzpunkte bereits bei rund 4700 Zeichen. Ein zu enges
+Limit schlägt hier nicht früh zu, sondern spät: erst beim Speichern, wenn die
+Arbeit getan ist.
 
 Davor steht die Wahl **„Bindung"** (`STORY_HOOK_ANCHORS` in `schema.ts`:
 `eng` | `mittel` | `frei`, Default `eng`). Ohne sie driftet das Modell
@@ -160,19 +206,54 @@ glaubt. Bei `eng` senkt die Route zusätzlich die Temperatur auf 0.7: dort ist
 der Vorrat an zulässigem Material klein, und hohe Temperatur führt dann zu genau
 dem Ausweichen ins Erfundene, das die Stufe verhindern soll.
 
-Die Stufe wird **nicht gespeichert**. Sie beschreibt nichts am Charakter,
-sondern wie man ihn gerade befragen will – anders als die Ansatzpunkte selbst,
-die am Charakter hängen.
+Daneben steht ein Freitextfeld **„Richtung"** (`richtung`, max. 500 Zeichen,
+optional): Stichworte, worum es gehen soll – „alte Schuld", „Verrat im
+Kollegium", „eher leise". Bewusst **kein** weiteres Menü: Was jemand von drei
+Ansatzpunkten will, lässt sich nicht in eine Liste sperren.
+
+Die Richtung steht im Prompt **hinter** der Bindung und ist ihr ausdrücklich
+untergeordnet („Die Bindung oben schlägt diese Stichworte", dazu die
+Anweisung, ein Stichwort notfalls fallenzulassen und seinen **Kern** im
+Charakter zu suchen statt es wörtlich zu erfüllen).
+
+**Diese Rangfolge hält nicht, und darauf darf man sich nicht verlassen.**
+Gemessen am 19.07.2026 (`gpt-4o`, Grafikdesignerin aus Portland, Stufe `eng`,
+Stichwort „Verschwörung in einem Großkonzern, geheime Organisation"): In **2
+von 2** Läufen erfand das Modell eine geheime Organisation und lieferte einen
+Zufallsfund – beides schließt `eng` ausdrücklich aus. Der zweite Lauf lief
+bereits mit der verschärften Formulierung; sie änderte nichts. Ein
+ausdrücklicher Nutzerwunsch schlägt eine Rangordnung, die nur im Prompttext
+steht.
+
+Ohne Konflikt funktioniert das Feld dagegen sauber: Dieselbe Figur mit `eng`
+und „alte Schuld, ein ungeklärtes Verhältnis" ergab drei Ansatzpunkte
+ausschließlich aus Vorhandenem (beruflicher Rückschlag, Tattoo, Wortsuche), mit
+korrekten Belegstellen.
+
+Der Widerspruch wird deshalb **in der Oberfläche sichtbar gemacht** statt im
+Prompt bekämpft: Stehen bei `eng` Stichworte im Feld, erscheint darunter eine
+Warnung in Bernstein, dass Erfundenes verlangende Stichworte die Bindung
+aufweichen und dafür `mittel` oder `frei` besser passt. Die verschärfte
+Prompt-Formulierung bleibt als Stupser stehen – sie schadet nicht, garantiert
+aber nichts.
+
+**Beide werden nicht gespeichert** – weder Stufe noch Richtung. Sie beschreiben
+nichts am Charakter, sondern wie man ihn gerade befragen will; anders als die
+Ansatzpunkte selbst, die am Charakter hängen. In der Oberfläche steht das
+Richtungsfeld deshalb **über** dem Ansatzpunkte-Textfeld, direkt unter der
+Stufe: Beides zusammen stellt die Frage, die der Knopf beantwortet. Das ist der
+Unterschied zum Zusatzwunsch bei „Text neu erzeugen", der **unter** seinem
+Textfeld sitzt – der greift einen vorhandenen Text auf, dieser hier füllt ein
+leeres Feld.
 
 Beide Routen liefern **Freitext**, kein Structured Output: eine Beschreibung ist
-ein String und drei Ansatzpunkte landen in einem Textfeld, das von Hand
-weitergeschrieben wird – ein JSON-Schema drumherum wäre reiner Token-Aufschlag
+ein String und ein Ansatzpunkt ist ein Absatz, der von Hand weitergeschrieben
+wird – ein JSON-Schema drumherum wäre reiner Token-Aufschlag
 (dieselbe Überlegung wie bei `generate-name`). Und beide **persistieren nichts**:
 das Ergebnis geht in den Bearbeitungs-Zustand der Detailansicht und wird erst
 über „Änderungen speichern" abgelegt. Das ist hier keine Nachlässigkeit, sondern
 der Punkt – ein neu erzeugter Text ist nicht zwangsläufig besser als der alte,
-und „Verwerfen" muss den alten zurückbringen. Aus demselben Grund fragt
-„Neu ableiten" nach, sobald im Feld schon etwas steht.
+und „Verwerfen" muss den alten zurückbringen.
 
 Die Ansatzpunkte liegen in der eigenen Spalte `storyHooks` und **nicht** in
 `GeneratedCharacter`: dieser Typ beschreibt, was das Modell bei der
@@ -208,8 +289,8 @@ Formular oder Detailansicht. Extra-Arbeit entstand nur durch die Eigenheiten
 Zusammenfassungszeile der Übersicht (ein 1200-Zeichen-Text füllte sie allein).
 
 An **Ort, Zeit und Regeln** hängt je ein **Würfel** (`scenarioPlaces.ts`,
-`scenarioTimes.ts`, `scenarioRules.ts` – je sechs Listen zu 100, eine pro
-Genre, zusammen 1800 Einträge). Rein lokal wie alle Würfel im Projekt. Welche
+`scenarioTimes.ts`, `scenarioRules.ts` – je neun Listen zu 100, eine pro
+Genre, zusammen 2700 Einträge). Rein lokal wie alle Würfel im Projekt. Welche
 Liste gezogen wird, entscheidet das **Genre-Feld daneben**; ohne Auswahl fällt
 es auf „Gegenwart" zurück, und über die Listen wird **nie** gemischt – dieselbe
 Regel wie in `backgrounds.ts`. Die Zuordnung Feld → Funktion steht in der Karte
@@ -235,6 +316,18 @@ Charaktere des Szenarios – sonst beschriebe der Text den heutigen Bestand stat
 die Welt und änderte sich mit jeder neuen Figur. Wie überall persistiert die
 Route nichts: das Ergebnis geht ins Formularfeld, und ein zweiter Klick fragt
 nach, bevor er eine von Hand geschriebene Beschreibung ersetzt.
+
+Neben dem Erzeugen-Knopf steht – wie beim Handlungsentwurf – ein Feld für
+**Stichwörter**
+(`zusatz`, max. 1000 Zeichen, optional): was in der Beschreibung vorkommen soll,
+das aus Ort, Zeit und Regeln nicht hervorgeht („ständiger Regen", „Misstrauen
+gegen Fremde"). Route und Prompt konnten das von Anfang an, es fehlte nur die
+Oberfläche; im Prompt steht es als „Besonders wichtig" **hinter** den
+Anforderungen, aber die Festlegungen bleiben übergeordnet („Erfinde nichts, was
+ihnen widerspricht"). Anders als der Zusatzwunsch am Handlungsentwurf erscheint
+es an **beiden** Stellen: Die Beschreibung ist auch im Anlege-Formular erzeugbar
+(`/scenarios`), das den Wert deshalb ebenfalls hält – ungespeichert, wie überall,
+und in `resetForm` mit dem übrigen Formular geräumt.
 
 **Zwei Wege zum Anlegen**, beide gewollt: das Feld in der Galerie schickt nur
 einen Namen (man ordnet gerade einen Charakter zu und will nicht in ein
@@ -280,6 +373,44 @@ Drei Zuschnitte, die zusammengehören:
   Unsinn. Aus demselben Grund ist der Knopf im **Anlege-Formular gar nicht
   vorhanden** – dort gibt es weder Id noch Besetzung.
 
+Daneben steht ein **Zusatzwunsch** (`zusatz`, max. 1000 Zeichen,
+optional): Stichworte und Inhalte, die der nächste Entwurf berücksichtigen soll
+– „ein verschollener Brief soll eine Rolle spielen", „ohne Gewalt". Route und
+Prompt konnten das von Anfang an, nur die Oberfläche fehlte; im Prompt steht er
+als „Besonders wichtig – zusätzliche Wünsche für diesen Entwurf" **hinter**
+Welt und Figuren.
+
+Gemessen am 19.07.2026 („Das Herz von York", zwei Figuren, `gpt-4o`): Ohne
+Wunsch kommt kein Brief vor, mit Wunsch trägt der Brief die ganze Handlung, und
+der Konflikt bleibt gewaltfrei. Anders als bei der „Richtung" der Ansatzpunkte
+gibt es hier **keine konkurrierende Bindungsstufe**, die das Feld überstimmen
+müsste – der Konflikt, der dort auftrat, entsteht hier gar nicht.
+
+Er steht in der **Kopfzeile des Feldes, direkt neben dem Erzeugen-Knopf** –
+nicht unter dem Textfeld, wo er anfangs saß. Dort las man ihn als weitere
+Angabe zum Szenario, und der Zusammenhang zum Knopf, an den er sich richtet,
+war nicht zu sehen. Die Nähe zum Knopf sagt beides zugleich: dass er die
+Erzeugung steuert und nicht den Inhalt. Gehalten wird er in
+der **Seite**, nicht in `ScenarioDetails`, und **gespeichert wird er nicht** –
+er beschreibt nichts am Szenario, sondern wie man es gerade befragen will
+(dieselbe Regel wie bei Bindung und Richtung). Nach dem Erzeugen bleibt er
+stehen: Der häufigste Fall ist, dass der Entwurf nicht taugt und man mit
+demselben Wunsch plus einer Ergänzung noch einmal drückt.
+
+In `ScenarioFields` ist er wie `generatable` **je Feld** geführt
+(`ZUSATZ_PLATZHALTER` + Props `zusatz` / `onZusatzChange`) und erscheint nur,
+wo alle drei zusammenkommen – ein Wunsch ohne Erzeugen-Knopf hätte keinen
+Empfänger.
+
+Weil in der Kopfzeile jetzt ein **zweites** Eingabefeld steht, umschließt das
+`<label>` das Feld nicht mehr, sondern verweist über `htmlFor` auf eine Id
+(`szenario-<key>`). Ein Label um beide wäre für Screenreader eine falsche
+Zuordnung, und ein Klick auf die Beschriftung landete womöglich im
+Stichwort-Feld. Das trägt deshalb sein eigenes `aria-label` und **keine**
+sichtbare Beschriftung – die täuschte eine Festlegung des Szenarios vor, die es
+nicht ist. Der Platzhalter ist knapp gehalten (die Kopfzeile hat wenig Platz),
+das ausführliche „wofür" steht im `title`.
+
 Welche Felder einen KI-Knopf bekommen, bestimmt die **aufrufende Seite** über
 `generatable` (ein `Set` von Feldnamen), nicht `ScenarioFields`. Die Komponente
 bleibt darstellend: sie kennt kein `fetch` und ruft nur `onGenerate(key)`.
@@ -303,16 +434,25 @@ Der Charakter kommt **aus dem Request**, nicht über eine Id: anders als bei
 `scenario-plot` geht es hier um seinen **Inhalt**, und der ist in der
 Detailansicht womöglich ungespeichert bearbeitet (dieselbe Regel wie bei
 `regenerate-text`). Mitgegeben werden Beschreibung, vollständige Merkmale,
-Ansatzpunkte und `input.setting` – letzteres als bester Genre-Hinweis;
-`input.notes` bewusst **nicht**: stammt die Figur aus einem Szenario, stünde
-dort dessen kompletter Weltkontext, und der Vorschlag wäre eine Abschrift statt
-einer Ableitung.
+Ansatzpunkte, `input.genre` und `input.setting`; `input.notes` bewusst
+**nicht**: stammt die Figur aus einem Szenario, stünde dort dessen kompletter
+Weltkontext, und der Vorschlag wäre eine Abschrift statt einer Ableitung.
+
+**Das Genre wird übernommen, nicht erzeugt.** Es steht in den Vorgaben des
+Charakters (s. u.), geht als „Genre (steht fest)" in den Prompt und wird der
+Modellantwort von der Route wieder angehängt; im `scenarioDraftSchema` kommt es
+**nicht** vor. Vorher musste das Modell es aus dem Setting-Freitext erschließen
+und lag oft daneben – eine Märchenfigur mit Mühle und Wald landete verlässlich
+im Genre „historisch". Die Figur weiß es besser als der Text über sie. Der
+Prompt sagt zusätzlich ausdrücklich, dass Ort, Zeit, Regeln und Beschreibung in
+diesem Genre spielen müssen, „auch dann, wenn der Charakter für sich genommen
+ebenso gut in ein anderes passen würde".
 
 Es ist die **einzige Route mit Structured Output außer `generate-text`**
-(`scenarioDraftSchema`): es entstehen sechs Felder, und das Genre muss eine Id
-aus `GENRE_TEMPLATES` treffen – hier zwingt das JSON-Schema die Antwort ins
-vorhandene Vokabular, statt bloß Tokens zu kosten. `handlung` liefert der
-Entwurf **nicht**: der braucht mehrere Figuren, das frische Szenario hat eine.
+(`scenarioDraftSchema`): es entstehen fünf Felder, die getrennt in die Maske
+müssen – dafür ist das JSON-Schema da, nicht um Tokens zu kosten. `handlung`
+liefert der Entwurf **nicht**: der braucht mehrere Figuren, das frische Szenario
+hat eine.
 
 *Zwei Fallen, beide beobachtet und behoben:*
 - Das Modell kodiert Umlaute unter Structured Outputs **gelegentlich als
@@ -355,6 +495,64 @@ führt auf die Vorbelegung zurück, nicht auf ein leeres Formular. Und weil
 `useSearchParams` eine Suspense-Grenze verlangt, ist `app/page.tsx` in eine
 Hülle gewickelt.
 
+**Personen aus dem Handlungsentwurf:** Der Entwurf entsteht aus den Figuren
+eines Szenarios, erfindet dabei aber regelmäßig weitere – den Vorgesetzten, die
+Schwester, den Mann am Hafen. Das war eine Sackgasse: Die Person stand im Text,
+und wer sie anlegen wollte, tippte alles von Hand ab. Der Knopf „🔍 Personen im
+Entwurf suchen" unter den Festlegungen schließt die Lücke.
+
+Der Ablauf ist **dreistufig**: `POST /api/scenario-plot-persons` liefert die
+genannten Personen samt dem, was der Entwurf über sie sagt → ein Klick auf einen
+Namen öffnet `PlotPersonModal` mit den gefundenen Angaben → „Ja, Charakter
+anlegen" führt auf `/?scenario=<id>` mit vorbelegtem Formular. Die Route
+**persistiert nichts**; angelegt wird am Ende über den gewöhnlichen Weg.
+
+**Ein KI-Aufruf, kein Mustervergleich** – im Deutschen ist jedes Substantiv
+großgeschrieben. „Der Schmied Bengt verwehrte ihr den Auftrag" enthält drei
+großgeschriebene Wörter und genau einen Namen; ein Abgleich auf Großschreibung
+böte „Schmied" und „Auftrag" als Personen an. Gemessen erkennt die Route in
+einem Testentwurf genau die drei Personen und lässt „Ratsversammlung" (Gruppe),
+„Bauernmarkt" (Ort) und „Hafenmeister" (Rolle) draußen.
+
+**Auf Knopfdruck, nicht beim Öffnen der Seite.** Ein Aufruf, der beim bloßen
+Ansehen eines Szenarios Geld kostet, wäre der erste seiner Art im Projekt.
+
+Es ist die **dritte Route mit Structured Output** (nach `generate-text` und
+`scenario-from-character`): Es entsteht eine Liste von Objekten mit je sieben
+Feldern, die einzeln in Formularfelder müssen – genau dafür ist das JSON-Schema
+da. Die Umlaut-Prüfung wanderte dabei aus `scenario-from-character` nach
+`lib/openai.ts` (`hatKaputteZeichen`) und läuft jetzt **rekursiv**: Ein kaputter
+Umlaut im dritten Listeneintrag ist so schlimm wie einer auf oberster Ebene.
+
+**Die zugeordneten Figuren lädt die Route selbst** (wie `scenario-plot`) – es
+geht um die Zuordnung, und die gibt es nur gespeichert. **Der Entwurf kommt
+dagegen aus dem Request** (wie `regenerate-text`): Er kann ungespeichert
+bearbeitet sein. Der Ausschluss bekannter Figuren macht das **Modell**, weil ein
+Entwurf „Thora" schreibt, wo die Figur „Thora Eisenbach" heißt. Die Route prüft
+danach noch einmal grob nach, und zwar über **ganze Namensteile** statt über
+Teilzeichenketten: „Mira" und „Mira Lindqvist" sind dieselbe Person, „Alva" und
+„Alvarez" nicht – obwohl das eine im anderen steckt.
+
+Der Prompt verlangt ausdrücklich **leere Felder statt Erfindungen**. Was hier
+entsteht, sind die *Vorgaben* einer Figur, und die sollen aus dem Entwurf
+stammen; ausgedacht wird beim Erzeugen des Charakters, wo es sichtbar ist.
+Bestätigt: Zu einer Person, über deren Aussehen der Entwurf schweigt, bleibt
+`aussehen` leer.
+
+Die Übergabe ans Formular läuft über **`sessionStorage`** (`personHandoff.ts`),
+nicht über die URL: Hintergrund und Persönlichkeit dürfen zusammen mehrere
+tausend Zeichen haben, und die hingen sonst an einer Adresse, die im Verlauf und
+in Server-Logs landet. Gelesen und **gelöscht wird getrennt** – React ruft
+`useState`-Initialisierer und Effekte im Entwicklungsmodus doppelt auf, und eine
+Funktion, die beides täte, käme beim zweiten Mal leer zurück.
+
+`plotPersonToInput` belegt genau die Felder, die `scenarioToInput` **nicht**
+belegt (Name, Geschlecht, Alter, Beruf, Hintergrund, Persönlichkeit, Aussehen);
+die beiden werden übereinandergelegt und überschneiden sich in keinem Feld.
+Leere Angaben fehlen ganz, statt als leerer String die Weltvorbelegung zu
+überschreiben. Ein Geschlecht, das nicht in `GENDERS` passt, wird „egal" – eine
+erfundene Zuordnung stünde später als Vorgabe da, die niemand gemacht hat.
+
 **Noch offen:** Die Festlegungen fließen in **neu erstellte** Charaktere ein,
 aber nicht rückwirkend: Wer einen bestehenden Charakter nachträglich einem
 Szenario zuordnet, ändert nichts an dessen Text. Auch „Text neu erzeugen" in
@@ -371,6 +569,51 @@ Wären sie änderbar, stünde in der DB eine Vorgabe, aus der der gespeicherte
 Text nie entstanden ist. Gerendert wird über `INPUT_LABELS`, nicht über die
 Schlüssel des Objekts – Altbestände haben nicht alle Felder, und die fehlen so
 sichtbar („— nichts angegeben —") statt lautlos.
+
+**Das Genre gehört zu den Vorgaben** (`input.genre`, Default `gegenwart`) und
+ist damit die erste, die etwas **steuert** statt nur zu protokollieren: Die
+Auswahl im Formular belegt wie bisher das Setting vor und bestimmt die Würfel,
+wird aber jetzt auch gespeichert – und beim Ableiten eines Szenarios übernommen.
+Vorher verfiel sie beim Speichern, und später war nicht mehr feststellbar, in
+welche Welt eine Figur gehört.
+
+Genau deshalb ist es das **einzige** Feld, das `serialize.ts` in den Vorgaben
+auffüllt (`normalizeInputGenre`): Ein fehlender Wert wäre mitten im Ablauf ein
+`undefined`, während die übrigen Vorgaben reine Anzeige sind und einem
+Altbestand ruhig sichtbar fehlen dürfen. Im Schema steht `.catch(DEFAULT_GENRE)`
+statt bloßem `.default` – eine Genre-Id, die es nicht mehr gibt, darf nicht die
+**gesamten** Vorgaben ungültig machen. Alte Charaktere und alte Exportdateien
+gelten damit zunächst als „Gegenwart".
+
+Deshalb ist das Genre die **einzige Vorgabe, die sich nachträglich ändern
+lässt** – als Auswahlfeld in der Charakter-Detailansicht, das über „Änderungen
+speichern" geht (eigener State neben `edited`, wie die Ansatzpunkte). Das
+widerspricht der Regel oben nur scheinbar: Sie schützt davor, dass in der DB
+eine Vorgabe steht, aus der der gespeicherte Text nie entstanden ist – und die
+Genre-Id geht gar nicht in den Text-Prompt ein, dorthin gehen `setting` und
+`notes`. Ohne diesen Weg blieben alle Altbestände dauerhaft „Gegenwart" und
+leiteten falsche Szenarien ab.
+
+Im PATCH ist es entsprechend ein **eigener Schlüssel `genre`**, nicht ein
+ganzes `input`-Objekt: Die Route liest die gespeicherten Vorgaben, setzt darin
+nur das Genre und schreibt zurück. So kann ein Patch die übrigen Vorgaben nicht
+anrühren, auch nicht versehentlich.
+
+**Genre und Szenario stehen zusammen** in der Bild-Spalte, unter „Bilder
+verwalten": Beides **ordnet die Figur ein**, statt sie zu beschreiben – anders
+als Name, Text und Merkmale in der Spalte daneben. Sie speichern aber
+**verschieden**: Das Szenario ordnet sofort zu (eigener PATCH über
+`updateCharacterScenario`, es kann nichts halb geändert sein), das Genre wartet
+auf „Änderungen speichern", weil es zu den Vorgaben gehört und mit Text und
+Merkmalen zusammen verworfen werden darf. Deshalb stehen sie **untereinander
+mit eigener Beschriftung** und je einem Hinweis, der das sagt – nebeneinander
+in einer Zeile wäre der Unterschied unsichtbar und eine Falle.
+
+Der **Namens-Würfel in der Galerie** bekommt das Genre trotzdem **nicht**
+mitgegeben: `randomName` stellt die Genre-Id über das Setting, und bei einem
+Altbestand ist die Id nur der aufgefüllte Default – ein vor der Umstellung
+angelegter Fantasy-Charakter bekäme dadurch plötzlich Gegenwartsnamen. Das
+Setting-Feld sagt in beiden Fällen die Wahrheit.
 
 **Editierbare Felder:** Name, Kurzbeschreibung, Beschreibung und alle Merkmale
 sind in beiden Ansichten editierbar. Am Namensfeld hängen in **beiden**
@@ -400,12 +643,51 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   `{ input, traits? }`: die Merkmale kennt nur die Galerie, und sie haben im
   Prompt **Vorrang** vor den Formular-Vorgaben (Geschlecht, Alter, Herkunft) –
   sie beschreiben den fertigen Charakter, die Vorgaben nur den Wunsch. Der Bild-Prompt wird
-  aus Optionen `{ includeTraits, visualDetails, extraPrompt }` + Kurzbeschreibung
+  aus Optionen `{ includeTraits, visualDetails, extraPrompt, genre }` +
+  Kurzbeschreibung
   (Szenen-Kontext) + Stilbeschreibung zusammengesetzt. **Hier** wird der Bild-Look
   getunt. Neben `stilBeschreibung` gibt es `framingBeschreibung`: Der
   Standard-Bildaufbau verlangt eine Umgebung mit Tiefenschärfe, „Skizze"
   schließt sie ausdrücklich aus (nur dort weicht auch die Kontextzeile ab).
   Bei einem neuen Stil also prüfen, ob der Standard-Bildaufbau passt.
+
+  **Stil und Genre sind zwei verschiedene Fragen:** Der Stil bestimmt, *wie*
+  gemalt wird (Illustration, Ölbild, Foto, Skizze), das Genre *was* zu sehen
+  ist. Vorher war Letzteres fest auf Gegenwart verdrahtet – „Contemporary,
+  present-day clothing", „a fitting modern real-world environment" –, also auf
+  genau eines von neun Genres: Eine Fantasy-Figur bekam eine Straßenszene und
+  einen Mantel von heute, obwohl im Text eine Burg stand. Die Welt steckt jetzt
+  in der Karte `BILDWELTEN` (Genre-Id → `epoche`, `umgebung`, `umgebungIllu`,
+  `orte`, `bueste`); die Stilbeschreibungen bleiben dieselben Sätze, nur die
+  Welt darin wechselt. Ein neues Genre kostet damit **einen Eintrag** und keine
+  neue Stilbeschreibung.
+
+  `umgebungIllu` ist der eine Schönheitsfehler: Er existiert nur, weil der
+  Gegenwarts-Prompt in der Illustration „modern **real-world** environment"
+  sagt und zeichengenau erhalten bleiben musste – für Fantasy wäre
+  „real-world" falsch. Bei allen anderen Genres steht dort dasselbe wie in
+  `umgebung`.
+
+  `bueste` ist der Kleidungshinweis für „Skizze", die keine Umgebung zeigt und
+  die Welt deshalb allein über die Kleidung transportieren kann. Bei Gegenwart
+  ist er **leer**: Der bisherige Skizzen-Prompt sagt zur Epoche nichts, und
+  ohne Angabe malen die Modelle ohnehin Gegenwart.
+
+  Eine unbekannte oder fehlende Genre-Id fällt auf Gegenwart zurück – dieselbe
+  Regel wie bei den Würfeln, und hier zusätzlich die Garantie, dass
+  Altbestände und ältere Clients denselben Prompt bekommen wie zuvor. Die
+  Route `generate-image` nimmt `genre` deshalb als `z.string().default(...)`
+  ohne Allowlist: Eine Bildgenerierung an einer Genre-Id scheitern zu lassen
+  wäre die teurere Reaktion. Das Genre kommt dabei **aus dem Client**, nicht
+  aus der Datenbank – im Formular aus `input.genre`, in der Bilder-Ansicht aus
+  dem **bearbeiteten** Genre der Detailansicht (eigener Prop, wie bei
+  `ScenarioFromCharacterModal`): Wer eben auf Fantasy gestellt hat und dann ein
+  Bild erzeugt, meint Fantasy.
+
+  Der Gegenwarts-Prompt ist gegen Regressionen geprüft: 150 Kombinationen aus
+  Stil, Optionen und Kurzbeschreibung (explizit `gegenwart`, ohne Genre und mit
+  unbekannter Id) sind zeichengenau die von vorher. Wer `BILDWELTEN` ändert,
+  sollte das wiederholen.
   Der `merkmaleBlock` zählt die Merkmale **einzeln** auf statt über
   `TRAIT_LABELS` zu laufen. Deshalb landet ein neues Merkmal nicht automatisch
   im Bild-Prompt – `interessen` steht bewusst nicht drin (Hobbys sind kein
@@ -477,7 +759,7 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   Charakter funktioniert (Augen, Haut, Narben, Gewohnheiten, Mitgeführtes) –
   **kein** Haarschnitt und kein Schnitt der Kleidung.
 - `backgrounds.ts` – Hintergründe für den Würfel am Feld „Hintergrund":
-  **sechs Listen zu je 100**, eine pro Genre-Id aus `templates.ts`
+  **neun Listen zu je 100**, eine pro Genre-Id aus `templates.ts`
   (`BACKGROUNDS_BY_GENRE`). `randomBackground(genre)` zieht **1–3** Einträge,
   mit Semikolon verbunden. Anders als bei den Berufen wird **nicht** markiert,
   sondern getrennt: ein Beruf passt in mehrere Genres, ein Lebenslauf nicht –
@@ -487,12 +769,19 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   (ein Konzernvertrag neben einem gebrochenen Lehnseid wären zwei Charaktere).
   Die Einträge sind subjektlose Verbalphrasen („floh aus der Heimat"), damit
   sie sich aneinanderreihen lassen und kein Geschlecht festlegen.
-- `professions.ts` – 300 Berufe für den Würfel am Feld „Beruf / Rolle", jeder
+- `professions.ts` – 360 Berufe für den Würfel am Feld „Beruf / Rolle", jeder
   mit den Genres markiert, in die er passt (`randomProfession(genre)` filtert
   danach). Die Markierung ist der Zweck der Struktur: eine flache Liste würde
   einen „Netrunner" ins Mittelalter würfeln. Ohne Treffer steht die ganze Liste
   zur Auswahl. Berufe stehen in der Grundform, das Textmodell passt sie ans
   Geschlecht an.
+  **Die einzige Datei, in der ein neues Genre keine eigene Liste bekommt.**
+  Science Fiction, Märchen und Superhelden erben über die Karte `GEERBT` die
+  Markierungen von Cyberpunk, Fantasy bzw. Gegenwart und haben daneben je 20
+  eigene Einträge. Ein Lebenslauf trägt sein Genre in sich, ein Beruf nicht:
+  ein Arzt bleibt ein Arzt, ein Müller im Märchen derselbe wie in der Fantasy.
+  Dreihundert Berufe zu kopieren, um an fast identische Einträge eine zweite
+  Markierung zu hängen, wäre Pflegeaufwand ohne Gewinn.
 - `names.ts` – Namensvorrat für den Würfel-Knopf: neun Kulturkreise à 200 Namen
   plus `GENRE_CULTURES` (Genre → Kulturkreise) und `randomName`. **Rein lokal,
   ohne API** – der Knopf lebt davon, dass man ihn mehrmals drückt, und das
@@ -565,7 +854,23 @@ lokal.
   (`z-70`) → Vorlagen-Auswahl (`z-75`) → Vollbild (`z-80`). Die inneren Ebenen werden **im DOM der
   äußeren** gerendert, deren Backdrop bei jedem Klick schließt – jede innere
   Ebene braucht daher `stopPropagation` auf ihrem eigenen Backdrop und
-  Schließen-Knopf, sonst reißt ein Klick alles mit. Für Esc reicht das nicht:
+  Schließen-Knopf, sonst reißt ein Klick alles mit.
+
+  **Kein Backdrop hängt direkt an `onClick`** – alle fünf laufen über
+  `useBackdropClose` (`app/components/`). Grund war ein Datenverlust: Wer die
+  Beschreibung in der Detailansicht markieren wollte und die Maustaste über dem
+  Rand losließ, verlor die Ansicht **samt aller ungespeicherten Änderungen**.
+  `click` feuert nämlich nicht dort, wo losgelassen wird, sondern auf dem
+  **gemeinsamen Vorfahren** von Druck- und Loslass-Punkt – bei einer Markierung
+  aus dem Dialog heraus ist das der Backdrop selbst. `stopPropagation` am Dialog
+  hilft dagegen **nichts**: Das Ereignis entsteht am Backdrop und steigt gar
+  nicht erst durch ihn hindurch auf. Der Hook prüft deshalb zusätzlich den
+  **Beginn** der Geste über `mousedown` und schließt nur, wenn beide auf dem
+  Backdrop lagen. Das Stoppen der Ausbreitung passiert dabei **unabhängig**
+  davon, ob geschlossen wird – sonst käme ausgerechnet die abgefangene
+  Markierungs-Geste bei der Ebene darunter an und schlösse dort.
+
+  Für Esc reicht das nicht:
   Ein Handler, der vom Offen-Zustand der Ebene darüber abhängt und deshalb neu
   registriert wird, hängt sich **während derselben Ereignisausbreitung** wieder
   ein und bekommt denselben Tastendruck ab (beide Ebenen schließen auf einmal).

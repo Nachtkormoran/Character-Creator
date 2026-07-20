@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getImageProvider } from "@/lib/imageProvider";
 import { buildImagePrompt } from "@/lib/prompts";
 import { DEFAULT_IMAGE_STYLE, generatedCharacterSchema } from "@/lib/schema";
+import { DEFAULT_GENRE } from "@/lib/templates";
 import { getSettings } from "@/lib/settings";
 import { extractVisualDetails } from "@/lib/visualDetails";
 import { z } from "zod";
@@ -19,6 +20,18 @@ const bodySchema = z.object({
   includeTextDetails: z.boolean().default(false),
   // Zusätzlicher freier Text, der im Bild-Prompt berücksichtigt wird
   extraPrompt: z.string().max(1000).optional(),
+  /**
+   * Genre-Id des Charakters. Bestimmt Kleidung, Ausstattung und Umgebung im
+   * Bild-Prompt – ohne sie bekäme eine Fantasy-Figur eine Straßenszene von
+   * heute. Kommt aus dem Client, weil das Genre dort ungespeichert geändert
+   * sein kann (Formular wie Detailansicht) und die Route den Charakter
+   * ohnehin nicht aus der Datenbank lädt.
+   *
+   * Bewusst `z.string()` und keine Allowlist: `buildImagePrompt` fällt bei
+   * einer unbekannten Id auf Gegenwart zurück, und eine Bildgenerierung an
+   * einer Genre-Id scheitern zu lassen wäre die teurere Reaktion.
+   */
+  genre: z.string().default(DEFAULT_GENRE),
   // Stil-/Motivvorlagen als Data-URLs. Begrenzt, weil sie im Request-Body
   // landen und base64 rund ein Drittel Overhead hat.
   referenceImages: z
@@ -46,6 +59,7 @@ export async function POST(request: Request) {
       includeTextDetails,
       extraPrompt,
       referenceImages,
+      genre,
     } = parsed.data;
 
     const visualDetails = includeTextDetails
@@ -56,6 +70,7 @@ export async function POST(request: Request) {
       includeTraits,
       visualDetails,
       extraPrompt,
+      genre,
     });
     // Modell und Qualität kommen aus den Einstellungen
     // (Default: gpt-image-1 / medium).

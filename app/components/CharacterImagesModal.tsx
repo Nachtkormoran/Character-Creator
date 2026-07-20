@@ -19,6 +19,7 @@ import {
 import type { StoredCharacter } from "@/lib/serialize";
 import { ImageLightbox } from "./ImageLightbox";
 import { ReferenceImagePicker } from "./ReferenceImagePicker";
+import { useBackdropClose } from "./useBackdropClose";
 
 /**
  * Bilder-Ansicht eines Charakters.
@@ -31,11 +32,20 @@ export function CharacterImagesModal({
   character: c,
   /** Der bearbeitete Stand aus der Detailansicht – Grundlage für den Prompt. */
   edited,
+  /**
+   * Das **bearbeitete** Genre aus der Detailansicht, nicht `c.input.genre`.
+   * Es steuert Kleidung und Umgebung im Bild, und es wartet dort auf
+   * „Änderungen speichern": Wer eben von Gegenwart auf Fantasy gestellt hat
+   * und dann ein Bild erzeugt, meint Fantasy. Dieselbe Regel wie beim
+   * Ableiten eines Szenarios.
+   */
+  genre,
   onChange,
   onClose,
 }: {
   character: StoredCharacter;
   edited: GeneratedCharacter;
+  genre: string;
   onChange: (updated: StoredCharacter) => void;
   onClose: () => void;
 }) {
@@ -71,6 +81,13 @@ export function CharacterImagesModal({
     ownPickerRef.current = value;
     setOwnPickerState(value);
   }, []);
+
+  // Beide Backdrops schließen nur bei einem echten Klick daneben, nicht am
+  // Ende einer Textmarkierung – und stoppen die Ausbreitung in jedem Fall.
+  const backdrop = useBackdropClose(onClose, { stopPropagation: true });
+  const pickerBackdrop = useBackdropClose(() => setOwnPicker(false), {
+    stopPropagation: true,
+  });
 
   /**
    * Esc schließt die oberste offene Ebene: Vollbild, sonst Vorlagen-Auswahl,
@@ -120,6 +137,7 @@ export function CharacterImagesModal({
         includeTextDetails,
         extraPrompt,
         referenceImages: referenceImage ? [referenceImage] : [],
+        genre,
       });
       return addCharacterImage(c.id, imageData);
     });
@@ -201,11 +219,9 @@ export function CharacterImagesModal({
       // stopPropagation ist hier entscheidend: diese Ansicht wird innerhalb des
       // Detail-Modals gerendert, dessen Backdrop bei jedem Klick schließt. Ohne
       // das würde ein Klick zum Schließen der Bilder-Ansicht die Detailansicht
-      // dahinter mitschließen.
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-      }}
+      // dahinter mitschließen. Der Hook stoppt deshalb auch dann, wenn er
+      // selbst nicht schließt (Textmarkierung, s. dort).
+      {...backdrop}
     >
       <div
         className="my-8 w-full max-w-4xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
@@ -437,10 +453,7 @@ export function CharacterImagesModal({
           className="fixed inset-0 z-75 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm"
           // Wie beim Backdrop der Bilder-Ansicht: ohne stopPropagation risse ein
           // Klick hier die Ebenen darunter mit.
-          onClick={(e) => {
-            e.stopPropagation();
-            setOwnPicker(false);
-          }}
+          {...pickerBackdrop}
         >
           <div
             className="my-8 w-full max-w-2xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"

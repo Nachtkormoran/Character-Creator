@@ -1,5 +1,5 @@
 import { DEFAULT_STORY_HOOK_ANCHOR, TRAIT_LABELS } from "./schema";
-import { GENRE_TEMPLATES } from "./templates";
+import { DEFAULT_GENRE, genreLabel } from "./templates";
 import type {
   CharacterInput,
   CharacterTraits,
@@ -126,20 +126,49 @@ Antworte mit nichts als dem Text selbst – keine Überschrift, keine Anführung
 }
 
 /**
- * Baut den Prompt für drei Ansatzpunkte einer Geschichte.
+ * Baut den Prompt für **einen** Ansatzpunkt einer Geschichte.
  *
  * Grundlage sind Beschreibung **und** Merkmale, weil beide etwas beisteuern,
  * was der andere nicht hat: der Text die Vorgeschichte, die Tabelle die harten
  * Eckdaten (Beruf, Wohnort, Interessen). Die Ansatzpunkte sollen aus dem
  * Charakter kommen, nicht aus einem allgemeinen Vorrat an Plot-Ideen.
  *
- * Ausgabe ist **Freitext**, kein strukturiertes JSON: das Ergebnis landet in
- * einem Textfeld, das von Hand weitergeschrieben wird. Ein Schema für drei
- * Absätze wäre nur Aufschlag – dieselbe Überlegung wie bei `buildNamePrompt`.
+ * **Einer je Aufruf, nicht drei.** Die Ansatzpunkte sind eine Liste, aus der
+ * einzeln gelöscht wird; wer einen dritten will, klickt ein drittes Mal. Drei
+ * auf einmal wären wieder ein Block, der nur ganz zu haben ist – und der
+ * häufigste Fall war ohnehin, dass zwei taugen und einer nicht.
+ *
+ * Ausgabe ist **Freitext**, kein strukturiertes JSON: das Ergebnis ist ein
+ * Absatz, der von Hand weitergeschrieben wird. Ein Schema drumherum wäre nur
+ * Aufschlag – dieselbe Überlegung wie bei `buildNamePrompt`.
  */
 export function buildStoryHooksPrompt(
   character: GeneratedCharacter,
   anchor: StoryHookAnchor = DEFAULT_STORY_HOOK_ANCHOR,
+  /**
+   * Stichworte zur Richtung – „Verrat, alte Schuld", „eher leise", „es soll um
+   * seine Schwester gehen". Freitext und bewusst **kein** weiteres Menü: Was
+   * jemand von einem Ansatzpunkt will, lässt sich nicht in eine Liste
+   * sperren, und die Stichworte sind je Charakter andere.
+   *
+   * Steht im Prompt **hinter** der Bindungsstufe und ist ihr ausdrücklich
+   * untergeordnet. Sonst hebelte das Feld sie aus: Wer bei `eng` „Verschwörung
+   * im Konzern" eingibt, bekäme sonst genau die erfundenen Personen und
+   * Ereignisse zurück, die diese Stufe verbietet. Die Stichworte wählen unter
+   * dem **zulässigen** Material aus, sie erweitern es nicht.
+   */
+  richtung?: string,
+  /**
+   * Die bereits vorhandenen Ansatzpunkte. Gehen **nur** mit, damit der neue
+   * ein anderer wird – ohne sie liefert wiederholtes Klicken dieselbe Idee in
+   * anderen Worten, und genau das Klicken ist jetzt der Weg zu mehreren.
+   *
+   * Das ist auch der Grund, warum sie hier stehen dürfen, obwohl der Prompt
+   * sonst nur Charaktermaterial enthält: Sie sind kein zusätzliches Material,
+   * sondern eine **Ausschlussliste**. Der Prompt sagt das ausdrücklich, sonst
+   * schreibt das Modell sie fort statt daneben.
+   */
+  vorhandene: string[] = [],
 ): string {
   const m = character.merkmale;
 
@@ -175,7 +204,24 @@ export function buildStoryHooksPrompt(
     line("Persönlichkeit", m.persoenlichkeit) +
     line("Interessen und Hobbys", m.interessen);
 
-  return `Leite aus diesem Charakter drei Ansatzpunkte für eine interessante Geschichte ab.
+  /**
+   * Die vorhandenen Ansatzpunkte als Ausschlussliste. Ungekürzt: Wovon sich
+   * der neue unterscheiden soll, muss vollständig dastehen – aus einer
+   * Überschrift allein ist nicht ersichtlich, welche Stelle des Charakters
+   * schon vergeben ist.
+   */
+  const bekannt = vorhandene.map((h) => h.trim()).filter(Boolean);
+  const bekanntBlock = bekannt.length
+    ? `
+Diese Ansatzpunkte gibt es für diesen Charakter bereits:
+${bekannt.map((h) => `- ${h}`).join("\n")}
+
+- Sie sind **keine Vorlage**, sondern eine Ausschlussliste: Schreibe sie nicht fort und liefere keine Abwandlung davon.
+- Der neue Ansatzpunkt muss an einer **anderen** Stelle des Charakters ansetzen und in eine andere Richtung führen. Ist das Naheliegende vergeben, nimm das Zweitnaheliegende.
+`
+    : "";
+
+  return `Leite aus diesem Charakter **einen** Ansatzpunkt für eine interessante Geschichte ab.
 
 Name: ${character.name}
 ${character.kurzbeschreibung ? `\nKurz: ${character.kurzbeschreibung}\n` : ""}
@@ -186,16 +232,28 @@ ${character.beschreibung}
 
 Bindung an den Charakter – das ist die wichtigste Anforderung:
 ${bindung[anchor]}
-
+${
+  richtung?.trim()
+    ? `
+Gewünschte Richtung: ${richtung.trim()}
+- Richte den Ansatzpunkt daran aus, so weit der Charakter das hergibt.
+- Es sind Stichworte, keine Handlungsvorgabe. Erzähle nicht die genannte Geschichte nach, sondern finde im Charakter die Stellen, an denen sie ansetzen könnte.
+- **Die Bindung oben schlägt diese Stichworte.** Verlangt ein Stichwort etwas, das die Bindung ausschließt, dann befolge die Bindung und **lass das Stichwort in diesem Punkt fallen**. Es ist ausdrücklich richtig, ein Stichwort nur teilweise oder gar nicht zu bedienen; es ist falsch, dafür die Bindung zu brechen.
+- Übersetze das Stichwort in diesem Fall in seinen **Kern** und suche den im Charakter: „Verrat" ist auch ein gebrochenes Versprechen unter Freunden, „Verschwörung" auch ein Schweigen, an dem sich jemand beteiligt. Erfinde keine Organisationen, Vorfälle oder Personen, nur damit das Stichwort wörtlich vorkommt.
+- Sei direkt und konkret.
+`
+    : ""
+}${bekanntBlock}
 Weitere Anforderungen:
-- Genau drei Ansatzpunkte, nummeriert (1., 2., 3.), je zwei bis vier Sätze.
-- Jeder beginnt mit einer knappen Überschrift von wenigen Worten, danach ein Doppelpunkt und der Text.
+- Genau **ein** Ansatzpunkt, zwei bis drei Sätze.
+- Er beginnt mit einer knappen Überschrift von wenigen Worten, danach ein Doppelpunkt und der Text.
+- **Keine Nummer davor.** Der Ansatzpunkt steht in einer Liste, deren Reihenfolge sich ändert.
 - Reiner Fließtext ohne Markdown: keine Sternchen, keine Rauten, keine Fettschrift.
-- Drei verschiedene Richtungen, nicht drei Fassungen derselben Idee.
+- Kein Absatzumbruch – ein zusammenhängender Block.
 - Ein Ansatzpunkt ist eine offene Ausgangslage mit einer Spannung, kein fertiges Handlungsgerüst und kein Ende.
 - Auf Deutsch, nüchtern und konkret.
 
-Antworte mit nichts als den drei Ansatzpunkten.`;
+Antworte mit nichts als dem Ansatzpunkt.`;
 }
 
 /**
@@ -411,6 +469,13 @@ export function buildScenarioFromCharacterPrompt(
    * dann eine Abschrift jenes Szenarios und keine Ableitung aus der Person.
    */
   setting?: string,
+  /**
+   * Das Genre aus den Vorgaben des Charakters. Es steht **fest** und ist keine
+   * Aufgabe für das Modell: Die Figur wurde in diesem Genre angelegt, und die
+   * Welt, in die sie gehört, kann keine andere sein. Hier steuert es nur noch,
+   * wie Ort, Zeit und Regeln auszufallen haben.
+   */
+  genre?: string,
 ): string {
   const m = character.merkmale;
 
@@ -427,14 +492,16 @@ export function buildScenarioFromCharacterPrompt(
     : "";
 
   const settingZeile = line("Ursprünglich angelegt als", setting);
-
-  const genres = GENRE_TEMPLATES.map((g) => `${g.id} (${g.label})`).join(", ");
+  const genreZeile = line(
+    "Genre (steht fest)",
+    genre ? genreLabel(genre) : undefined,
+  );
 
   return `Entwirf das Szenario – die Welt –, in die dieser Charakter gehört.
 
 Charakter: ${character.name}
 ${character.kurzbeschreibung}
-${settingZeile}
+${genreZeile}${settingZeile}
 Merkmale:
 ${merkmale}
 
@@ -445,13 +512,13 @@ Deine Aufgabe: Leite aus dieser Person die Welt ab, in der sie lebt. Nicht irgen
 
 Anforderungen an die einzelnen Felder:
 - **name**: Ein kurzer, prägnanter Titel für das Szenario (2–5 Wörter). Benenne die **Welt oder den Ort**, nicht die Person – der Titel muss auch dann noch passen, wenn fünf weitere Figuren dazukommen.
-- **genre**: Genau einer dieser Werte, unverändert: ${genres}.
-- **ort**: Wo diese Geschichte spielt. Konkret genug, dass man es sich vorstellen kann.
+- **ort**: Wo diese Geschichte spielt. Konkret genug, dass man es sich vorstellen kann. Es muss zum oben genannten Genre passen.
 - **zeit**: Epoche, Jahr oder Jahreszeit.
 - **regeln**: Was in dieser Welt gilt und für **alle** Figuren darin wahr ist – Technikstand, Magie, gesellschaftliche Ordnung, Tabus, Machtverhältnisse. Vollständige Sätze. Keine Aussage über diesen einen Charakter: was nur für ihn gilt, ist keine Regel der Welt.
 - **beschreibung**: 2–3 kurze Absätze (ca. 600–900 Zeichen) über die Welt – Atmosphäre, Alltag, was diesen Ort zu dieser Zeit ausmacht. Konkret und sinnlich statt allgemein.
 
 Für alle Felder gilt:
+- **Das Genre ist vorgegeben und nicht verhandelbar.** Ort, Zeit, Regeln und Beschreibung müssen erkennbar in diesem Genre spielen – auch dann, wenn der Charakter für sich genommen ebenso gut in ein anderes passen würde.
 - **Jede Festlegung muss ihren Anhalt im Charakter haben.** Beruf, Herkunft, Hintergrund und besondere Merkmale sagen dir, wie diese Welt wirtschaftet, wo ihre Grenzen verlaufen und was in ihr möglich ist. Erfinde nichts, was der Figur widerspricht.
 - Ergänze nur dort frei, wo der Charakter schweigt – und dann so, dass es zu ihm passt.
 - Die Welt ist **größer als diese eine Figur**. Sie soll Platz für weitere Charaktere lassen: beschreibe Verhältnisse, nicht ihre persönliche Lage.
@@ -504,6 +571,120 @@ Antworte mit nichts als dem Namen, ohne Anführungszeichen und ohne Erklärung.`
 }
 
 /**
+ * Die Welt, in der ein Bild spielt – je Genre-Id aus `templates.ts`.
+ *
+ * Der Bild-Prompt war vorher fest auf Gegenwart verdrahtet („Contemporary,
+ * present-day clothing", „a fitting modern real-world environment"). Das ist
+ * genau eines von neun Genres: Eine Fantasy-Figur bekam eine Straßenszene und
+ * einen Mantel von heute, obwohl im Text eine Burg stand. Der Stil bestimmt,
+ * **wie** gemalt wird, das Genre **was** zu sehen ist – erst beides zusammen
+ * ergibt ein passendes Bild.
+ *
+ * Anders als bei den Würfeln in `backgrounds.ts` liegt hier **kein** eigener
+ * Vorrat je Genre, sondern vier Textbausteine: Die Stilbeschreibungen bleiben
+ * dieselben Sätze, nur die Welt darin wechselt. Ein neues Genre kostet damit
+ * einen Eintrag und keine neue Stilbeschreibung.
+ */
+type Bildwelt = {
+  /** Epoche für Kleidung und Ausstattung, ohne Punkt am Ende. */
+  epoche: string;
+  /** Umgebung, wie sie in den meisten Bausteinen steht. */
+  umgebung: string;
+  /**
+   * Dieselbe Umgebung für die Illustration. Existiert **nur**, weil der
+   * Gegenwarts-Prompt dort „real-world" sagt und zeichengenau erhalten bleiben
+   * muss; für Fantasy oder Science Fiction wäre „real-world" schlicht falsch.
+   * Bei allen anderen Genres steht deshalb dasselbe wie in `umgebung`.
+   */
+  umgebungIllu: string;
+  /** Beispielschauplätze, die zum Genre passen. */
+  orte: string;
+  /**
+   * Kleidungshinweis für die Büste („Skizze"), die keine Umgebung zeigt und
+   * die Welt deshalb allein über die Kleidung transportiert.
+   *
+   * Bei Gegenwart **leer**: Der bisherige Skizzen-Prompt sagt zur Epoche
+   * nichts, und er bleibt unverändert. Das kostet dort auch nichts – ohne
+   * Angabe malen die Modelle ohnehin Gegenwart.
+   */
+  bueste: string;
+};
+
+const BILDWELTEN: Record<string, Bildwelt> = {
+  gegenwart: {
+    epoche: "Contemporary, present-day",
+    umgebung: "modern environment",
+    umgebungIllu: "modern real-world environment",
+    orte: "a city street, workplace, studio or interior",
+    bueste: "",
+  },
+  fantasy: {
+    epoche: "High-fantasy, medieval-inspired",
+    umgebung: "high-fantasy environment",
+    umgebungIllu: "high-fantasy environment",
+    orte: "a castle hall, a market town, a forest road or a candlelit chamber",
+    bueste:
+      "Clothing is high-fantasy and medieval-inspired: wool, linen, leather, simple metal fittings — no modern garments.",
+  },
+  steampunk: {
+    epoche: "Victorian-industrial steampunk",
+    umgebung: "steampunk environment",
+    umgebungIllu: "steampunk environment",
+    orte: "a brass-fitted workshop, an airship deck, a gaslit street or a cluttered laboratory",
+    bueste:
+      "Clothing is Victorian-industrial steampunk: waistcoats, leather, brass fittings, goggles — no modern garments.",
+  },
+  cyberpunk: {
+    epoche: "Near-future cyberpunk",
+    umgebung: "cyberpunk environment",
+    umgebungIllu: "cyberpunk environment",
+    orte: "a neon-lit street at night, a cramped apartment, a back-alley clinic or a corporate lobby",
+    bueste:
+      "Clothing is near-future cyberpunk: technical fabrics, worn synthetics, subtle visible implants — nothing historical.",
+  },
+  historisch: {
+    epoche: "Historical, period-appropriate",
+    umgebung: "historical period environment",
+    umgebungIllu: "historical period environment",
+    orte: "a cobbled street, a workshop, a manor interior or a harbour front",
+    bueste:
+      "Clothing is historical and period-appropriate — nothing modern, no contemporary garments.",
+  },
+  western: {
+    epoche: "19th-century American frontier",
+    umgebung: "Old West frontier environment",
+    umgebungIllu: "Old West frontier environment",
+    orte: "a dusty main street, a saloon interior, a ranch yard or open prairie",
+    bueste:
+      "Clothing is 19th-century frontier: worn cotton and leather, neckerchief, wide-brimmed hat — nothing modern.",
+  },
+  scifi: {
+    epoche: "Far-future science-fiction",
+    umgebung: "science-fiction environment",
+    umgebungIllu: "science-fiction environment",
+    orte: "a starship corridor, a research station, a colony settlement or a docking bay",
+    bueste:
+      "Clothing is far-future science fiction: functional jumpsuits, sleek technical fabrics, utility gear — nothing historical.",
+  },
+  maerchen: {
+    epoche: "Timeless fairy-tale",
+    umgebung: "fairy-tale environment",
+    umgebungIllu: "fairy-tale environment",
+    orte: "a deep forest, a thatched cottage, a watermill or a snowy village lane",
+    bueste:
+      "Clothing is timeless fairy-tale: simple homespun cloth, aprons, cloaks, worn boots — nothing modern.",
+  },
+  superhelden: {
+    epoche: "Contemporary comic-book superhero",
+    umgebung: "modern comic-book city environment",
+    umgebungIllu: "modern comic-book city environment",
+    orte: "a city rooftop at dusk, a busy street, a back alley or a laboratory interior",
+    bueste:
+      "Clothing is contemporary comic-book superhero: either a costume or an everyday outfit with a heroic edge.",
+  },
+};
+
+/**
  * Baut den Prompt für die Bildgenerierung aus den generierten Merkmalen.
  */
 export function buildImagePrompt(
@@ -513,20 +694,26 @@ export function buildImagePrompt(
     includeTraits?: boolean;
     visualDetails?: string;
     extraPrompt?: string;
+    /**
+     * Genre-Id des Charakters (`input.genre`). Eine unbekannte oder fehlende
+     * Id fällt auf Gegenwart zurück – dieselbe Regel wie bei den Würfeln, und
+     * hier zusätzlich die Garantie, dass Altbestände denselben Prompt
+     * bekommen wie bisher.
+     */
+    genre?: string;
   } = {},
 ): string {
   const { includeTraits = true, visualDetails, extraPrompt } = options;
   const m = character.merkmale;
+  const welt = BILDWELTEN[options.genre ?? ""] ?? BILDWELTEN[DEFAULT_GENRE];
 
   const stilBeschreibung: Record<string, string> = {
-    illustration:
-      "Stylized modern character concept art, in the style of high-end digital concept art / movie key art (Leonardo Kino XL look). Clearly an illustration and NOT a photograph: visible digital brushwork and painterly rendering, slightly stylized and idealized features and shapes, artistic illustrative shading rather than photoreal pores and skin texture. Still polished, detailed and with good anatomy. Contemporary, present-day clothing and styling. Cinematic lighting and rich, slightly heightened color grading. The character is set within a fitting modern real-world environment that suits their background and personality (e.g. a city street, workplace, studio or interior), rendered in the same illustrative style, with natural depth of field and atmosphere — NOT an empty studio backdrop.",
-    malerisch:
-      "Expressive painterly portrait, in the style of a fine-art oil / gouache painting. Clearly a hand-painted artwork with visible brush strokes, thick impasto texture, blended colors and an artistic, slightly loose rendering — NOT a photograph and not a clean digital render. Rich, harmonious color palette and warm painterly lighting. Contemporary, present-day clothing. The character is set within a fitting modern environment rendered in the same loose painterly manner, with soft atmospheric depth.",
-    fotorealistisch:
-      "Photorealistic portrait photograph. Shot on a full-frame camera, natural lighting, shallow depth of field, sharp focus, realistic skin texture and pores, high detail. Contemporary, present-day setting. Looks like a real photograph, not an illustration.",
-    skizze:
-      "Soft painted character study, like a digital sketch in gouache or matte oil. Muted, warm earthy palette (ochre, cream, olive, soft browns) with gentle, diffuse light and no dramatic contrast or color grading. Visible dry brush strokes and loose, sketchy edges — the painting fades out towards the borders and looks slightly unfinished, on a subtly textured paper-like surface. Calm, quiet, intimate mood. Clearly a hand-painted study, NOT a photograph and NOT polished concept art.",
+    illustration: `Stylized modern character concept art, in the style of high-end digital concept art / movie key art (Leonardo Kino XL look). Clearly an illustration and NOT a photograph: visible digital brushwork and painterly rendering, slightly stylized and idealized features and shapes, artistic illustrative shading rather than photoreal pores and skin texture. Still polished, detailed and with good anatomy. ${welt.epoche} clothing and styling. Cinematic lighting and rich, slightly heightened color grading. The character is set within a fitting ${welt.umgebungIllu} that suits their background and personality (e.g. ${welt.orte}), rendered in the same illustrative style, with natural depth of field and atmosphere — NOT an empty studio backdrop.`,
+    malerisch: `Expressive painterly portrait, in the style of a fine-art oil / gouache painting. Clearly a hand-painted artwork with visible brush strokes, thick impasto texture, blended colors and an artistic, slightly loose rendering — NOT a photograph and not a clean digital render. Rich, harmonious color palette and warm painterly lighting. ${welt.epoche} clothing. The character is set within a fitting ${welt.umgebung} rendered in the same loose painterly manner, with soft atmospheric depth.`,
+    fotorealistisch: `Photorealistic portrait photograph. Shot on a full-frame camera, natural lighting, shallow depth of field, sharp focus, realistic skin texture and pores, high detail. ${welt.epoche} setting. Looks like a real photograph, not an illustration.`,
+    // Die Büste zeigt keine Umgebung – die Welt steckt hier allein in der
+    // Kleidung, und bei Gegenwart ist der Zusatz leer (Prompt wie bisher).
+    skizze: `Soft painted character study, like a digital sketch in gouache or matte oil. Muted, warm earthy palette (ochre, cream, olive, soft browns) with gentle, diffuse light and no dramatic contrast or color grading. Visible dry brush strokes and loose, sketchy edges — the painting fades out towards the borders and looks slightly unfinished, on a subtly textured paper-like surface. Calm, quiet, intimate mood. Clearly a hand-painted study, NOT a photograph and NOT polished concept art.${welt.bueste ? ` ${welt.bueste}` : ""}`,
   };
   const stil = stilBeschreibung[imageStyle] || stilBeschreibung.illustration;
 
@@ -538,14 +725,14 @@ export function buildImagePrompt(
   };
   const framing =
     framingBeschreibung[imageStyle] ||
-    "Framing: half-body / upper-body composition with a natural, candid pose (the character may look slightly off-camera). The fitting modern environment is visible behind them with depth of field. Only one person in the image, no text, no watermark.";
+    `Framing: half-body / upper-body composition with a natural, candid pose (the character may look slightly off-camera). The fitting ${welt.umgebung} is visible behind them with depth of field. Only one person in the image, no text, no watermark.`;
 
   // Ohne Umgebung (Skizze) darf der Kontext nur Kleidung und Ausstrahlung
   // steuern – sonst zieht er doch wieder einen Schauplatz ins Bild.
   const kontext = character.kurzbeschreibung
     ? imageStyle === "skizze"
       ? `\nCharacter context (use it for clothing, expression and mood only, not for any background): ${character.kurzbeschreibung}\n`
-      : `\nScene context (use it to choose a fitting modern environment and outfit): ${character.kurzbeschreibung}\n`
+      : `\nScene context (use it to choose a fitting ${welt.umgebung} and outfit): ${character.kurzbeschreibung}\n`
     : "";
 
   const merkmaleBlock = includeTraits
@@ -579,4 +766,60 @@ Additional instructions from the user (important – incorporate these even if t
 ${kontext}${merkmaleBlock}${detailsBlock}${extraBlock}
 
 ${framing}`;
+}
+
+/**
+ * Baut den Prompt, der die **Personen aus einem Handlungsentwurf** heraussucht.
+ *
+ * Der Handlungsentwurf entsteht aus den Figuren eines Szenarios, erfindet dabei
+ * aber regelmäßig weitere: den Vorgesetzten, die Schwester, den Mann am Hafen.
+ * Diese Personen sind bisher eine Sackgasse gewesen – sie stehen im Text, und
+ * wer sie anlegen wollte, musste alles von Hand ins Formular übertragen.
+ *
+ * Die **bereits zugeordneten Namen gehen mit**, und zwar als Ausschlussliste:
+ * Gesucht ist, wer im Entwurf vorkommt und noch **nicht** zum Szenario gehört.
+ * Der Abgleich dort statt hier im Code zu machen ist Absicht – ein Entwurf
+ * nennt „Thora" auch dann, wenn die Figur „Thora Eisenbach" heißt, und ein
+ * Zeichenvergleich würde sie für eine zweite Person halten.
+ *
+ * Extrahiert wird **nur, was dasteht**. Der Prompt verlangt ausdrücklich leere
+ * Felder statt Erfindungen: Was hier entsteht, sind die *Vorgaben* für einen
+ * Charakter, und die sollen aus dem Entwurf stammen. Ausgedacht wird später,
+ * beim Erzeugen des Charakters – dort gehört es hin und ist sichtbar.
+ */
+export function buildPlotPersonsPrompt(
+  handlung: string,
+  /** Namen der Figuren, die dem Szenario schon zugeordnet sind. */
+  bekannte: string[],
+): string {
+  const bekanntBlock = bekannte.length
+    ? `Diese Figuren gehören bereits zum Szenario:
+${bekannte.map((n) => `- ${n}`).join("\n")}
+
+- Sie sind **nicht** gesucht. Lass sie weg, auch wenn der Entwurf sie nur mit dem Vornamen oder einer Kurzform nennt („Thora" für „Thora Eisenbach").
+- Erkenne dabei auch abweichende Schreibweisen und Beugungen als dieselbe Person.
+`
+    : "Dem Szenario ist bisher niemand zugeordnet – alle genannten Personen sind gesucht.\n";
+
+  return `Finde in diesem Handlungsentwurf alle **Personen**, die noch nicht zum Szenario gehören.
+
+Handlungsentwurf:
+${handlung.trim()}
+
+${bekanntBlock}
+Was zählt als Person:
+- Ein benannter Mensch mit einer Rolle in der Handlung.
+- **Keine** Gruppen („die Ratsversammlung", „die Dorfbewohner"), keine Orte, keine Organisationen, keine Gegenstände.
+- Keine Person, die nur als Rolle ohne Namen vorkommt („ein Bote", „die Wirtin") – ohne Namen lässt sie sich später nicht wiederfinden.
+- Im Deutschen ist jedes Substantiv großgeschrieben. Großschreibung allein macht ein Wort **nicht** zu einem Namen: „Der Schmied Bengt" enthält genau einen Namen.
+
+Für jede gefundene Person:
+- **name**: exakt die Schreibweise aus dem Text, im Nominativ. Nennt der Entwurf Vor- und Nachnamen, gib beide an.
+- **geschlecht**: „weiblich", „männlich" oder „divers" – nur wenn der Text es hergibt (Pronomen, Anrede, Endungen). Sonst leer.
+- **alter**, **beruf**, **hintergrund**, **persoenlichkeit**, **aussehen**: nur, was der Entwurf tatsächlich sagt.
+
+Wichtig: **Erfinde nichts.** Sagt der Entwurf zum Aussehen nichts, bleibt das Feld leer. Ein leeres Feld ist richtig, eine plausible Erfindung ist falsch – diese Angaben werden später als Vorgaben angezeigt, und was darin steht, soll aus dem Entwurf stammen.
+
+Kommt keine neue Person vor, gib eine leere Liste zurück.
+Alle Angaben auf Deutsch.`;
 }

@@ -57,6 +57,20 @@ export default function ScenariosPage() {
   >(null);
 
   /**
+   * Stichwörter für die Erzeugung, je Feld. Hier ist das nur die Beschreibung.
+   *
+   * Gehalten wird das **in der Seite, nicht in `details`** – und **gespeichert
+   * wird es nicht**: Die Stichwörter beschreiben nichts am Szenario, sondern
+   * wie man es gerade befragen will (dieselbe Regel wie „Bindung", „Richtung"
+   * und der Zusatzwunsch am Handlungsentwurf). Nach dem Erzeugen bleiben sie
+   * stehen, weil der häufigste Fall ein zweiter Versuch mit einer Ergänzung
+   * ist; `resetForm` räumt sie mit dem übrigen Formular weg.
+   */
+  const [zusatz, setZusatz] = useState<
+    Partial<Record<keyof ScenarioDetails, string>>
+  >({});
+
+  /**
    * Im Anlege-Formular ist **nur die Beschreibung** erzeugbar. Der
    * Handlungsentwurf braucht ein gespeichertes Szenario mit zugeordneten
    * Charakteren – beides gibt es hier noch nicht. Der Knopf erscheint erst in
@@ -84,6 +98,7 @@ export default function ScenariosPage() {
       const { beschreibung } = await generateScenarioDescription(
         name.trim(),
         details,
+        zusatz.beschreibung ?? "",
       );
       setDetails((d) => ({ ...d, beschreibung }));
     } catch (err) {
@@ -103,6 +118,7 @@ export default function ScenariosPage() {
   function resetForm() {
     setName("");
     setDetails(LEER);
+    setZusatz({});
     setFormError(null);
   }
 
@@ -175,6 +191,10 @@ export default function ScenariosPage() {
             generatable={ERZEUGBAR}
             onGenerate={handleGenerate}
             generatingField={generatingField}
+            zusatz={zusatz}
+            onZusatzChange={(key, value) =>
+              setZusatz((z) => ({ ...z, [key]: value }))
+            }
           />
 
           <div className="flex items-center gap-3">

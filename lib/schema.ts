@@ -2,7 +2,7 @@ import { z } from "zod";
 // Nur für die Genre-Ids in `scenarioDraftSchema`. Kein Kreis: `templates.ts`
 // importiert von hier ausschließlich einen **Typ**, und der ist zur Laufzeit
 // nicht da.
-import { GENRE_TEMPLATES } from "./templates";
+import { DEFAULT_GENRE, GENRE_TEMPLATES, genreLabel } from "./templates";
 
 /**
  * Zentrale Schemas & Typen für den Charakter Creator.
@@ -128,6 +128,26 @@ export function isKnownImageModel(value: string): value is ImageModel {
 }
 
 export const characterInputSchema = z.object({
+  /**
+   * Das Genre der Figur.
+   *
+   * **Eine echte Vorgabe, kein Bedienzustand des Formulars.** Es war lange
+   * beides: Die Genre-Auswahl belegte das Setting-Feld vor und steuerte die
+   * Würfel, wurde aber nirgends gespeichert. Damit war später nicht mehr
+   * feststellbar, in welche Welt eine Figur gehört – beim Ableiten eines
+   * Szenarios musste das Genre aus dem Setting-Freitext erraten werden, und
+   * das ging oft daneben.
+   *
+   * `.catch` statt bloßem `.default`: Eine Genre-Id, die es nicht (mehr) gibt,
+   * darf nicht die **gesamten** Vorgaben ungültig machen – sonst stünde die
+   * Figur wegen einer Kleinigkeit ohne alles da. Sie fällt auf Gegenwart
+   * zurück, wie überall im Projekt.
+   */
+  genre: z
+    .enum(GENRE_TEMPLATES.map((g) => g.id) as [string, ...string[]])
+    .default(DEFAULT_GENRE)
+    .catch(DEFAULT_GENRE),
+
   // Grundlegende Vorgaben
   /**
    * Wunschname, optional. Ein einzelnes Wort wird als Vorname verstanden und
@@ -270,6 +290,7 @@ export const TRAIT_LABELS: Record<keyof CharacterTraits, string> = {
  * statt sie stillschweigend zu unterschlagen.
  */
 export const INPUT_LABELS: Record<keyof CharacterInput, string> = {
+  genre: "Genre",
   name: "Wunschname",
   gender: "Geschlecht",
   age: "Alter",
@@ -297,7 +318,27 @@ export function inputDisplayValue(
   if (key === "imageStyle") {
     return IMAGE_STYLES.find((s) => s.value === raw)?.label ?? raw;
   }
+  // Gespeichert ist die Id („western"), angezeigt gehört das Label hin.
+  if (key === "genre") return genreLabel(raw);
   return raw;
+}
+
+/**
+ * Füllt das **Genre** in den Vorgaben eines Altbestands auf.
+ *
+ * Bewusst nur dieses eine Feld und nicht alle: Die übrigen Vorgaben sind reine
+ * Anzeige, und dass sie einem alten Charakter fehlen, soll man in der
+ * Vorgaben-Ansicht auch sehen („— nichts angegeben —"). Das Genre dagegen
+ * **steuert** etwas – die Würfel und vor allem die Szenario-Ableitung – und ein
+ * fehlender Wert wäre dort ein `undefined` mitten im Ablauf.
+ *
+ * Aus demselben Grund fällt auch eine unbekannte Id auf Gegenwart zurück und
+ * bleibt nicht stehen: Sie träfe in keiner Liste zu.
+ */
+export function normalizeInputGenre(raw: unknown): CharacterInput {
+  const input = (raw ?? {}) as CharacterInput;
+  const bekannt = GENRE_TEMPLATES.some((g) => g.id === input.genre);
+  return bekannt ? input : { ...input, genre: DEFAULT_GENRE };
 }
 
 // ---------------------------------------------------------------------------
@@ -404,21 +445,20 @@ export function normalizeScenarioDetails(raw: unknown): ScenarioDetails {
  *    hat genau eine. Er wird später in der Szenario-Detailansicht erzeugt,
  *    wenn eine Besetzung dasteht.
  *
- * Das **Genre ist ein Enum** über die Ids aus `GENRE_TEMPLATES`, kein
- * Freitext: gespeichert wird überall die Id, und ein Modell, das „Western"
- * statt `western` liefert, ließe Würfel, Namenslisten und Berufe ins Leere
- * laufen. Hier ist ein JSON-Schema also nicht bloß Aufschlag, sondern das
- * Mittel, das die Antwort ins vorhandene Vokabular zwingt.
+ * Das **Genre erzeugt das Modell nicht** – es kommt aus den Vorgaben des
+ * Charakters und wird von der Route in den Entwurf gesetzt. Das war einmal
+ * anders: Solange Charaktere kein Genre trugen, musste das Modell es aus dem
+ * Setting-Freitext erraten, und ein Enum über die Ids aus `GENRE_TEMPLATES`
+ * hielt die Antwort wenigstens im Vokabular. Raten ist nicht mehr nötig, und
+ * die Figur weiß es besser als der Text über sie: Wer einen Charakter als
+ * Märchenfigur angelegt hat, will kein „historisch" zurückbekommen, weil
+ * Mühle und Wald auch dorthin passen. Das Genre steht dem Modell trotzdem im
+ * Prompt – als Vorgabe für Ort, Zeit und Regeln.
  */
 export const scenarioDraftSchema = z.object({
   name: z
     .string()
     .describe("Kurzer, prägnanter Titel des Szenarios (2–5 Wörter)"),
-  genre: z
-    .enum(
-      GENRE_TEMPLATES.map((g) => g.id) as [string, ...string[]],
-    )
-    .describe("Das am besten passende Genre"),
   ort: z.string().describe("Wo die Geschichte spielt"),
   zeit: z.string().describe("Epoche, Jahr oder Jahreszeit"),
   regeln: z
@@ -427,7 +467,75 @@ export const scenarioDraftSchema = z.object({
   beschreibung: z.string().describe("Fließtext über die Welt des Szenarios"),
 });
 
-export type ScenarioDraft = z.infer<typeof scenarioDraftSchema>;
+/**
+ * Was beim Client ankommt: der Modell-Entwurf **plus** das Genre, das die
+ * Route aus den Vorgaben des Charakters ergänzt. Deshalb ein Schnitt und kein
+ * blankes `z.infer` – das Schema beschreibt die Modellantwort, dieser Typ die
+ * fertige Antwort der Route.
+ */
+export type ScenarioDraft = z.infer<typeof scenarioDraftSchema> & {
+  genre: string;
+};
+
+// ---------------------------------------------------------------------------
+// Personen aus dem Handlungsentwurf
+// ---------------------------------------------------------------------------
+
+/**
+ * Eine im Handlungsentwurf genannte Person, die dem Szenario **noch nicht**
+ * zugeordnet ist.
+ *
+ * Der Handlungsentwurf entsteht aus den vorhandenen Figuren, erfindet dabei
+ * aber regelmäßig weitere: den Vorgesetzten, die Schwester, den Mann am
+ * Hafen. Bisher war das eine Sackgasse – die Person stand im Text und musste
+ * von Hand ins Erstellen-Formular übertragen werden.
+ *
+ * **Warum das ein KI-Aufruf sein muss und kein Mustervergleich:** Im
+ * Deutschen ist jedes Substantiv großgeschrieben. „Der Schmied Bengt verwehrte
+ * ihr den Auftrag" enthält drei großgeschriebene Wörter und genau einen Namen.
+ * Ein Abgleich auf Großschreibung würde „Schmied" und „Auftrag" als Personen
+ * anbieten.
+ *
+ * Alle Felder sind **Pflicht und dürfen leer sein**: Structured Outputs
+ * verlangt, dass jedes Feld im Schema auch geliefert wird, und ein Entwurf
+ * sagt selten etwas über das Aussehen. Ein leerer String ist die ehrliche
+ * Antwort – geraten werden soll hier nichts, das steht später im Formular.
+ */
+export const plotPersonSchema = z.object({
+  name: z
+    .string()
+    .describe(
+      "Der Name der Person, exakt so geschrieben wie im Text – er wird darin wiedergefunden",
+    ),
+  geschlecht: z
+    .string()
+    .describe(
+      'Eines von: "weiblich", "männlich", "divers". Leer lassen, wenn der Text es nicht hergibt',
+    ),
+  alter: z
+    .string()
+    .describe("Alter oder Altersangabe, wenn genannt – sonst leer"),
+  beruf: z.string().describe("Beruf oder Rolle in der Handlung"),
+  hintergrund: z
+    .string()
+    .describe(
+      "Was der Entwurf über ihre Vorgeschichte und ihre Verbindung zu den anderen Figuren sagt",
+    ),
+  persoenlichkeit: z
+    .string()
+    .describe("Was der Entwurf über ihr Wesen und ihr Auftreten sagt"),
+  aussehen: z.string().describe("Was der Entwurf über ihr Aussehen sagt"),
+});
+
+export type PlotPerson = z.infer<typeof plotPersonSchema>;
+
+/**
+ * Die Antwort der Route. Ein umschließendes Objekt und kein blankes Array,
+ * weil Structured Outputs auf oberster Ebene ein Objekt verlangt.
+ */
+export const plotPersonsSchema = z.object({
+  personen: z.array(plotPersonSchema),
+});
 
 // ---------------------------------------------------------------------------
 // Ansatzpunkte für eine Geschichte

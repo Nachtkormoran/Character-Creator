@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { CharacterForm } from "./components/CharacterForm";
 import { CharacterResult } from "./components/CharacterResult";
 import {
@@ -17,7 +17,12 @@ import {
   type CharacterInput,
   type GeneratedCharacter,
 } from "@/lib/schema";
-import { scenarioToInput, type ScenarioPrefill } from "@/lib/scenarioInput";
+import {
+  plotPersonToInput,
+  scenarioToInput,
+  type ScenarioPrefill,
+} from "@/lib/scenarioInput";
+import { clearPlotPerson, readPlotPerson } from "@/lib/personHandoff";
 import type { StoredScenario } from "@/lib/serialize";
 
 /**
@@ -54,14 +59,10 @@ function Home() {
   // Vorlage gilt nur für die Sitzung und wird nicht mitgespeichert.
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
 
+  const router = useRouter();
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  /**
-   * Name des zuletzt gespeicherten Charakters – die Ergebnis-Ansicht schließt
-   * nach dem Speichern, und ohne diese Rückmeldung stünde der Nutzer wortlos
-   * wieder vor dem leeren Formular.
-   */
-  const [savedNotice, setSavedNotice] = useState<string | null>(null);
 
   const [scenarios, setScenarios] = useState<StoredScenario[]>([]);
   const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(null);
@@ -83,13 +84,37 @@ function Home() {
   const [prefillName, setPrefillName] = useState<string | null>(null);
   const [prefillError, setPrefillError] = useState<string | null>(null);
 
+  /**
+   * Eine im Handlungsentwurf eines Szenarios gefundene Person, die von dort
+   * hierher weitergereicht wurde. Beim ersten Rendern gelesen und **nicht**
+   * dabei gelöscht – warum, steht in `personHandoff.ts`.
+   */
+  const [person] = useState(() =>
+    typeof window === "undefined" ? null : readPlotPerson(),
+  );
+  useEffect(() => {
+    clearPlotPerson();
+  }, []);
+
   useEffect(() => {
     if (!scenarioParam) return;
     let abgebrochen = false;
     getScenario(scenarioParam)
       .then(({ scenario }) => {
         if (abgebrochen) return;
-        setPrefill(scenarioToInput(scenario.name, scenario.details));
+        const welt = scenarioToInput(scenario.name, scenario.details);
+        /**
+         * Welt und Person übereinanderlegen. Die Person steht **oben**, aber
+         * die beiden überschneiden sich in keinem Feld: Das Szenario belegt
+         * Genre, Setting und Weltkontext, die Person Name, Geschlecht, Alter,
+         * Beruf, Hintergrund, Persönlichkeit und Aussehen. Leere Angaben der
+         * Person fehlen ganz und können deshalb nichts überschreiben.
+         */
+        setPrefill(
+          person
+            ? { values: { ...welt.values, ...plotPersonToInput(person) } }
+            : welt,
+        );
         setPrefillName(scenario.name);
         setSelectedScenarioId(scenario.id);
       })
@@ -100,7 +125,9 @@ function Home() {
     return () => {
       abgebrochen = true;
     };
-  }, [scenarioParam]);
+    // `person` steht schon beim ersten Rendern fest und ändert sich nie – es
+    // steht hier nur, damit die Abhängigkeiten vollständig sind.
+  }, [scenarioParam, person]);
 
   /**
    * Auf die Vorbelegung warten, statt das Formular leer zu zeigen und
@@ -119,7 +146,6 @@ function Home() {
     setImageData(null);
     setImageError(null);
     setSaved(false);
-    setSavedNotice(null);
     setInput(formInput);
     setView("result"); // sofort zur Ergebnis-Ansicht wechseln
     try {
@@ -141,7 +167,6 @@ function Home() {
 
   // Zurück zum Formular für einen neuen Charakter
   function handleNew() {
-    setSavedNotice(null);
     resetToForm();
   }
 
@@ -171,6 +196,8 @@ function Home() {
         includeTextDetails,
         extraPrompt,
         referenceImages: referenceImage ? [referenceImage] : [],
+        // Das Genre steht in den Vorgaben, aus denen der Charakter entstand.
+        genre: input.genre,
       });
       setImageData(imageData);
       setSaved(false);
@@ -192,11 +219,21 @@ function Home() {
         selectedScenarioId,
       );
       setSaved(true);
-      // Ansicht schließen: sie bietet sonst weiter einen Speichern-Knopf an,
-      // und ein zweiter Klick legt einen zweiten Charakter an statt den
-      // vorhandenen zu aktualisieren.
-      resetToForm();
-      setSavedNotice(character.name);
+      /**
+       * Weiter zur Übersicht, statt zurück ins leere Formular.
+       *
+       * Das Formular war der falsche Ort: Nach dem Speichern will man den
+       * Charakter sehen, nicht den nächsten anfangen. Die grüne Meldung mit
+       * dem Link dorthin ist damit entfallen – die Galerie sortiert absteigend
+       * nach Datum, der neue Charakter steht also oben und ist seine eigene
+       * Bestätigung.
+       *
+       * Der Wechsel erledigt nebenbei, wofür vorher `resetToForm()` da war:
+       * Die Ergebnis-Ansicht kennt keine Charakter-Id, ein zweiter Klick auf
+       * „Speichern" wäre ein zweiter `POST` und damit ein Duplikat. Sie ist
+       * nach dem `push` nicht mehr da.
+       */
+      router.push("/gallery");
     } catch (err) {
       setTextError(err instanceof Error ? err.message : "Speichern fehlgeschlagen.");
     } finally {
@@ -218,20 +255,12 @@ function Home() {
           </p>
         </div>
 
-        {savedNotice && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-green-600/30 bg-green-500/10 px-4 py-3 text-sm text-green-800 dark:text-green-300">
-            <span>„{savedNotice}“ wurde gespeichert.</span>
-            <Link
-              href={
-                scenarioParam ? `/scenarios/${scenarioParam}` : "/gallery"
-              }
-              className="font-medium underline"
-            >
-              {scenarioParam ? "Zum Szenario" : "In der Galerie ansehen"}
-            </Link>
-          </div>
-        )}
-
+        {/*
+          Hier stand die Meldung „… wurde gespeichert" mit einem Link in die
+          Galerie. Sie ist mit dem Rücksprung entfallen: Der Weg führt jetzt
+          direkt dorthin, und eine Bestätigung dafür, dass man angekommen ist,
+          wo man hinwollte, ist eine Zeile zu viel.
+        */}
         {prefillName && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-black/10 bg-black/[0.03] px-4 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
             <span>
@@ -261,7 +290,6 @@ function Home() {
             onGenerate={handleGenerate}
             loading={textLoading}
             initialInput={prefill?.values}
-            initialGenre={prefill?.genre}
           />
         )}
       </div>

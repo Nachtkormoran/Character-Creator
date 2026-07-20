@@ -43,12 +43,13 @@ export default function RootLayout({
               <span>Charakter Creator</span>
             </Link>
             <nav className="flex items-center gap-4 text-sm">
-              <Link
-                href="/"
-                className="text-foreground/70 transition-colors hover:text-foreground"
-              >
-                Erstellen
-              </Link>
+              {/*
+                Kein Eintrag „Erstellen": Das Ziel war `/`, also dieselbe
+                Seite, auf die schon der Titel links führt – und „Erstellen"
+                sagte nicht, *was*. Der Weg zum neuen Charakter läuft über
+                „Charaktere" und den dortigen Knopf „+ Neuer Charakter", wo er
+                im Zusammenhang steht.
+              */}
               <Link
                 href="/gallery"
                 className="text-foreground/70 transition-colors hover:text-foreground"

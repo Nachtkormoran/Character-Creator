@@ -48,6 +48,31 @@ Charaktere lassen sich **speichern** und in einer **Galerie** wiederfinden.
 
    → http://localhost:3000
 
+## Start per Doppelklick (macOS)
+
+Statt des Terminals genügt ein Doppelklick auf
+[Charakter Creator starten.command](Charakter%20Creator%20starten.command)
+im Finder. Das Skript startet den Dev-Server und öffnet die App im Browser,
+sobald der Server antwortet.
+
+Das Terminal-Fenster muss dabei **offen bleiben** – darin läuft der Server.
+Beenden mit `Strg+C` oder durch Schließen des Fensters.
+
+Drei Dinge nimmt es einem ab:
+
+- **PATH ergänzen.** Der Finder startet Skripte mit einer minimalen Umgebung,
+  in der weder `~/.local/node/bin` noch Homebrew noch nvm liegen – ohne das
+  fände das Skript `npm` nicht.
+- **`npm install`**, falls `node_modules` fehlt (nur beim ersten Mal).
+- **Freien Port suchen** (ab 3000 aufwärts). Ist 3000 belegt, weicht Next.js
+  von sich aus aus; der Browser zeigte dann auf die falsche Adresse.
+
+Bleibt die Datei nach dem Klonen ohne Ausführrecht liegen, einmalig:
+
+```bash
+chmod +x "Charakter Creator starten.command"
+```
+
 ## Projektstruktur
 
 ```

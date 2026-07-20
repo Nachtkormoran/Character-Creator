@@ -10,6 +10,7 @@ import {
 } from "@/lib/schema";
 import type { StoredCharacter, StoredScenario } from "@/lib/serialize";
 import { ScenarioFields } from "./ScenarioFields";
+import { useBackdropClose } from "./useBackdropClose";
 
 /**
  * Leitet aus einem Charakter ein **Szenario** ab – die Gegenrichtung zu
@@ -33,6 +34,7 @@ export function ScenarioFromCharacterModal({
   character: c,
   edited,
   storyHooks,
+  genre,
   onScenarioCreated,
   onAssign,
   onClose,
@@ -45,6 +47,16 @@ export function ScenarioFromCharacterModal({
    */
   edited: GeneratedCharacter;
   storyHooks: string;
+  /**
+   * Das Genre aus der Detailansicht – der **bearbeitete** Stand, nicht der
+   * gespeicherte. Wer das Genre gerade umgestellt und noch nicht gespeichert
+   * hat und dann ableiten lässt, meint das neue; dieselbe Regel wie bei
+   * `edited`. Es **entscheidet** über das Genre des Szenarios und wird nicht
+   * vom Modell gewählt: Wer einen Charakter als Märchenfigur angelegt hat,
+   * will keine historische Welt zurückbekommen, bloß weil Mühle und Wald auch
+   * dorthin passen würden.
+   */
+  genre: string;
   /** Das neue Szenario in die Liste der aufrufenden Seite aufnehmen. */
   onScenarioCreated: (scenario: StoredScenario) => void;
   /** Den Charakter dem Szenario zuordnen (persistiert). */
@@ -74,6 +86,8 @@ export function ScenarioFromCharacterModal({
    * Hinweis aufs Genre. Hier oben und nicht im Aufruf, weil `?.` in einer
    * Abhängigkeitsliste kein gültiger Ausdruck ist.
    */
+  const backdrop = useBackdropClose(onClose, { stopPropagation: true });
+
   const setting = c.input?.setting ?? "";
 
   /**
@@ -90,20 +104,21 @@ export function ScenarioFromCharacterModal({
    * stabil, der Effekt hat leere Abhängigkeiten und kann nicht erneut
    * zünden.
    */
-  const eingaben = useRef({ edited, storyHooks, setting });
+  const eingaben = useRef({ edited, storyHooks, setting, genre });
   useEffect(() => {
-    eingaben.current = { edited, storyHooks, setting };
+    eingaben.current = { edited, storyHooks, setting, genre };
   });
 
   const ableiten = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
-      const { edited, storyHooks, setting } = eingaben.current;
+      const { edited, storyHooks, setting, genre } = eingaben.current;
       const { draft } = await generateScenarioFromCharacter(
         edited,
         storyHooks,
         setting,
+        genre,
       );
       const { name: vorschlag, ...rest } = draft;
       setName(vorschlag);
@@ -168,10 +183,7 @@ export function ScenarioFromCharacterModal({
   return (
     <div
       className="fixed inset-0 z-70 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-      }}
+      {...backdrop}
     >
       <div
         className="my-8 w-full max-w-2xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"

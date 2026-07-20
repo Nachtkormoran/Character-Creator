@@ -26,6 +26,30 @@ const S = "steampunk";
 const C = "cyberpunk";
 const H = "historisch";
 const W = "western";
+const SF = "scifi";
+const M = "maerchen";
+const SH = "superhelden";
+
+/**
+ * Genres, die die Markierungen eines verwandten Genres **mit-** erben.
+ *
+ * Das ist der Unterschied zu `backgrounds.ts` und den Szenario-Listen, wo drei
+ * neue Genres drei neue Listen zu hundert bekommen haben. Ein Lebenslauf trägt
+ * sein Genre in sich, ein Beruf nicht: Ein Arzt bleibt ein Arzt, ob in der
+ * Gegenwart oder in einer Superheldenstadt, und ein Müller ist im Märchen
+ * derselbe wie in der Fantasy. Dreihundert Berufe abzuschreiben, um an
+ * neunzig Prozent identischer Einträge eine zweite Markierung zu hängen, wäre
+ * eine Kopie mit Pflegeaufwand, keine neue Liste.
+ *
+ * Geerbt wird nur die **Grundmenge**; was es in der geerbten Welt nicht gibt
+ * (Netrunner im Märchen), fehlt dort schon in der Quelle. Genre-eigene Berufe
+ * stehen unten in einem eigenen Block und sind direkt markiert.
+ */
+const GEERBT: Record<string, string> = {
+  scifi: C,
+  maerchen: F,
+  superhelden: G,
+};
 
 export const PROFESSIONS: Profession[] = [
   // Medizin & Pflege ------------------------------------------------------
@@ -383,15 +407,89 @@ export const PROFESSIONS: Profession[] = [
   { name: "Tierpfleger", genres: [G, H] },
   { name: "Baumpfleger", genres: [G] },
   { name: "Umweltgutachter", genres: [G] },
+
+  // Science Fiction -------------------------------------------------------
+  { name: "Schiffsnavigator", genres: [SF] },
+  { name: "Frachtpilot", genres: [SF] },
+  { name: "Schiffsingenieur", genres: [SF] },
+  { name: "Lebenserhaltungstechniker", genres: [SF] },
+  { name: "Schleusenwart", genres: [SF] },
+  { name: "Funkoffizier", genres: [SF] },
+  { name: "Terraformer", genres: [SF] },
+  { name: "Xenobiologe", genres: [SF] },
+  { name: "Astrogeologe", genres: [SF] },
+  { name: "Kolonieverwalter", genres: [SF] },
+  { name: "Quarantäneoffizier", genres: [SF] },
+  { name: "Hydroponikgärtner", genres: [SF] },
+  { name: "Bergungstaucher", genres: [SF] },
+  { name: "Kybernetiker", genres: [SF, C] },
+  { name: "Robotiktechniker", genres: [SF, C] },
+  { name: "Kälteschlaftechniker", genres: [SF] },
+  { name: "Vertragsmakler", genres: [SF, C] },
+  { name: "Reaktortechniker", genres: [SF] },
+  { name: "Sprungtorlotse", genres: [SF] },
+  { name: "Aufbereitungsarbeiter", genres: [SF] },
+
+  // Märchen ---------------------------------------------------------------
+  { name: "Rattenfänger", genres: [M, F, H] },
+  { name: "Schweinehirt", genres: [M, F, H] },
+  { name: "Gänsehirt", genres: [M, F] },
+  { name: "Leineweber", genres: [M, F, H] },
+  { name: "Fährmann", genres: [M, F, H] },
+  { name: "Kesselflicker", genres: [M, F, H] },
+  { name: "Korbflechter", genres: [M, F, H] },
+  { name: "Brunnengräber", genres: [M, F, H] },
+  { name: "Kräuterfrau", genres: [M, F] },
+  { name: "Wildhüter", genres: [M, F, H] },
+  { name: "Küchenmagd", genres: [M, F, H] },
+  { name: "Bienenvater", genres: [M, F, H] },
+  { name: "Wegezöllner", genres: [M, F, H] },
+  { name: "Bänkelsänger", genres: [M, H] },
+  { name: "Salzhändler", genres: [M, F, H] },
+  { name: "Ziegenhirt", genres: [M, F, H] },
+  { name: "Besenbinder", genres: [M, F, H] },
+  { name: "Waldköhler", genres: [M, F, H] },
+  { name: "Glöckner", genres: [M, F, H] },
+  { name: "Findelvogt", genres: [M, F] },
+
+  // Superhelden -----------------------------------------------------------
+  { name: "Katastrophenschutzbeauftragter", genres: [SH, G] },
+  { name: "Krisenmanager", genres: [SH, G] },
+  { name: "Sondereinsatzleiter", genres: [SH] },
+  { name: "Fähigkeitengutachter", genres: [SH] },
+  { name: "Registrierungsbeamter", genres: [SH] },
+  { name: "Schadensregulierer", genres: [SH, G] },
+  { name: "Trümmerräumer", genres: [SH] },
+  { name: "Notfallpsychologe", genres: [SH, G] },
+  { name: "Kostümschneider", genres: [SH] },
+  { name: "Verbindungsoffizier", genres: [SH, G] },
+  { name: "Enthüllungsjournalist", genres: [SH, G, C] },
+  { name: "Boulevardreporter", genres: [SH, G] },
+  { name: "Konzernanwalt", genres: [SH, G, C] },
+  { name: "Sonderermittler", genres: [SH, G] },
+  { name: "Rehabilitationstrainer", genres: [SH, G] },
+  { name: "Gerichtsgutachter", genres: [SH, G] },
+  { name: "Drohnenoperator", genres: [SH, G, C] },
+  { name: "Wachdienstleiter", genres: [SH, G] },
+  { name: "Aufsichtsbeamter", genres: [SH, G] },
+  { name: "Anlaufstellenleiter", genres: [SH, G] },
 ];
 
 /**
  * Würfelt einen Beruf, der zum Genre passt. Ohne bekanntes Genre (oder wenn
  * es dafür keine Einträge gäbe) steht die ganze Liste zur Auswahl.
+ *
+ * Genres aus `GEERBT` bekommen zusätzlich die Berufe ihres Quell-Genres – s.
+ * die Begründung dort.
  */
 export function randomProfession(genre?: string): string {
+  const geerbt = genre ? GEERBT[genre] : undefined;
   const passend = genre
-    ? PROFESSIONS.filter((p) => p.genres.includes(genre))
+    ? PROFESSIONS.filter(
+        (p) =>
+          p.genres.includes(genre) ||
+          (geerbt !== undefined && p.genres.includes(geerbt)),
+      )
     : [];
   const pool = passend.length > 0 ? passend : PROFESSIONS;
   return pool[Math.floor(Math.random() * pool.length)].name;

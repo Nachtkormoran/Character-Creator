@@ -79,4 +79,31 @@ export const GENRE_TEMPLATES: GenreTemplate[] = [
         "Wilder Westen Nordamerikas im 19. Jahrhundert: Prärie, Revolver, Saloons und Grenzland",
     },
   },
+  {
+    id: "scifi",
+    label: "Science Fiction",
+    emoji: "🚀",
+    values: {
+      setting:
+        "Science-Fiction-Zukunft zwischen den Sternen: Raumfahrt, Kolonien, Stationen und knappe Ressourcen",
+    },
+  },
+  {
+    id: "maerchen",
+    label: "Märchen",
+    emoji: "🧚",
+    values: {
+      setting:
+        "Märchenwelt aus Wald, Dorf und Schloss, in der Versprechen binden und Wünsche einen Preis haben",
+    },
+  },
+  {
+    id: "superhelden",
+    label: "Superhelden",
+    emoji: "🦸",
+    values: {
+      setting:
+        "Gegenwärtige Großstadt, in der einzelne Menschen Fähigkeiten haben und die Öffentlichkeit darüber streitet",
+    },
+  },
 ];

@@ -6,6 +6,7 @@ import {
   inputDisplayValue,
   type CharacterInput,
 } from "@/lib/schema";
+import { useBackdropClose } from "./useBackdropClose";
 
 /**
  * Zeigt die Vorgaben, mit denen ein Charakter ursprünglich erzeugt wurde.
@@ -41,16 +42,15 @@ export function CharacterInputModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  const backdrop = useBackdropClose(onClose, { stopPropagation: true });
+
   const keys = Object.keys(INPUT_LABELS) as (keyof CharacterInput)[];
   const belegt = keys.filter((k) => inputDisplayValue(k, input) !== "").length;
 
   return (
     <div
       className="fixed inset-0 z-70 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-      }}
+      {...backdrop}
     >
       <div
         className="my-8 w-full max-w-2xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"

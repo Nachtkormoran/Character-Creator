@@ -3,7 +3,11 @@ import type {
   CharacterImage,
   Scenario,
 } from "@/app/generated/prisma/client";
-import { normalizeScenarioDetails, normalizeTraits } from "./schema";
+import {
+  normalizeInputGenre,
+  normalizeScenarioDetails,
+  normalizeTraits,
+} from "./schema";
 import type {
   CharacterInput,
   GeneratedCharacter,
@@ -88,7 +92,9 @@ export function serializeCharacter(
   return {
     id: row.id,
     createdAt: row.createdAt.toISOString(),
-    input: JSON.parse(row.input) as CharacterInput,
+    // Vor der Genre-Spalte gespeicherte Charaktere haben keines – auffüllen,
+    // sonst liefe die Szenario-Ableitung in ein `undefined`.
+    input: normalizeInputGenre(JSON.parse(row.input)),
     character: {
       name: row.name ?? "",
       kurzbeschreibung: row.shortDescription ?? "",

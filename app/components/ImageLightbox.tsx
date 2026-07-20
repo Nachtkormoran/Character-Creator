@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useBackdropClose } from "./useBackdropClose";
 
 /**
  * Zeigt ein Bild in voller Größe über der restlichen Oberfläche.
@@ -34,6 +35,8 @@ export function ImageLightbox({
     };
   }, [onClose]);
 
+  const backdrop = useBackdropClose(onClose, { stopPropagation: true });
+
   return (
     <div
       // z-80: oberste Ebene – über Detail-Modal (z-50) und Bilder-Ansicht (z-70).
@@ -42,10 +45,7 @@ export function ImageLightbox({
       // Galerie-Modals gerendert, dessen Backdrop bei jedem Klick schließt.
       // Ohne das würde ein Klick zum Schließen der Lightbox auch die
       // Detailansicht dahinter mitschließen.
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-      }}
+      {...backdrop}
       role="dialog"
       aria-modal="true"
       aria-label={alt}

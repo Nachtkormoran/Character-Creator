@@ -21,6 +21,8 @@ import {
 import { characterFileName } from "@/lib/characterFile";
 import { downloadBlob, safeFileName } from "@/lib/download";
 import { randomName } from "@/lib/names";
+import { DEFAULT_GENRE, GENRE_TEMPLATES } from "@/lib/templates";
+import { useBackdropClose } from "../components/useBackdropClose";
 import {
   DEFAULT_STORY_HOOK_ANCHOR,
   STORY_HOOK_ANCHORS,
@@ -34,6 +36,7 @@ import {
   type StoredCharacter,
   type StoredScenario,
 } from "@/lib/serialize";
+import { joinHooks, splitHooks } from "@/lib/storyHooks";
 import { AutoTextarea } from "../components/AutoTextarea";
 import { CharacterImagesModal } from "../components/CharacterImagesModal";
 import { ImageLightbox } from "../components/ImageLightbox";
@@ -169,8 +172,14 @@ export default function GalleryPage() {
     id: string,
     character: GeneratedCharacter,
     storyHooks: string,
+    genre: string,
   ) {
-    const updated = await updateCharacterContent(id, character, storyHooks);
+    const updated = await updateCharacterContent(
+      id,
+      character,
+      storyHooks,
+      genre,
+    );
     setCharacters((cs) => cs.map((x) => (x.id === id ? updated : x)));
     setSelected((s) => (s && s.id === id ? updated : s));
   }
@@ -497,8 +506,8 @@ export default function GalleryPage() {
           scenarios={scenarios}
           onClose={() => setSelected(null)}
           onDelete={() => handleDelete(selected.id)}
-          onSaveContent={(character, storyHooks) =>
-            handleSaveContent(selected.id, character, storyHooks)
+          onSaveContent={(character, storyHooks, genre) =>
+            handleSaveContent(selected.id, character, storyHooks, genre)
           }
           onCharacterUpdated={applyUpdate}
           onAssignScenario={(scenarioId) => handleAssignScenario(selected.id, scenarioId)}
@@ -530,6 +539,7 @@ function DetailModal({
   onSaveContent: (
     character: GeneratedCharacter,
     storyHooks: string,
+    genre: string,
   ) => Promise<void>;
   onCharacterUpdated: (updated: StoredCharacter) => void;
   onAssignScenario: (scenarioId: string | null) => Promise<void>;
@@ -547,8 +557,35 @@ function DetailModal({
    * Charakter, sind aber kein Feld von `GeneratedCharacter` – das beschreibt,
    * was das Modell bei der Erstgenerierung liefert, und dazu zählen sie nicht.
    * Sie teilen sich mit `edited` nur den Speichern-Knopf.
+   *
+   * Als **Liste**, obwohl die Datenbank einen String hält: Jeder Ansatzpunkt
+   * ist für sich brauchbar oder nicht, und nur einzeln lässt sich einer
+   * wegwerfen, ohne die anderen mitzunehmen. Umgerechnet wird an genau zwei
+   * Stellen – hier beim Laden und in `saveEdits` beim Schreiben (s.
+   * `lib/storyHooks.ts`).
    */
-  const [hooks, setHooks] = useState(c.storyHooks);
+  const [hooks, setHooks] = useState<string[]>(() => splitHooks(c.storyHooks));
+
+  /**
+   * Das Genre steht aus demselben Grund neben `edited` wie die Ansatzpunkte:
+   * Es gehört zum Charakter, ist aber kein Feld von `GeneratedCharacter` – es
+   * kommt aus den Vorgaben. Auch hier nur der Speichern-Knopf gemeinsam.
+   *
+   * Es ist die **einzige** Vorgabe, die sich nachträglich ändern lässt. Die
+   * übrigen sind ein Protokoll des Erstellungszeitpunkts; die Genre-Id geht
+   * dagegen nie in den Text-Prompt ein (dorthin gehen `setting` und `notes`),
+   * sondern steuert Würfel und Szenario-Ableitung. Ohne diesen Weg blieben
+   * alle vor der Genre-Spalte angelegten Charaktere dauerhaft „Gegenwart".
+   */
+  const [genre, setGenre] = useState(c.input?.genre ?? DEFAULT_GENRE);
+
+  /**
+   * Schließt bei einem Klick daneben – aber nicht, wenn nur eine
+   * Textmarkierung aus dem Dialog heraus über dem Backdrop endet. Genau das
+   * kostete hier sonst **alle ungespeicherten Änderungen**, sobald jemand die
+   * Beschreibung zum Kopieren markierte.
+   */
+  const backdrop = useBackdropClose(onClose);
   const [hooksBusy, setHooksBusy] = useState(false);
   const [hooksError, setHooksError] = useState<string | null>(null);
   /**
@@ -559,6 +596,13 @@ function DetailModal({
   const [anchor, setAnchor] = useState<StoryHookAnchor>(
     DEFAULT_STORY_HOOK_ANCHOR,
   );
+  /**
+   * Stichworte zur Richtung der Ansatzpunkte. Aus demselben Grund wie die
+   * Stufe **nur für diese Sitzung**: Beides beschreibt nichts am Charakter,
+   * sondern wie man ihn gerade befragen will. Was dabei herauskommt, wird
+   * gespeichert – der Weg dorthin nicht.
+   */
+  const [hookDirection, setHookDirection] = useState("");
 
   // Text neu erzeugen: Zusatzwunsch (Stil, Perspektive, Schwerpunkt).
   const [rewriteHint, setRewriteHint] = useState("");
@@ -627,6 +671,14 @@ function DetailModal({
       randomName({
         gender: edited.merkmale.geschlecht,
         herkunft: edited.merkmale.herkunft,
+        /**
+         * Hier **kein** `genre`, obwohl es die Vorgaben inzwischen tragen:
+         * `randomName` stellt die Genre-Id über das Setting, und bei einem
+         * Altbestand ist die Id nur der aufgefüllte Default. Ein vor der
+         * Genre-Spalte angelegter Fantasy-Charakter bekäme dadurch plötzlich
+         * Gegenwartsnamen. Das Setting-Feld sagt in beiden Fällen die
+         * Wahrheit – bei neuen Charakteren belegt die Genre-Vorlage es.
+         */
         setting: c.input.setting,
       }),
     );
@@ -676,23 +728,29 @@ function DetailModal({
   }
 
   /**
-   * Drei Ansatzpunkte für eine Geschichte ableiten. Ebenfalls erst einmal nur
-   * eine ungespeicherte Änderung – und ein zweiter Klick überschreibt, was im
-   * Feld steht. Deshalb die Rückfrage, sobald dort schon etwas steht: von Hand
-   * ergänzte Notizen wären sonst still weg.
+   * Einen Ansatzpunkt ableiten und **anhängen**. Vorher ersetzte der Knopf den
+   * ganzen Block und musste deshalb nachfragen; jetzt kann er nichts zerstören,
+   * und die Rückfrage entfällt. Die vorhandenen gehen als Ausschlussliste mit,
+   * sonst käme beim zweiten Klick dieselbe Idee in anderen Worten zurück.
+   *
+   * Wie zuvor nur eine ungespeicherte Änderung – abgelegt wird erst über
+   * „Änderungen speichern".
    */
   async function deriveHooks() {
     if (hooksBusy) return;
-    if (
-      hooks.trim() &&
-      !confirm("Die vorhandenen Ansatzpunkte werden ersetzt. Fortfahren?")
-    )
-      return;
     setHooksBusy(true);
     setHooksError(null);
     try {
-      const { ansatzpunkte } = await generateStoryHooks(edited, anchor);
-      setHooks(ansatzpunkte);
+      const { ansatzpunkte } = await generateStoryHooks(
+        edited,
+        anchor,
+        hookDirection,
+        hooks,
+      );
+      // Über `joinHooks` statt roh: Eine Leerzeile mitten in der Antwort
+      // würde den Eintrag beim nächsten Laden in zwei zerlegen.
+      const neu = joinHooks([ansatzpunkte]);
+      if (neu) setHooks((h) => [...h, neu]);
     } catch (e) {
       setHooksError(e instanceof Error ? e.message : "Fehler.");
     } finally {
@@ -710,7 +768,7 @@ function DetailModal({
     setExportingJson(true);
     setExportError(null);
     try {
-      const datei = await buildCharacterFile(c, edited, hooks);
+      const datei = await buildCharacterFile(c, edited, hooksText);
       const blob = new Blob([JSON.stringify(datei, null, 2)], {
         type: "application/json",
       });
@@ -757,9 +815,19 @@ function DetailModal({
   const setTrait = (key: keyof CharacterTraits, value: string) =>
     setEdited((e) => ({ ...e, merkmale: withTrait(e.merkmale, key, value) }));
 
+  /**
+   * Die Liste in der Form, die Datenbank, Exportdatei und die Prompts der
+   * Szenario-Routen erwarten. Einmal abgeleitet statt an jeder Verwendung neu:
+   * Sie geht in den Vergleich für `dirty` ebenso ein wie ins Speichern, in den
+   * JSON-Export und in die Szenario-Ableitung – und die vier müssen sich einig
+   * sein, sonst gilt etwas als geändert, was nur anders geschrieben ist.
+   */
+  const hooksText = joinHooks(hooks);
+
   const dirty =
     JSON.stringify(edited) !== JSON.stringify(c.character) ||
-    hooks !== c.storyHooks;
+    hooksText !== c.storyHooks ||
+    genre !== (c.input?.genre ?? DEFAULT_GENRE);
   const nameValid = edited.name.trim().length > 0;
 
   async function saveEdits() {
@@ -768,7 +836,7 @@ function DetailModal({
     setEditError(null);
     const payload = { ...edited, name: edited.name.trim() };
     try {
-      await onSaveContent(payload, hooks);
+      await onSaveContent(payload, hooksText, genre);
       setEdited(payload);
     } catch (e) {
       setEditError(e instanceof Error ? e.message : "Fehler.");
@@ -789,7 +857,7 @@ function DetailModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         className="my-8 w-full max-w-5xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
@@ -860,7 +928,8 @@ function DetailModal({
             <button
               onClick={() => {
                 setEdited(c.character);
-                setHooks(c.storyHooks);
+                setHooks(splitHooks(c.storyHooks));
+                setGenre(c.input?.genre ?? DEFAULT_GENRE);
               }}
               disabled={savingEdits}
               className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
@@ -965,12 +1034,64 @@ function DetailModal({
               Weitere Bilder erzeugen, hochladen und das primäre wählen.
             </p>
 
+            {/*
+              Genre und Szenario stehen zusammen unter dem Bild: Beides ordnet
+              die Figur ein, statt sie zu beschreiben – anders als Name, Text
+              und Merkmale in der Spalte daneben.
+
+              Sie speichern allerdings **verschieden**: Das Szenario ordnet
+              sofort zu (eigener PATCH, es kann nichts halb geändert sein), das
+              Genre wartet auf „Änderungen speichern", weil es zu den Vorgaben
+              gehört und mit Text und Merkmalen zusammen verworfen werden darf.
+              Untereinander mit eigener Beschriftung ist das zu erkennen –
+              nebeneinander in einer Zeile wäre es eine Falle.
+            */}
+            <div className="mt-4 flex flex-col gap-3 border-t border-black/10 pt-4 dark:border-white/10">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-foreground/60">Genre</span>
+                <select
+                  value={genre}
+                  onChange={(e) => setGenre(e.target.value)}
+                  className="w-full rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                >
+                  {GENRE_TEMPLATES.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.emoji} {t.label}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-foreground/50">
+                  Steuert die Würfel und das Genre eines abgeleiteten
+                  Szenarios. Wird erst beim Speichern der Änderungen übernommen.
+                </span>
+              </label>
+
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-foreground/60">Szenario</span>
+                <select
+                  value={c.scenarioId ?? ""}
+                  onChange={(e) => assignScenario(e.target.value || null)}
+                  disabled={assigningScenario}
+                  className="w-full rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                >
+                  <option value="">— keine —</option>
+                  {scenarios.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-xs text-foreground/50">
+                  Wird sofort gespeichert.
+                </span>
+              </label>
+            </div>
           </div>
         </div>
 
         {/*
           Ansatzpunkte für eine Geschichte. Über die volle Breite und nicht in
-          der Beschreibungs-Spalte: es sind drei Absätze Fließtext, und neben
+          der Beschreibungs-Spalte: es sind mehrere Absätze Fließtext, und neben
           dem Bild stünde jeder davon als schmale Säule.
         */}
         <div className="mt-6">
@@ -1002,13 +1123,13 @@ function DetailModal({
                 type="button"
                 onClick={deriveHooks}
                 disabled={hooksBusy}
-                title="Leitet aus Beschreibung und Merkmalen drei Ausgangslagen für eine Geschichte ab"
+                title="Leitet aus Beschreibung und Merkmalen eine weitere Ausgangslage für eine Geschichte ab und hängt sie an die Liste an"
                 className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
               >
                 {hooksBusy
                   ? "Denkt nach …"
-                  : hooks.trim()
-                    ? "✨ Neu ableiten"
+                  : hooks.length
+                    ? "✨ Weiteren ableiten"
                     : "✨ Ableiten"}
               </button>
             </div>
@@ -1017,15 +1138,97 @@ function DetailModal({
           <p className="mb-2 text-xs text-foreground/50">
             {STORY_HOOK_ANCHORS.find((a) => a.value === anchor)?.hint}
           </p>
-          <div className="rounded-md border border-black/10 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]">
-            <AutoTextarea
-              value={hooks}
-              onChange={setHooks}
-              ariaLabel="Ansatzpunkte für eine Geschichte"
-              placeholder="Noch keine Ansatzpunkte – der Knopf oben schlägt drei vor. Der Text lässt sich anschließend frei bearbeiten."
-              className="text-sm"
+
+          {/*
+            Stichworte zur Richtung. Steht **über** dem Textfeld und direkt
+            unter der Bindungsstufe, weil beides zusammen die Frage stellt, die
+            der Knopf oben beantwortet – anders als der Zusatzwunsch beim Text
+            neu erzeugen, der unter seinem Textfeld sitzt: Der greift einen
+            vorhandenen Text auf, dieser hier füllt ein leeres Feld.
+
+            Ein Freitextfeld und kein weiteres Menü: Was jemand von drei
+            Ansatzpunkten will, lässt sich nicht in eine Liste sperren.
+          */}
+          <div className="mb-2">
+            <input
+              value={hookDirection}
+              onChange={(e) => setHookDirection(e.target.value)}
+              maxLength={500}
+              placeholder="Richtung (optional) – z. B. alte Schuld, Verrat im Kollegium, eher leise …"
+              aria-label="Stichworte zur Richtung der Ansatzpunkte"
+              className="w-full rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
             />
+            {/*
+              Bei „eng" ist der Hinweis eine **Warnung**, keine Erläuterung:
+              Gemessen bricht das Modell die Bindung, wenn die Stichworte
+              Erfundenes verlangen (s. CLAUDE.md). Das lässt sich per Prompt
+              nicht durchsetzen – der Nutzer erfährt es deshalb hier, statt
+              sich über Ansatzpunkte zu wundern, die die Stufe verbieten sollte.
+            */}
+            {hookDirection.trim() && (
+              <p
+                className={
+                  anchor === "eng"
+                    ? "mt-1 text-xs text-amber-700 dark:text-amber-400"
+                    : "mt-1 text-xs text-foreground/50"
+                }
+              >
+                {anchor === "eng"
+                  ? "Achtung: Stichworte, die Erfundenes verlangen (Verschwörung, geheime Organisation …), weichen die enge Bindung auf. Ist das gewollt, passt „mittel“ oder „frei“ besser."
+                  : "Wählt aus, woran angesetzt wird."}
+              </p>
+            )}
           </div>
+          {/*
+            Eine Liste statt eines Blocks: Jeder Ansatzpunkt ist für sich
+            brauchbar oder nicht. Der Löschknopf sitzt deshalb an der einzelnen
+            Karte und wirkt **sofort** – ohne Rückfrage, denn abgelegt ist
+            nichts, solange „Änderungen speichern" nicht gedrückt wurde, und
+            „Verwerfen" holt die gespeicherte Liste zurück.
+          */}
+          {hooks.length === 0 ? (
+            <p className="rounded-md border border-dashed border-black/15 px-3 py-6 text-center text-sm text-foreground/50 dark:border-white/15">
+              Noch keine Ansatzpunkte – der Knopf oben schlägt einen vor. Jeder
+              weitere Klick hängt einen an.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {hooks.map((hook, i) => (
+                <li
+                  // Der Index als Key ist hier richtig: Die Einträge haben
+                  // keine Id, und die Liste ändert sich nur am Ende (Anhängen)
+                  // oder durch Löschen – beides ohne Umsortieren.
+                  key={i}
+                  className="flex items-start gap-2 rounded-md border border-black/10 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]"
+                >
+                  <span className="mt-1 w-4 shrink-0 text-right text-xs text-foreground/40 tabular-nums">
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <AutoTextarea
+                      value={hook}
+                      onChange={(v) =>
+                        setHooks((h) => h.map((x, j) => (j === i ? v : x)))
+                      }
+                      ariaLabel={`Ansatzpunkt ${i + 1}`}
+                      className="text-sm"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setHooks((h) => h.filter((_, j) => j !== i))
+                    }
+                    title="Diesen Ansatzpunkt entfernen"
+                    aria-label={`Ansatzpunkt ${i + 1} entfernen`}
+                    className="mt-0.5 shrink-0 rounded-md border border-transparent px-2 py-0.5 text-sm text-foreground/40 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           {hooksError && (
             <p className="mt-1 text-xs text-red-600 dark:text-red-400">
               {hooksError}
@@ -1040,23 +1243,7 @@ function DetailModal({
           <TraitsTable traits={edited.merkmale} onChange={setTrait} compact />
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-4 dark:border-white/10">
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-foreground/60">Szenario:</span>
-            <select
-              value={c.scenarioId ?? ""}
-              onChange={(e) => assignScenario(e.target.value || null)}
-              disabled={assigningScenario}
-              className="rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
-            >
-              <option value="">— keine —</option>
-              {scenarios.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-black/10 pt-4 dark:border-white/10">
           <div className="flex items-center gap-3">
             <span className="text-xs text-foreground/50">
               {new Date(c.createdAt).toLocaleDateString("de-DE")}
@@ -1116,6 +1303,7 @@ function DetailModal({
         <CharacterImagesModal
           character={c}
           edited={edited}
+          genre={genre}
           onChange={onCharacterUpdated}
           onClose={() => setImagesOpen(false)}
         />
@@ -1125,7 +1313,8 @@ function DetailModal({
         <ScenarioFromCharacterModal
           character={c}
           edited={edited}
-          storyHooks={hooks}
+          storyHooks={hooksText}
+          genre={genre}
           onScenarioCreated={onScenarioCreated}
           onAssign={(scenarioId) => onAssignScenario(scenarioId)}
           onClose={() => setScenarioDraftOpen(false)}

@@ -13,6 +13,7 @@ import {
 } from "@/lib/templates";
 
 const EMPTY: CharacterInput = {
+  genre: DEFAULT_GENRE,
   name: "",
   gender: "egal",
   age: "",
@@ -77,7 +78,6 @@ export function CharacterForm({
   onGenerate,
   loading,
   initialInput,
-  initialGenre,
 }: {
   onGenerate: (input: CharacterInput) => void;
   loading: boolean;
@@ -88,13 +88,18 @@ export function CharacterForm({
    * aufrufende Seite rendert das Formular deshalb erst, wenn sie sie hat.
    */
   initialInput?: Partial<CharacterInput>;
-  initialGenre?: string;
 }) {
   const [form, setForm] = useState<CharacterInput>({
     ...EMPTY,
     ...initialInput,
   });
-  const [genre, setGenre] = useState<string>(initialGenre ?? DEFAULT_GENRE);
+  /**
+   * Das Genre ist **Teil der Vorgaben**, kein eigener State mehr. Früher war
+   * es beides nicht: eine reine Formular-Umschaltung, die beim Speichern
+   * verfiel. Damit wusste später niemand mehr, in welche Welt die Figur
+   * gehört – am schmerzlichsten beim Ableiten eines Szenarios.
+   */
+  const genre = form.genre;
   const [namingAI, setNamingAI] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
@@ -108,9 +113,8 @@ export function CharacterForm({
   // Genre-Vorlage anwenden: nur die von der Vorlage definierten Felder
   // überschreiben (Merge), alles andere bleibt erhalten.
   function applyGenre(id: string) {
-    setGenre(id);
     const template = GENRE_TEMPLATES.find((t) => t.id === id);
-    if (template) setForm((f) => ({ ...f, ...template.values }));
+    setForm((f) => ({ ...f, ...(template?.values ?? {}), genre: id }));
   }
 
   /**
@@ -120,7 +124,6 @@ export function CharacterForm({
    */
   function reset() {
     setForm({ ...EMPTY, ...initialInput });
-    setGenre(initialGenre ?? DEFAULT_GENRE);
     setNameError(null);
   }
 
@@ -165,8 +168,8 @@ export function CharacterForm({
       className="flex flex-col gap-5 rounded-xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03]"
     >
       <Field
-        label="Genre-Vorlage"
-        hint="Belegt das Setting genre-passend vor – alle anderen Felder bleiben unverändert."
+        label="Genre"
+        hint="Belegt das Setting genre-passend vor, steuert die Würfel und wird am Charakter gespeichert – alle anderen Felder bleiben unverändert."
       >
         <select
           className={inputClass}

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { getOpenAI, TEXT_MODEL } from "@/lib/openai";
+import { getOpenAI, hatKaputteZeichen, TEXT_MODEL } from "@/lib/openai";
 import { buildScenarioFromCharacterPrompt } from "@/lib/prompts";
 import { generatedCharacterSchema, scenarioDraftSchema } from "@/lib/schema";
+import { DEFAULT_GENRE, GENRE_TEMPLATES } from "@/lib/templates";
 
 export const runtime = "nodejs";
 
@@ -20,10 +21,13 @@ export const runtime = "nodejs";
  * lässt, meint den neuen. Dieselbe Überlegung wie bei `regenerate-text`.
  *
  * Anders als die übrigen Erzeugen-Routen liefert diese **Structured Output**
- * statt Freitext: es entstehen sechs verschiedene Felder, und das Genre muss
- * eine Id aus `GENRE_TEMPLATES` treffen. Das JSON-Schema ist hier also kein
- * Aufschlag, sondern das Mittel, das die Antwort ins vorhandene Vokabular
- * zwingt.
+ * statt Freitext: es entstehen fünf verschiedene Felder, die getrennt in die
+ * Maske müssen. Das JSON-Schema ist hier also kein Aufschlag, sondern das
+ * Mittel, das die Antwort auseinanderhält.
+ *
+ * Das **Genre erzeugt das Modell nicht** – es kommt aus den Vorgaben des
+ * Charakters und wird der Antwort hier angehängt. Es geht trotzdem in den
+ * Prompt: als Vorgabe für Ort, Zeit und Regeln.
  *
  * **Persistiert nichts.** Der Vorschlag geht in eine Maske, wird dort geprüft
  * und geändert und erst mit „Szenario anlegen" über `POST /api/scenarios`
@@ -32,9 +36,19 @@ export const runtime = "nodejs";
  */
 const bodySchema = z.object({
   character: generatedCharacterSchema,
-  storyHooks: z.string().trim().max(4000).optional().default(""),
+  // Dasselbe Limit wie im PATCH: Die Ansatzpunkte sind eine Liste, die
+  // beliebig wachsen darf, und was sich speichern lässt, muss sich auch
+  // ableiten lassen.
+  storyHooks: z.string().trim().max(20000).optional().default(""),
   /** Nur das Setting-Feld der ursprünglichen Vorgaben – s. Prompt-Kommentar. */
   setting: z.string().trim().max(300).optional().default(""),
+  /**
+   * Das Genre des Charakters. Es **wird übernommen**, nicht erzeugt: Die Figur
+   * wurde in diesem Genre angelegt, und die Welt um sie herum kann keine
+   * andere sein. Fehlt es (Altbestand), fällt es wie überall auf Gegenwart
+   * zurück.
+   */
+  genre: z.string().trim().max(40).optional().default(DEFAULT_GENRE),
 });
 
 export async function POST(request: Request) {
@@ -49,11 +63,18 @@ export async function POST(request: Request) {
     }
 
     const { character, storyHooks, setting } = parsed.data;
+    // Eine Id, die es nicht gibt, wäre in der Maske eine leere Auswahl – und
+    // ließe später Würfel und Namenslisten ins Leere laufen.
+    const genre = GENRE_TEMPLATES.some((g) => g.id === parsed.data.genre)
+      ? parsed.data.genre
+      : DEFAULT_GENRE;
+
     const openai = getOpenAI();
     const prompt = buildScenarioFromCharacterPrompt(
       character,
       storyHooks,
       setting,
+      genre,
     );
 
     const versuch = () =>
@@ -71,26 +92,8 @@ export async function POST(request: Request) {
         temperature: 0.8,
       });
 
-    /**
-     * **Kaputte Umlaute erkennen.** Beobachtet: Das Modell kodiert Umlaute
-     * unter Structured Outputs gelegentlich als `\u`-Escape und verzählt
-     * sich dabei bei den Hexziffern. Statt eines `ü` steht dann ein
-     * NUL-Zeichen gefolgt von den Resten „fc" da – und es gehen zusätzlich
-     * Buchstaben verloren („Nordküste" wird zu „Nordkfce"). Genau deshalb
-     * lässt sich das **nicht reparieren**: die Zeichen sind weg, ein
-     * Herausfiltern der NULs ergäbe nur lautlosen Kauderwelsch in der
-     * Datenbank.
-     *
-     * Der Test lautet deshalb nicht „enthält NUL", sondern „enthält
-     * irgendein Steuerzeichen": es ist dieselbe Ursache, und in einem
-     * Szenariotext hat keines davon je etwas zu suchen. Zeilenumbruch und
-     * Tabulator bleiben ausgenommen – die sind in den mehrzeiligen Feldern
-     * legitim.
-     */
-    const kaputt = (d: object) =>
-      Object.values(d).some(
-        (v) => typeof v === "string" && /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(v),
-      );
+    // Kaputte Umlaute erkennen – Begründung an `hatKaputteZeichen`.
+    const kaputt = hatKaputteZeichen;
 
     let draft = (await versuch()).choices[0]?.message.parsed;
     // Ein zweiter Anlauf genügt: der Fehler ist sprunghaft, nicht systematisch.
@@ -119,7 +122,8 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ draft });
+    // Das Genre kommt aus dem Charakter, nicht aus der Modellantwort.
+    return NextResponse.json({ draft: { ...draft, genre } });
   } catch (err) {
     console.error("scenario-from-character error:", err);
     const message = err instanceof Error ? err.message : "Unbekannter Fehler.";

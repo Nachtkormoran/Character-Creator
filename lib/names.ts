@@ -416,13 +416,33 @@ export const NAME_CULTURES: NameCulture[] = [
  * `templates.ts`). Mehrere Einträge werden gleich gewichtet gewürfelt – so
  * bleibt „Gegenwart" bunt, während Fantasy und Western eng geführt sind.
  */
+/** Der Gegenwarts-Mix, weil zwei Genres ihn teilen und der Fallback ihn braucht. */
+const GEGENWART_CULTURES = [
+  "deutsch",
+  "britisch",
+  "nordisch",
+  "slawisch",
+  "romanisch",
+  "japanisch",
+];
+
 export const GENRE_CULTURES: Record<string, string[]> = {
-  gegenwart: ["deutsch", "britisch", "nordisch", "slawisch", "romanisch", "japanisch"],
+  gegenwart: GEGENWART_CULTURES,
   fantasy: ["fantasy"],
   steampunk: ["viktorianisch"],
   cyberpunk: ["japanisch", "britisch", "slawisch", "romanisch"],
   historisch: ["viktorianisch", "deutsch", "romanisch", "nordisch"],
   western: ["western"],
+  // Diese drei greifen auf **bestehende** Namenslisten zu, statt eigene zu
+  // bekommen: Eine Superheldenstadt ist eine Gegenwartsmetropole, und Science
+  // Fiction ist die Gegenwart ohne den deutschen Schwerpunkt – die Herkünfte
+  // haben sich vermischt, aber beliebig soll es nicht werden.
+  // Das Märchen bekommt **zwei** Kreise: „fantasy" allein zieht anglophone
+  // Klangnamen („Thessaly Riversong"), und die haben im Grimm’schen Register
+  // nichts zu suchen. Erst mit „deutsch" daneben stimmt der Ton.
+  scifi: ["britisch", "japanisch", "slawisch", "romanisch", "nordisch"],
+  maerchen: ["deutsch", "fantasy"],
+  superhelden: GEGENWART_CULTURES,
 };
 
 /** Kulturkreise, aus denen gewürfelt wird, wenn nichts anderes passt. */

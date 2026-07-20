@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   deleteScenario,
+  findPlotPersons,
   generateScenarioDescription,
   generateScenarioPlot,
   getScenario,
@@ -14,9 +15,12 @@ import {
 import {
   SCENARIO_LABELS,
   normalizeScenarioDetails,
+  type PlotPerson,
   type ScenarioDetails,
 } from "@/lib/schema";
+import { stashPlotPerson } from "@/lib/personHandoff";
 import { primaryImage, type StoredCharacter } from "@/lib/serialize";
+import { PlotPersonModal } from "../../components/PlotPersonModal";
 import { ScenarioFields } from "../../components/ScenarioFields";
 
 export default function ScenarioDetailPage({
@@ -46,6 +50,22 @@ export default function ScenarioDetailPage({
     keyof ScenarioDetails | null
   >(null);
 
+  /**
+   * Zusätzliche Wünsche für die Erzeugung, je Feld.
+   *
+   * **Wird nicht gespeichert** – wie „Bindung" und „Richtung" bei den
+   * Ansatzpunkten beschreibt der Wunsch nichts am Szenario, sondern wie man es
+   * gerade befragen will. Beim nächsten Öffnen der Seite ist das Feld leer,
+   * und das ist richtig so: Der Entwurf steht dann längst da.
+   *
+   * Er bleibt aber **nach** dem Erzeugen stehen, statt geleert zu werden – der
+   * häufigste Fall ist, dass man den Entwurf nicht mag und mit demselben
+   * Wunsch plus einer Ergänzung noch einmal drückt.
+   */
+  const [zusatz, setZusatz] = useState<
+    Partial<Record<keyof ScenarioDetails, string>>
+  >({});
+
   /** Hier sind beide Textfelder erzeugbar – das Szenario ist gespeichert. */
   const ERZEUGBAR: ReadonlySet<keyof ScenarioDetails> = new Set([
     "beschreibung",
@@ -73,12 +93,18 @@ export default function ScenarioDetailPage({
     setSaveError(null);
     try {
       if (key === "handlung") {
-        const { handlung } = await generateScenarioPlot(id, name.trim(), details);
+        const { handlung } = await generateScenarioPlot(
+          id,
+          name.trim(),
+          details,
+          zusatz.handlung ?? "",
+        );
         setDetails((d) => ({ ...d, handlung }));
       } else {
         const { beschreibung } = await generateScenarioDescription(
           name.trim(),
           details,
+          zusatz.beschreibung ?? "",
         );
         setDetails((d) => ({ ...d, beschreibung }));
       }
@@ -95,7 +121,9 @@ export default function ScenarioDetailPage({
         setName(scenario.name);
         setDetails(scenario.details);
         setCharacters(characters);
-        setSaved(JSON.stringify({ name: scenario.name, details: scenario.details }));
+        setSaved(
+          JSON.stringify({ name: scenario.name, details: scenario.details }),
+        );
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Fehler."))
       .finally(() => setLoading(false));
@@ -103,6 +131,64 @@ export default function ScenarioDetailPage({
 
   const dirty = saved !== "" && JSON.stringify({ name, details }) !== saved;
   const nameValid = name.trim().length > 0;
+
+  // -------------------------------------------------------------------------
+  // Personen aus dem Handlungsentwurf
+  // -------------------------------------------------------------------------
+
+  /**
+   * Das Suchergebnis **zusammen mit dem Text, zu dem es gehört**.
+   *
+   * Ändert sich der Entwurf, ist das Ergebnis hinfällig – es verweist auf
+   * Sätze, die so nicht mehr dastehen. Statt es in einem Effekt zurückzusetzen
+   * (was einen Moment lang die falsche Liste zeigt und das Zurücksetzen an
+   * jeder Änderungsstelle erzwingt), wird die Gültigkeit **abgeleitet**: Ein
+   * Ergebnis zählt nur, solange sein Text noch der aktuelle ist.
+   */
+  const [ergebnis, setErgebnis] = useState<{
+    handlung: string;
+    personen: PlotPerson[] | null;
+    fehler: string | null;
+  } | null>(null);
+  const [suchend, setSuchend] = useState(false);
+  /** Die Person, für die gerade die Rückfrage offen ist. */
+  const [gewaehlt, setGewaehlt] = useState<PlotPerson | null>(null);
+
+  const aktuell =
+    ergebnis && ergebnis.handlung === details.handlung ? ergebnis : null;
+  /** `null` heißt „noch nicht gesucht", `[]` heißt „gesucht, nichts gefunden". */
+  const personen = aktuell?.personen ?? null;
+  const suchFehler = aktuell?.fehler ?? null;
+
+  async function personenSuchen() {
+    const handlung = details.handlung;
+    if (suchend || !handlung.trim()) return;
+    setSuchend(true);
+    setErgebnis(null);
+    try {
+      const { personen } = await findPlotPersons(id, handlung);
+      setErgebnis({ handlung, personen, fehler: null });
+    } catch (e) {
+      setErgebnis({
+        handlung,
+        personen: null,
+        fehler: e instanceof Error ? e.message : "Fehler.",
+      });
+    } finally {
+      setSuchend(false);
+    }
+  }
+
+  /**
+   * Die Person ans Erstellen-Formular übergeben. Der Umweg über
+   * `sessionStorage` statt über die Adresse ist in `personHandoff.ts`
+   * begründet; `?scenario=` bleibt daneben stehen, weil es die Zuordnung und
+   * die Weltvorbelegung auslöst – beides gilt hier genauso.
+   */
+  function personAnlegen(person: PlotPerson) {
+    stashPlotPerson(person);
+    router.push(`/?scenario=${id}`);
+  }
 
   async function save() {
     if (!dirty || !nameValid || saving) return;
@@ -116,7 +202,10 @@ export default function ScenarioDetailPage({
       setName(aktualisiert.name);
       setDetails(aktualisiert.details);
       setSaved(
-        JSON.stringify({ name: aktualisiert.name, details: aktualisiert.details }),
+        JSON.stringify({
+          name: aktualisiert.name,
+          details: aktualisiert.details,
+        }),
       );
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Fehler.");
@@ -216,7 +305,75 @@ export default function ScenarioDetailPage({
           generatable={ERZEUGBAR}
           onGenerate={handleGenerate}
           generatingField={generatingField}
+          zusatz={zusatz}
+          onZusatzChange={(key, value) =>
+            setZusatz((z) => ({ ...z, [key]: value }))
+          }
         />
+
+        {/*
+          Personen aus dem Handlungsentwurf – direkt unter den Festlegungen,
+          weil sie sich auf das Feld darüber beziehen.
+
+          Bewusst **auf Knopfdruck** und nicht beim Öffnen der Seite: Die Suche
+          ist ein KI-Aufruf, und im Projekt löst jede Erzeugung ein Klick aus.
+          Ein Aufruf, der beim bloßen Ansehen eines Szenarios Geld kostet, wäre
+          der erste seiner Art.
+        */}
+        {details.handlung.trim() && (
+          <div className="mt-4 border-t border-black/10 pt-4 dark:border-white/10">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={personenSuchen}
+                disabled={suchend}
+                title="Sucht im Handlungsentwurf nach Personen, die dem Szenario noch nicht zugeordnet sind"
+                className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              >
+                {suchend ? "Sucht …" : "🔍 Personen im Entwurf suchen"}
+              </button>
+              {personen === null && !suchend && (
+                <span className="text-xs text-foreground/50">
+                  Findet Namen, für die es noch keinen Charakter gibt.
+                </span>
+              )}
+            </div>
+
+            {suchFehler && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {suchFehler}
+              </p>
+            )}
+
+            {personen !== null &&
+              (personen.length === 0 ? (
+                <p className="mt-2 text-xs text-foreground/50">
+                  Keine neuen Personen – der Entwurf nennt nur Figuren, die dem
+                  Szenario schon zugeordnet sind.
+                </p>
+              ) : (
+                <div className="mt-3">
+                  <p className="mb-2 text-xs text-foreground/60">
+                    Noch nicht im Szenario – anklicken, um daraus einen
+                    Charakter anzulegen:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {personen.map((p) => (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => setGewaehlt(p)}
+                        title={`Charakter für „${p.name}" anlegen`}
+                        className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-500/20 dark:text-amber-300"
+                      >
+                        + {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
       </section>
 
       <section>
@@ -301,6 +458,15 @@ export default function ScenarioDetailPage({
           Szenario löschen
         </button>
       </div>
+
+      {gewaehlt && (
+        <PlotPersonModal
+          person={gewaehlt}
+          dirty={dirty}
+          onConfirm={() => personAnlegen(gewaehlt)}
+          onClose={() => setGewaehlt(null)}
+        />
+      )}
     </div>
   );
 }

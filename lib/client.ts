@@ -4,10 +4,12 @@ import {
   type CharacterFile,
 } from "./characterFile";
 import { makeThumbnail } from "./image";
+import { DEFAULT_GENRE } from "./templates";
 import type {
   CharacterInput,
   CharacterTraits,
   GeneratedCharacter,
+  PlotPerson,
   ScenarioDetails,
   ScenarioDraft,
   Settings,
@@ -77,17 +79,38 @@ export function regenerateDescription(
 }
 
 /**
- * Drei Ansatzpunkte für eine Geschichte, als Freitext. `anchor` bestimmt, wie
- * fest sie am Charakter hängen – von „nur aus dem, was schon dasteht" bis
- * „freie Hand".
+ * **Ein** Ansatzpunkt für eine Geschichte, als Freitext – die Galerie hängt
+ * ihn an ihre Liste an. `anchor` bestimmt, wie fest er am Charakter hängt –
+ * von „nur aus dem, was schon dasteht" bis „freie Hand".
  */
 export function generateStoryHooks(
   character: GeneratedCharacter,
   anchor: StoryHookAnchor,
+  /** Stichworte zur Richtung – wählen unter dem aus, was `anchor` zulässt. */
+  richtung = "",
+  /**
+   * Die vorhandenen Ansatzpunkte als Ausschlussliste. Ohne sie liefert der
+   * zweite Klick die erste Idee in anderen Worten.
+   */
+  vorhandene: string[] = [],
 ) {
   return postJson<{ ansatzpunkte: string }>("/api/story-hooks", {
     character,
     anchor,
+    richtung,
+    vorhandene,
+  });
+}
+
+/**
+ * Personen aus dem Handlungsentwurf, die dem Szenario noch nicht zugeordnet
+ * sind. `handlung` kommt aus dem Formularzustand und nicht aus der Datenbank:
+ * ein gerade bearbeiteter Entwurf ist der gemeinte.
+ */
+export function findPlotPersons(scenarioId: string, handlung: string) {
+  return postJson<{ personen: PlotPerson[] }>("/api/scenario-plot-persons", {
+    scenarioId,
+    handlung,
   });
 }
 
@@ -99,6 +122,12 @@ export function generateImage(
     includeTextDetails: boolean;
     extraPrompt?: string;
     referenceImages?: string[];
+    /**
+     * Genre-Id des Charakters – steuert Kleidung und Umgebung im Bild.
+     * Optional, weil eine fehlende Id serverseitig auf Gegenwart fällt; das
+     * ist genau der Prompt, den es vor dem genre-abhängigen Bild-Prompt gab.
+     */
+    genre?: string;
   },
 ) {
   return postJson<{ imageData: string }>("/api/generate-image", {
@@ -315,15 +344,18 @@ export async function updateCharacterScenario(
 }
 
 /**
- * `storyHooks` ist optional, weil es außerhalb des Charakter-Objekts steht:
- * die Ansatzpunkte gehören zum Charakter, sind aber **kein** Teil dessen, was
- * das Modell bei der Erstgenerierung liefert (`GeneratedCharacter`). Bleiben sie
- * weg, rührt der Teil-PATCH das gespeicherte Feld nicht an.
+ * `storyHooks` und `genre` sind optional, weil beide außerhalb des
+ * Charakter-Objekts stehen: Sie gehören zum Charakter, sind aber **kein** Teil
+ * dessen, was das Modell bei der Erstgenerierung liefert
+ * (`GeneratedCharacter`) – die Ansatzpunkte entstehen später auf Knopfdruck,
+ * das Genre kommt aus den Vorgaben. Bleiben sie weg, rührt der Teil-PATCH die
+ * gespeicherten Felder nicht an.
  */
 export async function updateCharacterContent(
   id: string,
   character: GeneratedCharacter,
   storyHooks?: string,
+  genre?: string,
 ): Promise<StoredCharacter> {
   const res = await fetch(`/api/characters/${id}`, {
     method: "PATCH",
@@ -334,6 +366,7 @@ export async function updateCharacterContent(
       description: character.beschreibung,
       traits: character.merkmale,
       ...(storyHooks !== undefined ? { storyHooks } : {}),
+      ...(genre !== undefined ? { genre } : {}),
     }),
   });
   const data = await res.json().catch(() => ({}));
@@ -424,11 +457,14 @@ export function generateScenarioFromCharacter(
   character: GeneratedCharacter,
   storyHooks = "",
   setting = "",
+  /** Das Genre aus den Vorgaben – es wird übernommen, nicht neu erzeugt. */
+  genre = DEFAULT_GENRE,
 ) {
   return postJson<{ draft: ScenarioDraft }>("/api/scenario-from-character", {
     character,
     storyHooks,
     setting,
+    genre,
   });
 }
 

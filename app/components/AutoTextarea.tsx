@@ -1,6 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useRef } from "react";
+import { useAutoGrow } from "./useAutoGrow";
 
 /**
  * Textarea, die in der Höhe automatisch mit ihrem Inhalt mitwächst (kein
@@ -21,13 +22,7 @@ export function AutoTextarea({
   placeholder?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+  useAutoGrow(ref, value);
 
   return (
     <textarea
