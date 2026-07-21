@@ -26,6 +26,11 @@ const bodySchema = z.object({
   name: z.string().trim().max(80).optional().default(""),
   details: scenarioDetailsSchema,
   zusatz: z.string().trim().max(1000).optional().default(""),
+  // Ein bestehender Handlungsentwurf als Grundlage einer Neuerzeugung (die
+  // Checkbox „aktuellen Handlungsentwurf verwenden"). Großzügig bemessen wie
+  // die anderen Handlungsfelder – der Entwurf ist das längste Feld eines
+  // Szenarios. Leer = wie bisher aus Welt und Figuren.
+  basis: z.string().trim().max(20000).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -39,7 +44,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenarioId, name, details, zusatz } = parsed.data;
+    const { scenarioId, name, details, zusatz, basis } = parsed.data;
 
     const rows = await prisma.character.findMany({
       where: { scenarioId },
@@ -92,7 +97,13 @@ export async function POST(request: Request) {
         },
         {
           role: "user",
-          content: buildScenarioPlotPrompt(name, details, characters, zusatz),
+          content: buildScenarioPlotPrompt(
+            name,
+            details,
+            characters,
+            zusatz,
+            basis,
+          ),
         },
       ],
       temperature: 0.9,

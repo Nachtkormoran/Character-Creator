@@ -357,7 +357,16 @@ export function buildScenarioPlotPrompt(
   },
   characters: PlotCharacter[],
   zusatz?: string,
+  /**
+   * Ein **bestehender Handlungsentwurf als Grundlage**. Ist er gesetzt, entsteht
+   * keine Handlung aus dem Nichts, sondern eine **eigenständige neue Fassung**
+   * des vorhandenen Entwurfs – die Stichwörter (`zusatz`) steuern zusätzlich,
+   * wohin sie sich verschiebt. Ohne ihn bleibt es beim Entwurf aus Welt und
+   * Figuren wie bisher.
+   */
+  basis?: string,
 ): string {
+  const nutzeBasis = !!basis?.trim();
   const welt =
     line("Szenario", name) +
     line("Genre", details.genre) +
@@ -413,15 +422,29 @@ export function buildScenarioPlotPrompt(
     ? `\nBesonders wichtig – zusätzliche Wünsche für diesen Entwurf:\n${zusatz.trim()}\n`
     : "";
 
-  return `Entwirf die Handlung für ein Szenario: die Ausgangslage, aus der sich eine Geschichte zwischen diesen Figuren entwickeln kann.
+  // Auftrag und Grundlage hängen daran, ob ein bestehender Entwurf mitkommt:
+  // ohne ihn eine Handlung aus Welt und Figuren, mit ihm eine neue Fassung.
+  const auftrag = nutzeBasis
+    ? "Überarbeite den vorhandenen Handlungsentwurf zu einer eigenständigen neuen Fassung – dieselbe Welt, dieselben Figuren, aber ein frischer Wurf."
+    : "Entwirf die Handlung für ein Szenario: die Ausgangslage, aus der sich eine Geschichte zwischen diesen Figuren entwickeln kann.";
+
+  const basisBlock = nutzeBasis
+    ? `\nBisheriger Handlungsentwurf – deine Grundlage:\n${basis!.trim()}\n`
+    : "";
+
+  const basisAnforderung = nutzeBasis
+    ? "\n- Nimm den bisherigen Entwurf als Ausgangspunkt: Behalte seinen tragenden Konflikt und die beteiligten Figuren, forme daraus aber eine **eigenständige neue Fassung** – kein bloßes Umformulieren, sondern eine echte Alternative, die Schwerpunkte verschiebt und den Auslöser schärft."
+    : "";
+
+  return `${auftrag}
 
 Die Welt steht fest:
 ${welt}${weltText}
 Diese Figuren gibt es, und nur diese:
 
 ${figuren}
-
-Anforderungen:
+${basisBlock}
+Anforderungen:${basisAnforderung}
 - Drei bis vier kurze Absätze (insgesamt ca. 900–1400 Zeichen).
 - **Erfinde keine neuen Hauptfiguren.** Arbeite mit den Genannten. Nebenfiguren dürfen vorkommen, aber die Handlung muss von diesen Personen getragen werden.
 - Benenne, **wer was von wem will** und woran es sich entzündet. Ein Konflikt braucht mindestens zwei Personen mit unvereinbaren Absichten.

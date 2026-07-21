@@ -126,6 +126,15 @@ export default function ScenarioDetailPage({
     Partial<Record<keyof ScenarioDetails, string>>
   >({});
 
+  /**
+   * Ob der nächste Handlungsentwurf den **aktuellen** als Grundlage nimmt
+   * (Checkbox „aktuellen Handlungsentwurf verwenden"). Dann geht `details.handlung`
+   * als `basis` mit, und die Stichwörter steuern zusätzlich, wohin sich die
+   * neue Fassung verschiebt. Wie der Zusatzwunsch **nicht gespeichert** – die
+   * Wahl beschreibt einen Lauf, nicht das Szenario.
+   */
+  const [handlungAlsBasis, setHandlungAlsBasis] = useState(false);
+
   // -------------------------------------------------------------------------
   // Weltbild des Szenarios
   // -------------------------------------------------------------------------
@@ -241,11 +250,17 @@ export default function ScenarioDetailPage({
           );
           return;
         }
+        // Ist die Checkbox an, geht der **aktive** Entwurf als Grundlage mit –
+        // im live editierten Stand, wie überall. Sonst leer (Entwurf aus Welt
+        // und Figuren wie bisher).
+        const basis =
+          handlungAlsBasis && details.handlung.trim() ? details.handlung : "";
         const { handlung } = await generateScenarioPlot(
           id,
           name.trim(),
           details,
           zusatz.handlung ?? "",
+          basis,
         );
         const items = [...aktuelleVarianten(), handlung];
         setVarianten(items);
@@ -764,6 +779,27 @@ export default function ScenarioDetailPage({
               </span>
             )}
           </div>
+        )}
+        {/*
+          Nächsten Entwurf auf dem aktuellen aufbauen. Erscheint nur, wenn es
+          einen gibt – ohne Grundlage ist die Wahl leer. Die Stichwörter im
+          Feld-Kopf steuern dann zusätzlich, wohin sich die neue Fassung
+          verschiebt.
+        */}
+        {details.handlung.trim() && (
+          <label
+            className="mb-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+            title="Der nächste „✨ Neu erzeugen“-Lauf nimmt den angezeigten Entwurf als Grundlage und formt daraus eine neue Fassung – statt frei aus Welt und Figuren zu beginnen. Die Stichwörter wirken zusätzlich."
+          >
+            <input
+              type="checkbox"
+              checked={handlungAlsBasis}
+              onChange={(e) => setHandlungAlsBasis(e.target.checked)}
+              disabled={saving || generatingField !== null}
+              className="size-4 accent-foreground"
+            />
+            aktuellen Handlungsentwurf verwenden
+          </label>
         )}
         <ScenarioFields
           details={details}

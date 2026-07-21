@@ -613,10 +613,15 @@ export function generateScenarioPlot(
   name: string,
   details: ScenarioDetails,
   zusatz = "",
+  /**
+   * Ein bestehender Handlungsentwurf als Grundlage (Checkbox „aktuellen
+   * Handlungsentwurf verwenden"). Leer = wie bisher aus Welt und Figuren.
+   */
+  basis = "",
 ) {
   return postJson<{ handlung: string; characters: number }>(
     "/api/scenario-plot",
-    { scenarioId, name, details, zusatz },
+    { scenarioId, name, details, zusatz, basis },
   );
 }
 
