@@ -489,6 +489,13 @@ export function buildStoryArcPrompt(
   handlung: string,
   characters: PlotCharacter[],
   anzahl: number,
+  /**
+   * `spiel` macht aus den Stationen **spielbare Szenen** (etwas, das eine
+   * Gruppe tut), `buch` **Erzählabschnitte**. Nur eine Tonlage im Prompt.
+   */
+  format: "buch" | "spiel" = "buch",
+  /** Zusätzliche Wünsche für diesen Lauf (Stichwörter) – optional. */
+  zusatz?: string,
 ): string {
   /** Rückt einen mehrzeiligen Block ein, damit die Zuordnung zur Figur hält. */
   const einrücken = (text: string, tiefe = "     ") =>
@@ -525,6 +532,37 @@ export function buildStoryArcPrompt(
     .filter(Boolean)
     .join(", ");
 
+  // Format-Tonlage: dieselbe Zerlegung, aber die Stationen sind mal
+  // Erzählabschnitte, mal spielbare Szenen.
+  const formatZeile =
+    format === "spiel"
+      ? "- Jede Station ist eine **spielbare Szene**: etwas, das eine Spielgruppe an einem Ort tut, mit den beteiligten Figuren. Beschreibe, was dort geschieht und woran es sich entscheidet."
+      : "- Jede Station ist ein **Erzählabschnitt** eines Buches: ein zusammenhängender Ausschnitt der Handlung, der die Geschichte ein Stück weiterträgt.";
+
+  const zusatzBlock = zusatz?.trim()
+    ? `\nBesonders wichtig – zusätzliche Wünsche für diesen Arc:\n${zusatz.trim()}\n`
+    : "";
+
+  // Die Phasenfolge **explizit** vorgeben statt sie das Modell aus einer Zahl
+  // ableiten zu lassen: Gemessen liefert es sonst verlässlich fünf Stationen
+  // (eine je genannter Phase), egal welche Zahl gefordert war – die dokumentierte
+  // Lehre „prüfbarer Endzustand statt Verfahren". Wir verteilen die fünf Phasen
+  // gleichmäßig über die geforderte Stationenzahl (Anfang exposition, Ende
+  // aufloesung) und geben dem Modell die fertige Liste.
+  const PHASEN = [
+    "exposition",
+    "steigerung",
+    "hoehepunkt",
+    "fall",
+    "aufloesung",
+  ];
+  const folge = Array.from({ length: anzahl }, (_, i) =>
+    anzahl <= 1
+      ? PHASEN[0]
+      : PHASEN[Math.round((i * (PHASEN.length - 1)) / (anzahl - 1))],
+  );
+  const folgeListe = folge.map((p, i) => `${i + 1}. ${p}`).join("\n");
+
   return `Zerlege den folgenden Handlungsentwurf in einen Story Arc: eine geordnete Folge von Stationen, die die Geschichte von ihrer Ausgangslage bis zu ihrer Auflösung abschreitet.
 
 Der Handlungsentwurf:
@@ -534,19 +572,63 @@ Diese Figuren gibt es, und nur diese:
 
 ${figuren}
 
-Am Ende müssen genau ${anzahl} Stationen dastehen, in dieser dramaturgischen Abfolge (eine je Stufe):
-1. exposition – die Ausgangslage: wer, wo, welche Spannung liegt in der Luft.
-2. steigerung – der Konflikt bricht auf und eskaliert.
-3. hoehepunkt – die Entscheidung, der Punkt ohne Umkehr.
-4. fall – die Folgen der Entscheidung, es wird enger.
-5. aufloesung – der neue Zustand, in dem die Geschichte zur Ruhe kommt.
+Die fünf Dramaturgie-Phasen bedeuten:
+- exposition – die Ausgangslage: wer, wo, welche Spannung liegt in der Luft.
+- steigerung – der Konflikt bricht auf und eskaliert.
+- hoehepunkt – die Entscheidung, der Punkt ohne Umkehr.
+- fall – die Folgen der Entscheidung, es wird enger.
+- aufloesung – der neue Zustand, in dem die Geschichte zur Ruhe kommt.
+
+Der Arc hat **genau ${anzahl} Stationen** mit diesen Phasen, in dieser Reihenfolge. Gib für jede Zeile genau einen Eintrag zurück, mit der angegebenen Phase – nicht mehr und nicht weniger:
+${folgeListe}
 
 Anforderungen:
 - **Zerlege, erfinde nicht.** Der Entwurf ist die Obergrenze der Wahrheit: Baue keine Ereignisse ein, die nicht in ihm angelegt sind. Lässt er etwas offen, konkretisiere es aus den Figuren – aber erfinde keine neue Wendung und kein neues Ende.
 - Jede Station **verändert die Lage** gegenüber der vorigen. Keine zwei Stationen, die dasselbe noch einmal sagen.
 - Jede Station nennt in ihren Figuren die Namen, die sie tragen – **ausschließlich** aus dieser Besetzung: ${namen}. Erfinde keine neuen Namen.
+${formatZeile}
 - Titel kurz und prägnant (2–5 Wörter). Beschreibung als Fließtext, ohne Nummerierung, ohne Aufzählungszeichen.
-- Alles auf Deutsch.`;
+- Alles auf Deutsch.
+${zusatzBlock}`;
+}
+
+/**
+ * Baut den Prompt für die **Kapitel einer Story-Arc-Station** – zwei bis drei
+ * Kapitel, jedes mit Überschrift und zwei bis drei Sätzen.
+ *
+ * Bewusst die Zerlegung **der Station**, nicht der Besetzung: Kapitel gliedern
+ * den Stationstext feiner auf (eine Ebene unter dem Akt), sie erfinden nichts
+ * Neues. Deshalb braucht der Prompt weder Welt noch volle Charaktere – die
+ * Station trägt Beschreibung und beteiligte Figuren schon in sich. Dieselbe
+ * Abgrenzung wie Arc ↔ Handlungsentwurf, nur eine Ebene tiefer.
+ */
+export function buildStoryArcChaptersPrompt(stufe: {
+  titel: string;
+  beschreibung: string;
+  figuren: string[];
+}): string {
+  const figuren = stufe.figuren.filter((f) => f.trim());
+  const figurenZeile =
+    figuren.length > 0
+      ? `\nBeteiligte Figuren: ${figuren.join(", ")}.`
+      : "";
+
+  return `Zerlege die folgende Station eines Story Arcs in zwei bis drei Kapitel.
+
+Station: ${stufe.titel.trim() || "(ohne Titel)"}
+Was in ihr geschieht:
+${stufe.beschreibung.trim() || "(keine Beschreibung)"}${figurenZeile}
+
+Am Ende müssen zwei bis drei Kapitel dastehen. Sie schreiten die Station in ihrer Reihenfolge ab und decken sie zusammen lückenlos ab.
+
+Jedes Kapitel besteht aus:
+- einer kurzen Überschrift (2–6 Wörter),
+- zwei bis drei Sätzen, die sagen, was in dem Kapitel passiert.
+
+Anforderungen:
+- **Zerlege, erfinde nicht.** Bleib in dem, was die Station hergibt – konkretisiere, aber füge keine neuen Ereignisse oder Figuren hinzu.
+- Jedes Kapitel trägt die Handlung ein Stück weiter; keine zwei, die dasselbe sagen.
+- Alles auf Deutsch, ohne Nummerierung und ohne Aufzählungszeichen im Text.`;
 }
 
 /**

@@ -12,9 +12,12 @@ import {
 import { makeThumbnail } from "./image";
 import { DEFAULT_GENRE } from "./templates";
 import type {
+  ArcFormat,
+  ArcLength,
   CharacterInput,
   CharacterTraits,
   GeneratedCharacter,
+  Kapitel,
   PlotPerson,
   PlotVariants,
   ScenarioDetails,
@@ -632,10 +635,30 @@ export function generateScenarioPlot(
  * ungespeicherten Stand aus dem Request. **Persistiert nichts** – gespeichert
  * wird über `updateScenario({ storyArc })`.
  */
-export function generateStoryArc(scenarioId: string, handlung: string) {
+export function generateStoryArc(
+  scenarioId: string,
+  handlung: string,
+  options: { laenge?: ArcLength; format?: ArcFormat; zusatz?: string } = {},
+) {
   return postJson<{ storyArc: StoryArc }>("/api/scenario-arc", {
     scenarioId,
     handlung,
+    ...options,
+  });
+}
+
+/**
+ * Leitet die **Kapitel einer Story-Arc-Station** ab (zwei bis drei). Die Route
+ * braucht weder `scenarioId` noch die Charaktere – die Station trägt alles in
+ * sich. **Persistiert nichts**; gespeichert wird über `updateScenario`.
+ */
+export function generateStoryArcChapters(stufe: {
+  titel: string;
+  beschreibung: string;
+  figuren: string[];
+}) {
+  return postJson<{ kapitel: Kapitel[] }>("/api/story-arc-chapters", {
+    stufe,
   });
 }
 

@@ -3,7 +3,15 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { getTextClient, hatKaputteZeichen } from "@/lib/openai";
 import { buildStoryArcPrompt, type PlotCharacter } from "@/lib/prompts";
-import { ARC_PHASES, normalizeTraits, storyArcSchema } from "@/lib/schema";
+import {
+  ARC_FORMATS,
+  ARC_LENGTHS,
+  DEFAULT_ARC_FORMAT,
+  DEFAULT_ARC_LENGTH,
+  arcStationen,
+  normalizeTraits,
+  storyArcSchema,
+} from "@/lib/schema";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -35,10 +43,17 @@ const bodySchema = z.object({
   // Großzügig wie bei `scenario-plot-persons`: der Handlungsentwurf ist das
   // längste Feld eines Szenarios.
   handlung: z.string().trim().min(1).max(20000),
+  // Länge (Stationenzahl) und Format – nicht gespeichert, beschreiben den Lauf.
+  laenge: z
+    .enum(ARC_LENGTHS.map((l) => l.value) as [string, ...string[]])
+    .optional()
+    .default(DEFAULT_ARC_LENGTH),
+  format: z
+    .enum(ARC_FORMATS.map((f) => f.value) as [string, ...string[]])
+    .optional()
+    .default(DEFAULT_ARC_FORMAT),
+  zusatz: z.string().trim().max(1000).optional().default(""),
 });
-
-// Der MVP erzeugt fest den klassischen Fünfakter (eine Station je Phase).
-const ANZAHL = ARC_PHASES.length;
 
 export async function POST(request: Request) {
   try {
@@ -51,7 +66,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenarioId, handlung } = parsed.data;
+    const { scenarioId, handlung, laenge, format, zusatz } = parsed.data;
+    const anzahl = arcStationen(laenge);
 
     const rows = await prisma.character.findMany({
       where: { scenarioId },
@@ -86,7 +102,13 @@ export async function POST(request: Request) {
     }));
 
     const { client: openai, model, extraParams } = await getTextClient();
-    const prompt = buildStoryArcPrompt(handlung, characters, ANZAHL);
+    const prompt = buildStoryArcPrompt(
+      handlung,
+      characters,
+      anzahl,
+      format as "buch" | "spiel",
+      zusatz,
+    );
 
     const versuch = () =>
       openai.chat.completions.parse({
@@ -151,6 +173,8 @@ export async function POST(request: Request) {
         if (eigene.size === 0) return false;
         return bekannt.some((b) => [...eigene].some((w) => b.has(w)));
       }),
+      // Kapitel entstehen getrennt, auf Knopfdruck je Stufe – hier leer.
+      kapitel: [] as { titel: string; inhalt: string }[],
     }));
 
     return NextResponse.json({ storyArc: { stufen } });

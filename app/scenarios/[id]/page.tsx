@@ -13,6 +13,7 @@ import {
   generateScenarioField,
   generateScenarioPlot,
   generateStoryArc,
+  generateStoryArcChapters,
   getScenario,
   listScenarios,
   updateCharacterContent,
@@ -22,9 +23,13 @@ import {
 import { downloadBlob, safeFileName } from "@/lib/download";
 import { scenarioFileName } from "@/lib/scenarioFile";
 import {
+  DEFAULT_ARC_FORMAT,
+  DEFAULT_ARC_LENGTH,
   MAX_PLOT_VARIANTS,
   SCENARIO_LABELS,
   normalizeScenarioDetails,
+  type ArcFormat,
+  type ArcLength,
   type GeneratedCharacter,
   type PlotPerson,
   type PlotVariants,
@@ -73,6 +78,22 @@ export default function ScenarioDetailPage({
   const [storyArc, setStoryArc] = useState<StoryArc>({ stufen: [] });
   const [arcBusy, setArcBusy] = useState(false);
   const [arcFehler, setArcFehler] = useState<string | null>(null);
+  /**
+   * Länge, Format und Zusatzwunsch für die Arc-Erzeugung – wie beim
+   * Handlungsentwurf **nicht gespeichert**: Sie beschreiben einen Lauf, nicht
+   * den Arc.
+   */
+  const [arcParams, setArcParams] = useState<{
+    laenge: ArcLength;
+    format: ArcFormat;
+    zusatz: string;
+  }>({ laenge: DEFAULT_ARC_LENGTH, format: DEFAULT_ARC_FORMAT, zusatz: "" });
+  /** Welche Station gerade Kapitel erzeugt, und ein etwaiger Fehler dazu. */
+  const [kapitelBusy, setKapitelBusy] = useState<number | null>(null);
+  const [kapitelFehler, setKapitelFehler] = useState<{
+    index: number;
+    text: string;
+  } | null>(null);
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
   /**
    * Der angeklickte Charakter – öffnet dasselbe Detail-Modal wie in der
@@ -454,12 +475,49 @@ export default function ScenarioDetailPage({
     setArcBusy(true);
     setArcFehler(null);
     try {
-      const { storyArc: neu } = await generateStoryArc(id, details.handlung);
+      const { storyArc: neu } = await generateStoryArc(id, details.handlung, {
+        laenge: arcParams.laenge,
+        format: arcParams.format,
+        zusatz: arcParams.zusatz,
+      });
       setStoryArc(neu);
     } catch (e) {
       setArcFehler(e instanceof Error ? e.message : "Fehler.");
     } finally {
       setArcBusy(false);
+    }
+  }
+
+  /**
+   * Kapitel für eine Station ableiten (zwei bis drei). Die Station geht im
+   * **aktuell bearbeiteten** Stand mit; das Ergebnis ersetzt ihre Kapitel als
+   * ungespeicherte Änderung – „Verwerfen" bringt die alten zurück. Ein
+   * funktionales Update, damit parallele Bearbeitungen nicht verlorengehen.
+   */
+  async function kapitelAbleiten(stufeIndex: number) {
+    if (kapitelBusy !== null) return;
+    const stufe = storyArc.stufen[stufeIndex];
+    if (!stufe || !stufe.beschreibung.trim()) return;
+    setKapitelBusy(stufeIndex);
+    setKapitelFehler(null);
+    try {
+      const { kapitel } = await generateStoryArcChapters({
+        titel: stufe.titel,
+        beschreibung: stufe.beschreibung,
+        figuren: stufe.figuren,
+      });
+      setStoryArc((arc) => ({
+        stufen: arc.stufen.map((s, k) =>
+          k === stufeIndex ? { ...s, kapitel } : s,
+        ),
+      }));
+    } catch (e) {
+      setKapitelFehler({
+        index: stufeIndex,
+        text: e instanceof Error ? e.message : "Fehler.",
+      });
+    } finally {
+      setKapitelBusy(null);
     }
   }
 
@@ -892,6 +950,11 @@ export default function ScenarioDetailPage({
         onAbleiten={storyArcAbleiten}
         busy={arcBusy}
         error={arcFehler}
+        params={arcParams}
+        onParamsChange={setArcParams}
+        onKapitelAbleiten={kapitelAbleiten}
+        kapitelBusy={kapitelBusy}
+        kapitelError={kapitelFehler}
         disabled={saving}
         handlung={details.handlung}
         quelleLabel={`Entwurf ${aktiv + 1}`}

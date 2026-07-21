@@ -1,24 +1,34 @@
 "use client";
 
-import { ARC_PHASE_LABELS, type ArcPhase, type StoryArc } from "@/lib/schema";
+import {
+  ARC_FORMATS,
+  ARC_LENGTHS,
+  ARC_PHASES,
+  MAX_ARC_STUFEN,
+  MAX_KAPITEL_PRO_STUFE,
+  type ArcFormat,
+  type ArcLength,
+  type ArcPhase,
+  type StoryArc,
+} from "@/lib/schema";
 import { AutoTextarea } from "./AutoTextarea";
 
 /**
  * Der **Story Arc** eines Szenarios – die dramaturgische Zerlegung des aktiven
  * Handlungsentwurfs in eine geordnete Folge von Stationen, dargestellt als
- * vertikale Zeitleiste von Karten.
+ * vertikale Zeitleiste von Karten. Jede Station lässt sich vollständig
+ * bearbeiten (Phase, Titel, Beschreibung, Figuren), umsortieren, löschen und um
+ * **Kapitel** ergänzen; neue Stationen lassen sich einfügen.
  *
  * Bewusst **präsentierend**, wie `ScenarioFields`: Die Komponente kennt kein
- * `fetch`. Sie zeigt den Arc, meldet Änderungen (Titel/Beschreibung tippen,
- * Station löschen) über `onChange` und den Ableiten-Wunsch über `onAbleiten`.
- * Erzeugen, Speichern und Verwerfen liegen in der Seite (`scenarios/[id]`),
- * die den Arc in ihren Bearbeitungs-Zustand einreiht – wie `plotVariants`.
+ * `fetch`. Sie zeigt den Arc, meldet alle Bearbeitungen über `onChange` und die
+ * beiden KI-Wünsche (Arc ableiten, Kapitel je Station) über `onAbleiten` /
+ * `onKapitelAbleiten`. Erzeugen, Speichern und Verwerfen liegen in der Seite
+ * (`scenarios/[id]`), die den Arc in ihren Bearbeitungs-Zustand einreiht.
  *
- * Die **Farbfolge der Phasen ist Struktur, keine Deko**: Die fünf Stufen sind
- * eine typisierte, aufsteigende Reihenfolge (Exposition → Auflösung), und die
- * Farbe macht sie beim Überfliegen erkennbar. Die Klassen stehen als Literale
- * in der Tabelle unten, damit Tailwind sie erzeugt (dynamisch zusammengesetzte
- * Klassen würde der JIT nicht sehen).
+ * Die **Farbfolge der Phasen ist Struktur, keine Deko**. Die Klassen stehen als
+ * Literale in der Tabelle unten, damit Tailwind sie erzeugt (dynamisch
+ * zusammengesetzte Klassen würde der JIT nicht sehen).
  */
 const PHASE_STYLE: Record<ArcPhase, { dot: string; chip: string }> = {
   exposition: {
@@ -43,12 +53,25 @@ const PHASE_STYLE: Record<ArcPhase, { dot: string; chip: string }> = {
   },
 };
 
+/** Kleiner quadratischer Icon-Knopf (▲ ▼ ✕) – gleiche Optik überall. */
+const MINI_BTN =
+  "rounded px-1.5 py-0.5 text-xs leading-none text-foreground/40 transition hover:bg-black/[0.05] hover:text-foreground/70 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-foreground/40 dark:hover:bg-white/[0.06]";
+
+/** Knopf im Feld-/Kopfstil – gleiche Höhe und Rand wie in `ScenarioFields`. */
+const CHIP_BTN =
+  "rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]";
+
 export function StoryArcSection({
   storyArc,
   onChange,
   onAbleiten,
   busy,
   error,
+  params,
+  onParamsChange,
+  onKapitelAbleiten,
+  kapitelBusy,
+  kapitelError,
   disabled,
   handlung,
   quelleLabel,
@@ -58,6 +81,20 @@ export function StoryArcSection({
   onAbleiten: () => void;
   busy: boolean;
   error: string | null;
+  /** Länge/Format/Zusatz des nächsten Laufs – nicht gespeichert. */
+  params: { laenge: ArcLength; format: ArcFormat; zusatz: string };
+  onParamsChange: (p: {
+    laenge: ArcLength;
+    format: ArcFormat;
+    zusatz: string;
+  }) => void;
+  /** Kapitel für die Station am Index ableiten. */
+  onKapitelAbleiten: (stufeIndex: number) => void;
+  /** Welche Station gerade Kapitel erzeugt (für Beschriftung/Sperre). */
+  kapitelBusy: number | null;
+  /** Fehler der Kapitel-Erzeugung, samt betroffener Station. */
+  kapitelError: { index: number; text: string } | null;
+  /** Gesperrt, während gespeichert wird. */
   disabled: boolean;
   /** Der aktive Handlungsentwurf – ohne ihn lässt sich nichts ableiten. */
   handlung: string;
@@ -67,15 +104,75 @@ export function StoryArcSection({
   const stufen = storyArc.stufen;
   const hatArc = stufen.length > 0;
   const kannAbleiten = handlung.trim().length > 0 && !busy && !disabled;
+  const kannHinzufuegen = stufen.length < MAX_ARC_STUFEN;
 
+  // --- Stufen-Mutationen (alle über onChange) -----------------------------
   function stufeAendern(i: number, patch: Partial<StoryArc["stufen"][number]>) {
     onChange({
       stufen: stufen.map((s, k) => (k === i ? { ...s, ...patch } : s)),
     });
   }
-
   function stufeLoeschen(i: number) {
     onChange({ stufen: stufen.filter((_, k) => k !== i) });
+  }
+  function stufeVerschieben(i: number, richtung: -1 | 1) {
+    const j = i + richtung;
+    if (j < 0 || j >= stufen.length) return;
+    const next = stufen.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange({ stufen: next });
+  }
+  function stufeHinzufuegen() {
+    if (!kannHinzufuegen) return;
+    // Neue Station erbt die Phase der letzten (Kontinuität am Ende der Kurve);
+    // bei leerem Arc beginnt sie bei der Exposition.
+    const phase: ArcPhase = stufen.length
+      ? stufen[stufen.length - 1].phase
+      : "exposition";
+    onChange({
+      stufen: [
+        ...stufen,
+        { titel: "", phase, beschreibung: "", figuren: [], kapitel: [] },
+      ],
+    });
+  }
+  function figurEntfernen(i: number, k: number) {
+    stufeAendern(i, {
+      figuren: stufen[i].figuren.filter((_, x) => x !== k),
+    });
+  }
+
+  // --- Kapitel-Mutationen -------------------------------------------------
+  function kapitelSetzen(i: number, kapitel: StoryArc["stufen"][number]["kapitel"]) {
+    stufeAendern(i, { kapitel });
+  }
+  function kapitelAendern(
+    i: number,
+    k: number,
+    patch: Partial<StoryArc["stufen"][number]["kapitel"][number]>,
+  ) {
+    kapitelSetzen(
+      i,
+      stufen[i].kapitel.map((c, x) => (x === k ? { ...c, ...patch } : c)),
+    );
+  }
+  function kapitelLoeschen(i: number, k: number) {
+    kapitelSetzen(
+      i,
+      stufen[i].kapitel.filter((_, x) => x !== k),
+    );
+  }
+  function kapitelVerschieben(i: number, k: number, richtung: -1 | 1) {
+    const arr = stufen[i].kapitel;
+    const j = k + richtung;
+    if (j < 0 || j >= arr.length) return;
+    const next = arr.slice();
+    [next[k], next[j]] = [next[j], next[k]];
+    kapitelSetzen(i, next);
+  }
+  function kapitelHinzufuegen(i: number) {
+    if (stufen[i].kapitel.length >= MAX_KAPITEL_PRO_STUFE) return;
+    kapitelSetzen(i, [...stufen[i].kapitel, { titel: "", inhalt: "" }]);
   }
 
   return (
@@ -87,28 +184,76 @@ export function StoryArcSection({
           </h2>
           <p className="mt-1 text-xs text-foreground/50">
             {hatArc
-              ? `Fünfakter – abgeleitet aus ${quelleLabel}.`
-              : "Die dramaturgische Zerlegung des Handlungsentwurfs in fünf Stationen."}
+              ? `Dramaturgische Zerlegung – abgeleitet aus ${quelleLabel}.`
+              : "Die dramaturgische Zerlegung des Handlungsentwurfs in Stationen."}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onAbleiten}
-          disabled={!kannAbleiten}
-          title={
-            handlung.trim()
-              ? "Zerlegt den aktiven Handlungsentwurf in einen Fünfakter"
-              : "Zuerst einen Handlungsentwurf erzeugen"
-          }
-          className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
-        >
-          {busy
-            ? "Leite ab …"
-            : hatArc
-              ? "📖 Neu ableiten"
-              : "📖 Story Arc ableiten"}
-        </button>
+
+        {/* Parameter + Ableiten-Knopf. Wirken nur auf die Arc-Erzeugung. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={params.laenge}
+            onChange={(e) =>
+              onParamsChange({ ...params, laenge: e.target.value as ArcLength })
+            }
+            disabled={disabled || busy}
+            aria-label="Länge des Story Arcs"
+            title="Wie viele Stationen erzeugt werden"
+            className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+          >
+            {ARC_LENGTHS.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={params.format}
+            onChange={(e) =>
+              onParamsChange({ ...params, format: e.target.value as ArcFormat })
+            }
+            disabled={disabled || busy}
+            aria-label="Format des Story Arcs"
+            title="Erzählabschnitte (Buch) oder spielbare Szenen (Spiel)"
+            className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+          >
+            {ARC_FORMATS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={onAbleiten}
+            disabled={!kannAbleiten}
+            title={
+              handlung.trim()
+                ? "Zerlegt den aktiven Handlungsentwurf in Stationen"
+                : "Zuerst einen Handlungsentwurf erzeugen"
+            }
+            className={CHIP_BTN}
+          >
+            {busy
+              ? "Leite ab …"
+              : hatArc
+                ? "📖 Neu ableiten"
+                : "📖 Story Arc ableiten"}
+          </button>
+        </div>
       </div>
+
+      {/* Zusatzwunsch für die Arc-Erzeugung. */}
+      <input
+        value={params.zusatz}
+        onChange={(e) => onParamsChange({ ...params, zusatz: e.target.value })}
+        disabled={disabled || busy}
+        maxLength={1000}
+        placeholder="Stichwörter für den Arc – z. B. „ein Verrat trägt den Wendepunkt“, „ohne Gewalt“"
+        title="Stichwörter, die der nächste Arc berücksichtigen soll. Werden nicht gespeichert."
+        aria-label="Stichwörter für den Story Arc"
+        className="mt-3 w-full rounded-md border border-black/15 bg-white px-3 py-1.5 text-xs outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+      />
 
       {error && (
         <p className="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>
@@ -117,8 +262,8 @@ export function StoryArcSection({
       {!hatArc && !busy && (
         <p className="mt-4 text-sm text-foreground/50">
           {handlung.trim()
-            ? "Noch kein Story Arc. „Story Arc ableiten“ zerlegt den Handlungsentwurf oben in Exposition, Steigerung, Höhepunkt, Fall und Auflösung."
-            : "Sobald ein Handlungsentwurf steht, lässt sich daraus ein Story Arc ableiten."}
+            ? "Noch kein Story Arc. „Story Arc ableiten“ zerlegt den Handlungsentwurf oben – oder baue die Stationen von Hand auf."
+            : "Sobald ein Handlungsentwurf steht, lässt sich daraus ein Story Arc ableiten. Von Hand geht es auch."}
         </p>
       )}
 
@@ -131,6 +276,7 @@ export function StoryArcSection({
           />
           {stufen.map((s, i) => {
             const stil = PHASE_STYLE[s.phase];
+            const kapitelLaeuft = kapitelBusy === i;
             return (
               <li
                 key={i}
@@ -143,22 +289,73 @@ export function StoryArcSection({
                 </div>
                 <div className="rounded-lg border border-black/10 bg-black/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.02]">
                   <div className="flex items-center justify-between gap-2">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold tracking-wide uppercase ${stil.chip}`}
-                    >
-                      <span className="tabular-nums opacity-70">{i + 1}</span>
-                      {ARC_PHASE_LABELS[s.phase]}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => stufeLoeschen(i)}
-                      disabled={disabled}
-                      aria-label={`Station ${i + 1} löschen`}
-                      title="Station löschen"
-                      className="rounded px-1.5 py-0.5 text-sm leading-none text-foreground/35 transition hover:bg-black/[0.05] hover:text-foreground/70 disabled:opacity-40 dark:hover:bg-white/[0.06]"
-                    >
-                      ✕
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold tabular-nums text-foreground/40">
+                        {i + 1}
+                      </span>
+                      {/* Phase editierbar – der Punkt an der Linie folgt ihr. */}
+                      <span className="relative">
+                        <select
+                          value={s.phase}
+                          onChange={(e) =>
+                            stufeAendern(i, {
+                              phase: e.target.value as ArcPhase,
+                            })
+                          }
+                          disabled={disabled}
+                          aria-label={`Phase der Station ${i + 1}`}
+                          className={`cursor-pointer appearance-none rounded-full border py-0.5 pr-5 pl-2 text-[0.65rem] font-semibold tracking-wide uppercase outline-none ${stil.chip}`}
+                        >
+                          {ARC_PHASES.map((p) => (
+                            <option
+                              key={p.value}
+                              value={p.value}
+                              className="bg-background text-foreground normal-case"
+                            >
+                              {p.label}
+                            </option>
+                          ))}
+                        </select>
+                        <span
+                          aria-hidden
+                          className="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-[0.55rem] opacity-60"
+                        >
+                          ▾
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => stufeVerschieben(i, -1)}
+                        disabled={disabled || i === 0}
+                        aria-label={`Station ${i + 1} nach oben`}
+                        title="Nach oben"
+                        className={MINI_BTN}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => stufeVerschieben(i, 1)}
+                        disabled={disabled || i === stufen.length - 1}
+                        aria-label={`Station ${i + 1} nach unten`}
+                        title="Nach unten"
+                        className={MINI_BTN}
+                      >
+                        ▼
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => stufeLoeschen(i)}
+                        disabled={disabled}
+                        aria-label={`Station ${i + 1} löschen`}
+                        title="Station löschen"
+                        className={MINI_BTN}
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
 
                   <input
@@ -184,19 +381,165 @@ export function StoryArcSection({
                       {s.figuren.map((f, k) => (
                         <span
                           key={k}
-                          className="rounded-full border border-black/10 bg-black/[0.04] px-2 py-0.5 text-xs text-foreground/70 dark:border-white/10 dark:bg-white/[0.06]"
+                          className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-black/[0.04] py-0.5 pr-1 pl-2 text-xs text-foreground/70 dark:border-white/10 dark:bg-white/[0.06]"
                         >
                           ◆ {f}
+                          <button
+                            type="button"
+                            onClick={() => figurEntfernen(i, k)}
+                            disabled={disabled}
+                            aria-label={`${f} aus Station ${i + 1} entfernen`}
+                            title="Figur entfernen"
+                            className="rounded-full px-1 leading-none text-foreground/40 transition hover:text-red-600 disabled:opacity-40 dark:hover:text-red-400"
+                          >
+                            ✕
+                          </button>
                         </span>
                       ))}
                     </div>
                   )}
+
+                  {/* Kapitel dieser Station – eine Ebene unter dem Akt. */}
+                  <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-foreground/60">
+                        Kapitel ({s.kapitel.length})
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onKapitelAbleiten(i)}
+                          disabled={
+                            disabled ||
+                            kapitelBusy !== null ||
+                            !s.beschreibung.trim()
+                          }
+                          title={
+                            s.beschreibung.trim()
+                              ? "Zerlegt diese Station in zwei bis drei Kapitel"
+                              : "Erst die Beschreibung der Station füllen"
+                          }
+                          className={CHIP_BTN}
+                        >
+                          {kapitelLaeuft
+                            ? "Leite ab …"
+                            : s.kapitel.length
+                              ? "📑 Neu ableiten"
+                              : "📑 Kapitel ableiten"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => kapitelHinzufuegen(i)}
+                          disabled={
+                            disabled ||
+                            s.kapitel.length >= MAX_KAPITEL_PRO_STUFE
+                          }
+                          title="Leeres Kapitel hinzufügen"
+                          className={CHIP_BTN}
+                        >
+                          + Kapitel
+                        </button>
+                      </div>
+                    </div>
+
+                    {kapitelError?.index === i && (
+                      <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                        {kapitelError.text}
+                      </p>
+                    )}
+
+                    {s.kapitel.length > 0 && (
+                      <ol className="mt-2 flex flex-col gap-2">
+                        {s.kapitel.map((k, ki) => (
+                          <li
+                            key={ki}
+                            className="rounded-md border border-black/10 bg-white p-2 dark:border-white/10 dark:bg-white/[0.03]"
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <span className="shrink-0 text-xs tabular-nums text-foreground/35">
+                                {i + 1}.{ki + 1}
+                              </span>
+                              <input
+                                value={k.titel}
+                                onChange={(e) =>
+                                  kapitelAendern(i, ki, {
+                                    titel: e.target.value,
+                                  })
+                                }
+                                disabled={disabled}
+                                aria-label={`Überschrift von Kapitel ${i + 1}.${ki + 1}`}
+                                placeholder="Überschrift"
+                                maxLength={200}
+                                className="-mx-1 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium outline-none transition hover:border-black/15 focus:border-black/40 disabled:opacity-60 dark:hover:border-white/15 dark:focus:border-white/40"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => kapitelVerschieben(i, ki, -1)}
+                                disabled={disabled || ki === 0}
+                                aria-label={`Kapitel ${i + 1}.${ki + 1} nach oben`}
+                                title="Nach oben"
+                                className={MINI_BTN}
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => kapitelVerschieben(i, ki, 1)}
+                                disabled={
+                                  disabled || ki === s.kapitel.length - 1
+                                }
+                                aria-label={`Kapitel ${i + 1}.${ki + 1} nach unten`}
+                                title="Nach unten"
+                                className={MINI_BTN}
+                              >
+                                ▼
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => kapitelLoeschen(i, ki)}
+                                disabled={disabled}
+                                aria-label={`Kapitel ${i + 1}.${ki + 1} löschen`}
+                                title="Kapitel löschen"
+                                className={MINI_BTN}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <AutoTextarea
+                              value={k.inhalt}
+                              onChange={(v) => kapitelAendern(i, ki, { inhalt: v })}
+                              ariaLabel={`Inhalt von Kapitel ${i + 1}.${ki + 1}`}
+                              placeholder="Zwei bis drei Sätze, was in dem Kapitel passiert …"
+                              className="text-sm text-foreground/75"
+                            />
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                  </div>
                 </div>
               </li>
             );
           })}
         </ol>
       )}
+
+      {/* Station hinzufügen – auch bei leerem Arc, um von Hand aufzubauen. */}
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={stufeHinzufuegen}
+          disabled={disabled || !kannHinzufuegen}
+          title={
+            kannHinzufuegen
+              ? "Fügt eine leere Station am Ende an – per ▲▼ verschiebbar"
+              : `Mehr als ${MAX_ARC_STUFEN} Stationen werden nicht gespeichert`
+          }
+          className={CHIP_BTN}
+        >
+          ➕ Station hinzufügen
+        </button>
+      </div>
     </section>
   );
 }

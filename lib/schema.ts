@@ -667,19 +667,58 @@ export const ARC_PHASE_LABELS = Object.fromEntries(
 ) as Record<ArcPhase, string>;
 
 /**
- * Die Obergrenze der Stationen. Der MVP erzeugt fest fünf (Fünfakter); die
- * Grenze liegt darüber, damit von Hand hinzugefügte oder später über einen
- * Längen-Parameter erzeugte Stufen Platz haben.
+ * Die Obergrenze der Stationen. Erzeugt werden je nach Länge 3, 5 oder 8; die
+ * Grenze liegt darüber, damit von Hand hinzugefügte Stufen Platz haben.
  */
-export const MAX_ARC_STUFEN = 12;
+export const MAX_ARC_STUFEN = 20;
+
+/** Wie viele Kapitel eine Stufe höchstens trägt (erzeugt werden 2–3). */
+export const MAX_KAPITEL_PRO_STUFE = 8;
 
 /**
- * **Die Structured-Output-Fassung** einer Stufe (geht an OpenAI). Alle Felder
- * sind Pflicht, tragen ihre Anweisung im `.describe()` und – wie überall im
- * Projekt – **keine** Längen-Constraints (`.max()` erzeugt `maxLength`, das
- * Structured Outputs ebenso ablehnt wie `.int()` `minimum`/`maximum`). Die
- * Bindung an die Stufenzahl und die Zeichenlängen prüft erst das
- * Speicher-Schema unten.
+ * **Länge des Arcs** – steuert, in wie viele Stationen der Handlungsentwurf
+ * zerlegt wird. Die Zahl bestimmt die Dramaturgie: 3 = Kurzbogen (Anfang,
+ * Wende, Ende), 5 = klassischer Fünfakter, 8 = Roman/Kampagne. Beschreibt einen
+ * Lauf, nicht den Arc – wird nicht gespeichert.
+ */
+export const ARC_LENGTHS = [
+  { value: "kurz", label: "Kurz · 3", stationen: 3 },
+  { value: "mittel", label: "Mittel · 5", stationen: 5 },
+  { value: "lang", label: "Lang · 8", stationen: 8 },
+] as const;
+
+export type ArcLength = (typeof ARC_LENGTHS)[number]["value"];
+export const DEFAULT_ARC_LENGTH: ArcLength = "mittel";
+
+/** Stationenzahl zu einer Länge (Fallback: Fünfakter). */
+export function arcStationen(laenge: string): number {
+  return ARC_LENGTHS.find((l) => l.value === laenge)?.stationen ?? 5;
+}
+
+/**
+ * **Format des Arcs** – nur eine Tonlage im Prompt: `buch` liefert
+ * Erzählabschnitte, `spiel` liefert spielbare Szenen (etwas, das eine Gruppe
+ * *tut*). Passt zum Doppelzweck der App. Wird nicht gespeichert.
+ */
+export const ARC_FORMATS = [
+  { value: "buch", label: "Buch · Erzählabschnitte" },
+  { value: "spiel", label: "Spiel · Szenen" },
+] as const;
+
+export type ArcFormat = (typeof ARC_FORMATS)[number]["value"];
+export const DEFAULT_ARC_FORMAT: ArcFormat = "buch";
+
+/**
+ * **Die Structured-Output-Fassungen** (gehen an OpenAI). Alle Felder sind
+ * Pflicht, tragen ihre Anweisung im `.describe()` und – wie überall im Projekt –
+ * **keine** Längen-Constraints (`.max()` erzeugt `maxLength`, das Structured
+ * Outputs ebenso ablehnt wie `.int()` `minimum`/`maximum`). Die Grenzen prüft
+ * erst das Speicher-Schema unten.
+ *
+ * Die **Kapitel entstehen getrennt** (eigene Route, auf Knopfdruck je Stufe) –
+ * deshalb kennt die Stufen-Erzeugung sie nicht, und `arcStufeSchema` trägt kein
+ * `kapitel`. Die Arc-Route hängt beim Zurückgeben je Stufe ein leeres
+ * `kapitel`-Array an.
  */
 export const arcStufeSchema = z.object({
   titel: z
@@ -688,7 +727,7 @@ export const arcStufeSchema = z.object({
   phase: z
     .enum(ARC_PHASE_VALUES)
     .describe(
-      "Die Dramaturgie-Stufe: exposition (Ausgangslage), steigerung (der Konflikt eskaliert), hoehepunkt (die Entscheidung), fall (die Folgen), aufloesung (der neue Zustand). Die Stationen müssen in genau dieser Reihenfolge stehen.",
+      "Die Dramaturgie-Stufe: exposition (Ausgangslage), steigerung (der Konflikt eskaliert), hoehepunkt (die Entscheidung), fall (die Folgen), aufloesung (der neue Zustand). Die Stationen müssen in dieser Reihenfolge stehen; bei mehr als fünf Stationen dürfen tragende Phasen mehrfach vorkommen, bei weniger werden benachbarte Phasen zusammengefasst.",
     ),
   beschreibung: z
     .string()
@@ -702,44 +741,61 @@ export const arcStufeSchema = z.object({
     ),
 });
 
-export type ArcStufe = z.infer<typeof arcStufeSchema>;
-
-/**
- * Die Antwort der Route – ein umschließendes Objekt, weil Structured Outputs
- * auf oberster Ebene ein Objekt verlangt.
- */
 export const storyArcSchema = z.object({
   stufen: z.array(arcStufeSchema),
 });
 
-export type StoryArc = z.infer<typeof storyArcSchema>;
+/** Ein Kapitel – Überschrift und zwei bis drei Sätze, was darin passiert. */
+export const kapitelSchema = z.object({
+  titel: z.string().describe("Kurze Überschrift des Kapitels (2–6 Wörter)"),
+  inhalt: z
+    .string()
+    .describe("Zwei bis drei Sätze, was in diesem Kapitel passiert"),
+});
+
+/** Die Antwort der Kapitel-Route – umschließendes Objekt (Structured Output). */
+export const kapitelListeSchema = z.object({
+  kapitel: z.array(kapitelSchema),
+});
 
 /**
  * **Die Speicher-/PATCH-Fassung** (kommt aus dem Client, geht in die Spalte).
- * Hier sitzen die Grenzen: die Stufenzahl (`MAX_ARC_STUFEN`) und großzügige
+ * Hier sitzen die Grenzen: Stufen- und Kapitelzahl und großzügige
  * Zeichenlängen. Großzügig, weil ein zu enges Limit – die Lehre aus
  * `storyHooks` und `ort`/`zeit` – **spät** zuschlägt: erst beim Speichern, wenn
- * die Arbeit getan ist. Die Phase bleibt an das Enum gebunden.
+ * die Arbeit getan ist. Phase bleibt ans Enum gebunden; `kapitel` ist optional
+ * (Stufen ohne abgeleitete Kapitel), fehlt es, gilt die leere Liste.
  */
-export const storyArcStoredSchema = z.object({
-  stufen: z
-    .array(
-      z.object({
-        titel: z.string().trim().max(200),
-        phase: z.enum(ARC_PHASE_VALUES),
-        beschreibung: z.string().trim().max(5000),
-        figuren: z.array(z.string().trim().max(120)).max(30),
-      }),
-    )
-    .max(MAX_ARC_STUFEN),
+export const kapitelStoredSchema = z.object({
+  titel: z.string().trim().max(200),
+  inhalt: z.string().trim().max(2000),
 });
+
+export const arcStufeStoredSchema = z.object({
+  titel: z.string().trim().max(200),
+  phase: z.enum(ARC_PHASE_VALUES),
+  beschreibung: z.string().trim().max(5000),
+  figuren: z.array(z.string().trim().max(120)).max(30),
+  kapitel: z.array(kapitelStoredSchema).max(MAX_KAPITEL_PRO_STUFE).default([]),
+});
+
+export const storyArcStoredSchema = z.object({
+  stufen: z.array(arcStufeStoredSchema).max(MAX_ARC_STUFEN),
+});
+
+// Die maßgeblichen Client-/Speicher-Typen kommen aus der Stored-Fassung: sie
+// trägt die Kapitel, die die Struktur führt (die Gen-Fassung kennt sie nicht).
+export type Kapitel = z.infer<typeof kapitelStoredSchema>;
+export type ArcStufe = z.infer<typeof arcStufeStoredSchema>;
+export type StoryArc = z.infer<typeof storyArcStoredSchema>;
 
 /**
  * Bringt einen gespeicherten (oder fehlenden) Arc in Form – für Altbestände und
  * Szenarien ohne abgeleiteten Arc `{ stufen: [] }`. Dieselbe Idee wie
  * `normalizePlotVariants`: kein Sonderfall „kein Arc" nötig, die leere Liste
  * ist der ruhende Zustand. Unbekannte Phasen fallen auf `exposition` zurück,
- * damit eine später umbenannte Stufe die gesamte Struktur nicht ungültig macht.
+ * fehlende Kapitel auf die leere Liste – damit eine später ergänzte Struktur
+ * (Kapitel kamen nach den Stufen dazu) Altbestände nicht ungültig macht.
  */
 export function normalizeStoryArc(raw: unknown): StoryArc {
   const src = (raw ?? {}) as { stufen?: unknown };
@@ -750,6 +806,18 @@ export function normalizeStoryArc(raw: unknown): StoryArc {
         const phase = ARC_PHASE_VALUES.includes(o.phase as ArcPhase)
           ? (o.phase as ArcPhase)
           : "exposition";
+        const kapitel = Array.isArray(o.kapitel)
+          ? o.kapitel.flatMap((k): Kapitel[] => {
+              if (!k || typeof k !== "object") return [];
+              const ko = k as Record<string, unknown>;
+              return [
+                {
+                  titel: typeof ko.titel === "string" ? ko.titel : "",
+                  inhalt: typeof ko.inhalt === "string" ? ko.inhalt : "",
+                },
+              ];
+            })
+          : [];
         return [
           {
             titel: typeof o.titel === "string" ? o.titel : "",
@@ -759,6 +827,7 @@ export function normalizeStoryArc(raw: unknown): StoryArc {
             figuren: Array.isArray(o.figuren)
               ? o.figuren.filter((x): x is string => typeof x === "string")
               : [],
+            kapitel,
           },
         ];
       })

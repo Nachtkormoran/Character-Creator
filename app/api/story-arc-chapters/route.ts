@@ -1,0 +1,102 @@
+import { NextResponse } from "next/server";
+import { zodResponseFormat } from "openai/helpers/zod";
+import { z } from "zod";
+import { getTextClient, hatKaputteZeichen } from "@/lib/openai";
+import { buildStoryArcChaptersPrompt } from "@/lib/prompts";
+import { MAX_KAPITEL_PRO_STUFE, kapitelListeSchema } from "@/lib/schema";
+
+export const runtime = "nodejs";
+
+/**
+ * Die **Kapitel einer Story-Arc-Station** – zwei bis drei, jedes mit
+ * Überschrift und zwei bis drei Sätzen.
+ *
+ * Bewusst **eigenständig und ohne DB-Zugriff**: Kapitel sind die Zerlegung des
+ * Stationstexts, eine Ebene unter dem Akt – nicht der Besetzung. Die Station
+ * trägt Beschreibung und beteiligte Figuren schon in sich, also kommt sie
+ * **aus dem Request** (sie kann in der Detailansicht ungespeichert bearbeitet
+ * sein). Anders als `scenario-arc` braucht diese Route weder `scenarioId` noch
+ * die Charaktere.
+ *
+ * **Structured Output** (eine Liste von Objekten mit je zwei Feldern) mit
+ * demselben Umlaut-Wächter (`hatKaputteZeichen`, rekursiv) plus **einem**
+ * Wiederholversuch wie die anderen Structured-Routen. **Persistiert nichts** –
+ * die Kapitel gehen in den Bearbeitungs-Zustand und werden über „Änderungen
+ * speichern" mit dem Arc abgelegt.
+ */
+const bodySchema = z.object({
+  stufe: z.object({
+    titel: z.string().trim().max(200).optional().default(""),
+    beschreibung: z.string().trim().min(1).max(5000),
+    figuren: z.array(z.string().trim().max(120)).max(30).optional().default([]),
+  }),
+});
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const parsed = bodySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Ungültige Eingaben.", details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    const { stufe } = parsed.data;
+
+    const { client: openai, model, extraParams } = await getTextClient();
+    const prompt = buildStoryArcChaptersPrompt(stufe);
+
+    const versuch = () =>
+      openai.chat.completions.parse({
+        model,
+        ...extraParams,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Du bist Dramaturg. Du gliederst eine gegebene Station in ihre Kapitel – du erfindest nichts Neues, sondern teilst das Vorhandene feiner auf.",
+          },
+          { role: "user", content: prompt },
+        ],
+        response_format: zodResponseFormat(kapitelListeSchema, "kapitel"),
+        temperature: 0.5,
+      });
+
+    let ergebnis = (await versuch()).choices[0]?.message.parsed;
+    if (ergebnis && hatKaputteZeichen(ergebnis)) {
+      console.warn(
+        "story-arc-chapters: fehlerhafte Zeichenkodierung, zweiter Versuch.",
+      );
+      ergebnis = (await versuch()).choices[0]?.message.parsed;
+    }
+
+    if (!ergebnis) {
+      return NextResponse.json(
+        { error: "Das Modell lieferte keine Antwort." },
+        { status: 502 },
+      );
+    }
+    if (hatKaputteZeichen(ergebnis)) {
+      return NextResponse.json(
+        {
+          error:
+            "Die Antwort kam zweimal mit fehlerhaften Umlauten zurück. Bitte noch einmal ableiten.",
+        },
+        { status: 502 },
+      );
+    }
+
+    // Nur Kapitel mit Inhalt, und höchstens so viele wie die Stufe trägt.
+    const kapitel = ergebnis.kapitel
+      .filter((k) => k.titel.trim() || k.inhalt.trim())
+      .slice(0, MAX_KAPITEL_PRO_STUFE);
+
+    return NextResponse.json({ kapitel });
+  } catch (err) {
+    console.error("story-arc-chapters error:", err);
+    const message = err instanceof Error ? err.message : "Unbekannter Fehler.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
