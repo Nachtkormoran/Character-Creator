@@ -660,10 +660,12 @@ export function generateScenarioPlot(
    * Ausgangslage. Unabhängig von `basis`.
    */
   weiterspinnen = false,
+  /** Ton und Sprache (`STORY_TONES`-Wert). Leer/`neutral` = wie bisher. */
+  ton = "",
 ) {
   return postJson<{ handlung: string; characters: number }>(
     "/api/scenario-plot",
-    { scenarioId, name, details, zusatz, basis, weiterspinnen },
+    { scenarioId, name, details, zusatz, basis, weiterspinnen, ton },
   );
 }
 
@@ -683,6 +685,7 @@ export function generateStoryArc(
     zusatz?: string;
     kreativ?: boolean;
     weiterspinnen?: boolean;
+    ton?: string;
   } = {},
 ) {
   return postJson<{ storyArc: StoryArc }>("/api/scenario-arc", {
@@ -703,7 +706,7 @@ export function generateStoryArcChapters(
     beschreibung: string;
     figuren: string[];
   },
-  options: { kreativ?: boolean; anzahl?: KapitelCount } = {},
+  options: { kreativ?: boolean; anzahl?: KapitelCount; ton?: string } = {},
 ) {
   return postJson<{ kapitel: Kapitel[] }>("/api/story-arc-chapters", {
     stufe,

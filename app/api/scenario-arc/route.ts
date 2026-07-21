@@ -60,6 +60,8 @@ const bodySchema = z.object({
   // „weiterspinnen": aus der offenen Ausgangslage eine vollständige Geschichte
   // entwickeln (Zuspitzung, Wendepunkt, Ende) statt sie nur zu gliedern.
   weiterspinnen: z.boolean().optional().default(false),
+  // Ton und Sprache – als String ohne Allowlist (unbekannt = kein Ton-Block).
+  ton: z.string().trim().max(40).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -73,8 +75,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenarioId, handlung, laenge, format, zusatz, kreativ, weiterspinnen } =
-      parsed.data;
+    const {
+      scenarioId,
+      handlung,
+      laenge,
+      format,
+      zusatz,
+      kreativ,
+      weiterspinnen,
+      ton,
+    } = parsed.data;
     const anzahl = arcStationen(laenge);
 
     const rows = await prisma.character.findMany({
@@ -120,6 +130,7 @@ export async function POST(request: Request) {
       zusatz,
       sparks,
       weiterspinnen,
+      ton,
     );
 
     // Die System-Rolle folgt dem Auftrag: gliedern oder weiterentwickeln.

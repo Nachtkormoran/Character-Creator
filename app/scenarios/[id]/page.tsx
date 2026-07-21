@@ -26,12 +26,15 @@ import {
   DEFAULT_ARC_FORMAT,
   DEFAULT_ARC_LENGTH,
   DEFAULT_KAPITEL_COUNT,
+  DEFAULT_STORY_TONE,
   MAX_PLOT_VARIANTS,
   SCENARIO_LABELS,
+  STORY_TONES,
   normalizeScenarioDetails,
   type ArcFormat,
   type ArcLength,
   type KapitelCount,
+  type StoryTone,
   type GeneratedCharacter,
   type PlotPerson,
   type PlotVariants,
@@ -95,6 +98,8 @@ export default function ScenarioDetailPage({
     weiterspinnen: boolean;
     /** Wie viele Kapitel ein „Kapitel ableiten" erzeugt. */
     kapitelAnzahl: KapitelCount;
+    /** Ton und Sprache – für Arc **und** Kapitel. */
+    ton: StoryTone;
   }>({
     laenge: DEFAULT_ARC_LENGTH,
     format: DEFAULT_ARC_FORMAT,
@@ -102,6 +107,7 @@ export default function ScenarioDetailPage({
     kreativ: false,
     weiterspinnen: false,
     kapitelAnzahl: DEFAULT_KAPITEL_COUNT,
+    ton: DEFAULT_STORY_TONE,
   });
   /** Welche Station gerade Kapitel erzeugt, und ein etwaiger Fehler dazu. */
   const [kapitelBusy, setKapitelBusy] = useState<number | null>(null);
@@ -178,6 +184,12 @@ export default function ScenarioDetailPage({
    * Entwurfs. Nicht gespeichert (beschreibt einen Lauf).
    */
   const [handlungWeiterspinnen, setHandlungWeiterspinnen] = useState(false);
+
+  /**
+   * Ton und Sprache des Handlungsentwurfs (eigen neben dem Story-Arc-Ton, damit
+   * man Entwurf und Arc unabhängig einstellen kann). Nicht gespeichert.
+   */
+  const [handlungTon, setHandlungTon] = useState<StoryTone>(DEFAULT_STORY_TONE);
 
   // -------------------------------------------------------------------------
   // Weltbild des Szenarios
@@ -306,6 +318,7 @@ export default function ScenarioDetailPage({
           zusatz.handlung ?? "",
           basis,
           handlungWeiterspinnen,
+          handlungTon,
         );
         const items = [...aktuelleVarianten(), handlung];
         setVarianten(items);
@@ -505,6 +518,7 @@ export default function ScenarioDetailPage({
         zusatz: arcParams.zusatz,
         kreativ: arcParams.kreativ,
         weiterspinnen: arcParams.weiterspinnen,
+        ton: arcParams.ton,
       });
       setStoryArc(neu);
     } catch (e) {
@@ -533,7 +547,11 @@ export default function ScenarioDetailPage({
           beschreibung: stufe.beschreibung,
           figuren: stufe.figuren,
         },
-        { kreativ: arcParams.kreativ, anzahl: arcParams.kapitelAnzahl },
+        {
+          kreativ: arcParams.kreativ,
+          anzahl: arcParams.kapitelAnzahl,
+          ton: arcParams.ton,
+        },
       );
       setStoryArc((arc) => ({
         stufen: arc.stufen.map((s, k) =>
@@ -878,6 +896,27 @@ export default function ScenarioDetailPage({
           </div>
         )}
         <div className="mb-3 flex flex-col gap-2">
+          {/*
+            Ton und Sprache des Handlungsentwurfs – eigener Ton neben dem des
+            Story Arcs, damit Entwurf und Arc unabhängig einstellbar sind.
+          */}
+          <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70">
+            <span>Ton:</span>
+            <select
+              value={handlungTon}
+              onChange={(e) => setHandlungTon(e.target.value as StoryTone)}
+              disabled={saving || generatingField !== null}
+              title="Ton und Sprache des Handlungsentwurfs – nimmt den Ton der späteren Geschichte vorweg"
+              className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+            >
+              {STORY_TONES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
           {/*
             Handlung weiterspinnen – **immer** sichtbar, denn es gilt auch für
             den frischen Entwurf: eine vollständige Geschichte (mit Ende) statt

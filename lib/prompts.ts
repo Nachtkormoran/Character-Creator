@@ -1,4 +1,4 @@
-import { DEFAULT_STORY_HOOK_ANCHOR, TRAIT_LABELS } from "./schema";
+import { DEFAULT_STORY_HOOK_ANCHOR, TRAIT_LABELS, toneHint } from "./schema";
 import { DEFAULT_GENRE, genreLabel } from "./templates";
 import type { ScenarioSamples } from "./scenarioSamples";
 import type {
@@ -13,6 +13,20 @@ import type {
 function line(label: string, value?: string): string {
   const v = (value || "").trim();
   return v ? `- ${label}: ${v}\n` : "";
+}
+
+/**
+ * Der **Ton-Block** für Handlungsentwurf, Story Arc und Kapitel – an einer
+ * Stelle, damit derselbe Ton überall gleich formuliert ist. Leer bei `neutral`
+ * (oder unbekannt): dann bleibt der Prompt wie bisher. Der Ton beschreibt, *wie*
+ * geschrieben wird, und ist der Sache – Zerlegung, Figurenbindung – nicht
+ * übergeordnet: Er ändert die Sprache, nicht den Inhalt.
+ */
+function tonHinweis(ton?: string): string {
+  const hint = toneHint(ton ?? "");
+  return hint
+    ? `\nTon und Sprache (er nimmt den Ton der späteren Geschichte vorweg): ${hint}\n`
+    : "";
 }
 
 /**
@@ -365,6 +379,8 @@ export function buildScenarioPlotPrompt(
    * Figuren wie bisher.
    */
   basis?: string,
+  /** **Ton und Sprache** (`STORY_TONES`-Wert). Leer/`neutral` = ohne Ton-Block. */
+  ton?: string,
   /**
    * **Handlung weiterspinnen**: Statt einer Ausgangslage mit offenem Ausgang
    * skizziert der Entwurf eine **vollständige Geschichte** – von der
@@ -430,6 +446,8 @@ export function buildScenarioPlotPrompt(
     ? `\nBesonders wichtig – zusätzliche Wünsche für diesen Entwurf:\n${zusatz.trim()}\n`
     : "";
 
+  const tonBlock = tonHinweis(ton);
+
   // Auftrag: zwei Achsen, unabhängig voneinander. **Basis** – frisch aus Welt
   // und Figuren oder aus einem vorhandenen Entwurf. **Weiterspinnen** – eine
   // offene Ausgangslage oder eine vollständige Geschichte bis zum Ende.
@@ -478,7 +496,7 @@ ${laengeZeile}
 - Alles muss den Regeln des Szenarios gehorchen. Was dort gilt, gilt auch hier.
 ${ergebnisAnforderung}
 - Reiner Fließtext auf Deutsch, ohne Markdown, ohne Überschriften, ohne Aufzählung.
-${zusatzBlock}
+${tonBlock}${zusatzBlock}
 Antworte mit nichts als dem Entwurf selbst.`;
 }
 
@@ -535,6 +553,8 @@ export function buildStoryArcPrompt(
    * erfinden, obwohl der Zerlege-Modus „kein neues Ende" verlangt.
    */
   weiterspinnen?: boolean,
+  /** **Ton und Sprache** (`STORY_TONES`-Wert). Leer/`neutral` = ohne Ton-Block. */
+  ton?: string,
 ): string {
   /** Rückt einen mehrzeiligen Block ein, damit die Zuordnung zur Figur hält. */
   const einrücken = (text: string, tiefe = "     ") =>
@@ -646,7 +666,7 @@ ${kernAnforderung}
 ${formatZeile}
 - Titel kurz und prägnant (2–5 Wörter). Beschreibung als Fließtext, ohne Nummerierung, ohne Aufzählungszeichen.
 - Alles auf Deutsch.
-${sparksBlock}${zusatzBlock}`;
+${tonHinweis(ton)}${sparksBlock}${zusatzBlock}`;
 }
 
 /**
@@ -672,6 +692,8 @@ export function buildStoryArcChaptersPrompt(
     /** Spanne der Kapitelzahl. Vorgabe 2–3 (die bisherige feste Zahl). */
     min?: number;
     max?: number;
+    /** **Ton und Sprache** (`STORY_TONES`-Wert). */
+    ton?: string;
   } = {},
 ): string {
   const kreativ = !!options.kreativ;
@@ -715,7 +737,7 @@ Anforderungen:
 ${ausarbeitung}
 - Jedes Kapitel trägt die Handlung ein Stück weiter; keine zwei, die dasselbe sagen.
 - Alles auf Deutsch, ohne Nummerierung und ohne Aufzählungszeichen im Text.
-${sparksBlock}`;
+${tonHinweis(options.ton)}${sparksBlock}`;
 }
 
 /**

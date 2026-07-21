@@ -697,6 +697,54 @@ export function kapitelSpanne(value: string): { min: number; max: number } {
 }
 
 /**
+ * **Ton und Sprache** der Erzeugung – geteilt von Handlungsentwurf, Story Arc
+ * und Kapiteln, damit derselbe Ton die spätere Geschichte durchzieht. Ein
+ * Lauf-Parameter (nicht gespeichert).
+ *
+ * `neutral` trägt bewusst **keinen** `hint`: dann kommt kein Ton-Block in den
+ * Prompt und der Text entsteht wie bisher. Der `hint` ist die Anweisung an das
+ * Modell, **wie** geschrieben wird (nicht **was**) – Wortwahl, Rhythmus,
+ * Stimmung. Er beschreibt nie den Inhalt, sodass derselbe Ton in jeder Welt
+ * funktioniert.
+ */
+export const STORY_TONES = [
+  { value: "neutral", label: "Neutral", hint: "" },
+  {
+    value: "leidenschaftlich",
+    label: "Leidenschaftlich",
+    hint: "Schreibe leidenschaftlich und intensiv: große Gefühle, Nähe und Dringlichkeit. Kraftvolle Verben, ein drängender Rhythmus, hoher emotionaler Einsatz – der Text soll brennen.",
+  },
+  {
+    value: "romantisch",
+    label: "Romantisch",
+    hint: "Schreibe romantisch und gefühlvoll: Sehnsucht, zarte Nähe, Blicke und Berührungen. Warme, sinnliche Bilder und ein weicher Rhythmus, das Herz im Vordergrund.",
+  },
+  {
+    value: "derb",
+    label: "Derb / vulgär",
+    hint: "Schreibe derb und ungeschliffen: direkte, drastische Sprache, Kraftausdrücke und Körperlichkeit, kein Blatt vor dem Mund. Roh und ehrlich statt gefällig – so, wie an rauen Orten wirklich gesprochen und geflucht wird.",
+  },
+  {
+    value: "cool",
+    label: "Cool",
+    hint: "Schreibe cool und unterkühlt: lakonisch, kontrolliert, mit Understatement. Kurze, trockene Sätze und beiläufige Distanz – nichts wird beschworen, alles bleibt lässig.",
+  },
+  {
+    value: "humorvoll",
+    label: "Humorvoll",
+    hint: "Schreibe humorvoll und mit Augenzwinkern: Wortwitz, Situationskomik und ironische Beobachtungen. Leichtfüßig und pointiert, ohne die Figuren bloßzustellen.",
+  },
+] as const;
+
+export type StoryTone = (typeof STORY_TONES)[number]["value"];
+export const DEFAULT_STORY_TONE: StoryTone = "neutral";
+
+/** Die Ton-Anweisung zu einer Wahl (leer bei `neutral` oder unbekannt). */
+export function toneHint(value: string): string {
+  return STORY_TONES.find((t) => t.value === value)?.hint ?? "";
+}
+
+/**
  * **Länge des Arcs** – steuert, in wie viele Stationen der Handlungsentwurf
  * zerlegt wird. Die Zahl bestimmt die Dramaturgie: 3 = Kurzbogen (Anfang,
  * Wende, Ende), 5 = klassischer Fünfakter, 8 = Roman/Kampagne. Beschreibt einen

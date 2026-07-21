@@ -34,6 +34,9 @@ const bodySchema = z.object({
   // „weiterspinnen": eine vollständige Geschichte (bis zum Ende) statt einer
   // offenen Ausgangslage. Unabhängig von `basis`.
   weiterspinnen: z.boolean().optional().default(false),
+  // Ton und Sprache – nicht gespeichert. Ohne Allowlist als String: ein
+  // unbekannter Wert liefert bloß keinen Ton-Block (`toneHint` gibt "").
+  ton: z.string().trim().max(40).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -47,7 +50,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenarioId, name, details, zusatz, basis, weiterspinnen } =
+    const { scenarioId, name, details, zusatz, basis, weiterspinnen, ton } =
       parsed.data;
 
     const rows = await prisma.character.findMany({
@@ -108,6 +111,7 @@ export async function POST(request: Request) {
             characters,
             zusatz,
             basis,
+            ton,
             weiterspinnen,
           ),
         },

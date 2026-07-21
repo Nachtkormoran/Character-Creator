@@ -7,11 +7,13 @@ import {
   KAPITEL_COUNTS,
   MAX_ARC_STUFEN,
   MAX_KAPITEL_PRO_STUFE,
+  STORY_TONES,
   type ArcFormat,
   type ArcLength,
   type ArcPhase,
   type KapitelCount,
   type StoryArc,
+  type StoryTone,
 } from "@/lib/schema";
 import { AutoTextarea } from "./AutoTextarea";
 
@@ -83,7 +85,7 @@ export function StoryArcSection({
   onAbleiten: () => void;
   busy: boolean;
   error: string | null;
-  /** Länge/Format/Zusatz/kreativ/weiterspinnen/Kapitelzahl – nicht gespeichert. */
+  /** Alle Lauf-Parameter der Arc-/Kapitel-Erzeugung – nicht gespeichert. */
   params: {
     laenge: ArcLength;
     format: ArcFormat;
@@ -91,6 +93,7 @@ export function StoryArcSection({
     kreativ: boolean;
     weiterspinnen: boolean;
     kapitelAnzahl: KapitelCount;
+    ton: StoryTone;
   };
   onParamsChange: (p: {
     laenge: ArcLength;
@@ -99,6 +102,7 @@ export function StoryArcSection({
     kreativ: boolean;
     weiterspinnen: boolean;
     kapitelAnzahl: KapitelCount;
+    ton: StoryTone;
   }) => void;
   /** Kapitel für die Station am Index ableiten. */
   onKapitelAbleiten: (stufeIndex: number) => void;
@@ -232,6 +236,22 @@ export function StoryArcSection({
             {ARC_FORMATS.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={params.ton}
+            onChange={(e) =>
+              onParamsChange({ ...params, ton: e.target.value as StoryTone })
+            }
+            disabled={disabled || busy}
+            aria-label="Ton der Sprache"
+            title="Ton und Sprache – gilt für Arc und Kapitel und nimmt den Ton der späteren Geschichte vorweg"
+            className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+          >
+            {STORY_TONES.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.value === "neutral" ? t.label : `Ton: ${t.label}`}
               </option>
             ))}
           </select>
