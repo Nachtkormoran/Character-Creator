@@ -685,6 +685,7 @@ export const ARC_LENGTHS = [
   { value: "kurz", label: "Kurz · 3", stationen: 3 },
   { value: "mittel", label: "Mittel · 5", stationen: 5 },
   { value: "lang", label: "Lang · 8", stationen: 8 },
+  { value: "sehr_lang", label: "Sehr lang · 10", stationen: 10 },
 ] as const;
 
 export type ArcLength = (typeof ARC_LENGTHS)[number]["value"];
