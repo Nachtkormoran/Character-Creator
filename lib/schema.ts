@@ -734,6 +734,11 @@ export const STORY_TONES = [
     label: "Humorvoll",
     hint: "Schreibe humorvoll und mit Augenzwinkern: Wortwitz, Situationskomik und ironische Beobachtungen. Leichtfüßig und pointiert, ohne die Figuren bloßzustellen.",
   },
+  {
+    value: "explizit",
+    label: "Sexuell explizit",
+    hint: "Schildere intime und sexuelle Momente ausdrücklich und detailliert, statt sie auszublenden oder anzudeuten – körperlich, sinnlich und konkret. Genau in diesen Momenten wird die Sprache direkter und etwas vulgär: deftige, körperliche Wörter statt Umschreibungen. Außerhalb solcher Szenen bleibt der Ton normal erzählend. Alle daran Beteiligten sind erwachsen und handeln einvernehmlich.",
+  },
 ] as const;
 
 export type StoryTone = (typeof STORY_TONES)[number]["value"];
