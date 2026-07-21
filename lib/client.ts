@@ -16,6 +16,7 @@ import type {
   CharacterTraits,
   GeneratedCharacter,
   PlotPerson,
+  PlotVariants,
   ScenarioDetails,
   ScenarioDraft,
   Settings,
@@ -628,7 +629,7 @@ export async function getScenario(
 
 export async function updateScenario(
   id: string,
-  patch: { name?: string; details?: ScenarioDetails },
+  patch: { name?: string; details?: ScenarioDetails; plotVariants?: PlotVariants },
 ): Promise<StoredScenario> {
   const res = await fetch(`/api/scenarios/${id}`, {
     method: "PATCH",

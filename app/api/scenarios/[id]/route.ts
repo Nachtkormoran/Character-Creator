@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { scenarioDetailsSchema } from "@/lib/schema";
+import { plotVariantsSchema, scenarioDetailsSchema } from "@/lib/schema";
 import { serializeCharacter, serializeScenario } from "@/lib/serialize";
 
 export const runtime = "nodejs";
@@ -18,6 +18,10 @@ const patchSchema = z
   .object({
     name: z.string().trim().min(1, "Der Name darf nicht leer sein.").max(80),
     details: scenarioDetailsSchema,
+    // Die Handlungsentwürfe kommen als eigenes Feld mit (eigene Spalte). Die
+    // aktive Variante steht zusätzlich in `details.handlung`; der Client hält
+    // beide gleich, `serializeScenario` zieht sie beim Lesen wieder zusammen.
+    plotVariants: plotVariantsSchema,
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, {
@@ -74,9 +78,11 @@ export async function PATCH(request: Request, { params }: Context) {
       );
     }
     const p = parsed.data;
-    const data: { name?: string; details?: string } = {};
+    const data: { name?: string; details?: string; plotVariants?: string } = {};
     if (p.name !== undefined) data.name = p.name;
     if (p.details !== undefined) data.details = JSON.stringify(p.details);
+    if (p.plotVariants !== undefined)
+      data.plotVariants = JSON.stringify(p.plotVariants);
 
     const row = await prisma.scenario.update({
       where: { id },

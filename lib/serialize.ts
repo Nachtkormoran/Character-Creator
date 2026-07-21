@@ -5,12 +5,14 @@ import type {
 } from "@/app/generated/prisma/client";
 import {
   normalizeInputGenre,
+  normalizePlotVariants,
   normalizeScenarioDetails,
   normalizeTraits,
 } from "./schema";
 import type {
   CharacterInput,
   GeneratedCharacter,
+  PlotVariants,
   ScenarioDetails,
 } from "./schema";
 
@@ -121,6 +123,13 @@ export interface StoredScenario {
    */
   details: ScenarioDetails;
   /**
+   * Alle Handlungsentwürfe und welcher aktiv ist. Die aktive Variante ist
+   * zugleich `details.handlung` (dort lesen Export und Personensuche sie) –
+   * `serializeScenario` hält beide konsistent. Immer mindestens gefüllt, wenn
+   * ein Handlungsentwurf existiert; sonst `items: []`.
+   */
+  plotVariants: PlotVariants;
+  /**
    * Vorschau des Weltbilds (WebP, ~40 KB) oder `null`. Das Original
    * (`imageData`, ~2 MB) reist **nie** in einer Antwort mit – es wird bei
    * Bedarf einzeln über `GET /api/scenarios/[id]/image` geholt (Vollbild,
@@ -141,13 +150,22 @@ type ScenarioRow = Omit<Scenario, "imageData"> & {
 };
 
 export function serializeScenario(row: ScenarioRow): StoredScenario {
+  const details = normalizeScenarioDetails(
+    row.details ? JSON.parse(row.details) : {},
+  );
+  const plotVariants = normalizePlotVariants(
+    row.plotVariants ? JSON.parse(row.plotVariants) : null,
+    details.handlung,
+  );
+  // Die aktive Variante ist die maßgebliche Handlung – so bekommt der Client die
+  // beiden nie widersprüchlich (etwa nach einem Import, der nur `details` setzt).
+  details.handlung = plotVariants.items[plotVariants.aktiv] ?? details.handlung;
   return {
     id: row.id,
     createdAt: row.createdAt.toISOString(),
     name: row.name,
-    details: normalizeScenarioDetails(
-      row.details ? JSON.parse(row.details) : {},
-    ),
+    details,
+    plotVariants,
     thumbnail: row.thumbnail ?? null,
     count: row._count?.characters ?? 0,
   };

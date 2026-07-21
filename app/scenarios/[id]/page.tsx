@@ -24,9 +24,11 @@ import { scenarioFileName } from "@/lib/scenarioFile";
 import {
   DEFAULT_IMAGE_STYLE,
   IMAGE_STYLES,
+  MAX_PLOT_VARIANTS,
   SCENARIO_LABELS,
   normalizeScenarioDetails,
   type PlotPerson,
+  type PlotVariants,
   type ScenarioDetails,
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
@@ -47,6 +49,15 @@ export default function ScenarioDetailPage({
   const [details, setDetails] = useState<ScenarioDetails>(
     normalizeScenarioDetails({}),
   );
+  /**
+   * Alle Handlungsentwürfe und der Index des aktiven. Die aktive Variante ist
+   * **zugleich** `details.handlung` – das Textfeld editiert sie dort live;
+   * `varianten` hält alle (auch die aktive, in stabiler Reihenfolge). Beide
+   * werden erst in `aktuelleVarianten()` zusammengeführt, damit nicht jeder
+   * Tastendruck in die Liste gespiegelt werden muss.
+   */
+  const [varianten, setVarianten] = useState<string[]>([]);
+  const [aktiv, setAktiv] = useState(0);
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +139,48 @@ export default function ScenarioDetailPage({
   ]);
 
   /**
+   * Die volle Variantenliste mit der aktiven Zelle auf dem **live editierten**
+   * Text: `details.handlung` ist die Wahrheit über die aktive Variante,
+   * `varianten` hält die übrigen. Zusammengeführt wird erst hier – so kostet das
+   * Tippen im Feld keine Spiegelung in die Liste. Hat ein Szenario noch gar
+   * keine gespeicherte Liste, wird ein von Hand getippter Entwurf zu Variante 1.
+   */
+  function aktuelleVarianten(): string[] {
+    if (varianten.length === 0)
+      return details.handlung.trim() ? [details.handlung] : [];
+    return varianten.map((v, i) => (i === aktiv ? details.handlung : v));
+  }
+
+  /** Auf einen anderen Entwurf umschalten – der bisherige wird zuvor gesichert. */
+  function varianteWaehlen(i: number) {
+    if (generatingField || saving) return;
+    const items = aktuelleVarianten();
+    if (i < 0 || i >= items.length || i === aktiv) return;
+    setVarianten(items);
+    setAktiv(i);
+    setDetails((d) => ({ ...d, handlung: items[i] }));
+  }
+
+  /**
+   * Einen Entwurf löschen. Anders als beim einzelnen Ansatzpunkt fragt es hier
+   * nach – ein Handlungsentwurf ist ein großer, teuer erzeugter Text. Der letzte
+   * verbliebene lässt sich nicht über die Leiste löschen (dann verschwände die
+   * Umschaltung ganz); dafür ist das Feld selbst da.
+   */
+  function varianteLoeschen(i: number) {
+    if (generatingField || saving) return;
+    const items = aktuelleVarianten();
+    if (items.length <= 1) return;
+    if (!confirm(`Entwurf ${i + 1} löschen?`)) return;
+    const rest = items.filter((_, k) => k !== i);
+    const na =
+      i === aktiv ? Math.min(i, rest.length - 1) : i < aktiv ? aktiv - 1 : aktiv;
+    setVarianten(rest);
+    setAktiv(na);
+    setDetails((d) => ({ ...d, handlung: rest[na] }));
+  }
+
+  /**
    * Ein Textfeld per KI erzeugen. Das Ergebnis landet als **ungespeicherte
    * Änderung** im Formular – wie überall sonst muss „Verwerfen" den alten Text
    * zurückbringen können. Die Rückfrage schützt von Hand Geschriebenes.
@@ -139,10 +192,11 @@ export default function ScenarioDetailPage({
    */
   async function handleGenerate(key: keyof ScenarioDetails) {
     if (generatingField) return;
-    // Ort, Zeit und Regeln werden **ergänzt** – dort kann nichts verlorengehen,
-    // also fragt auch nichts nach. Beschreibung und Handlungsentwurf werden
-    // ersetzt; von Hand Geschriebenes wäre sonst still weg.
-    const ersetzt = key === "beschreibung" || key === "handlung";
+    // Ort, Zeit und Regeln werden **ergänzt**, der Handlungsentwurf **angehängt**
+    // (als neue Variante) – in allen dreien kann nichts verlorengehen, also
+    // fragt nichts nach. Nur die Beschreibung wird ersetzt; von Hand
+    // Geschriebenes wäre dort sonst still weg.
+    const ersetzt = key === "beschreibung";
     if (
       ersetzt &&
       details[key].trim() &&
@@ -164,12 +218,23 @@ export default function ScenarioDetailPage({
         );
         setDetails((d) => ({ ...d, [key]: wert }));
       } else if (key === "handlung") {
+        // Jeder Lauf hängt einen **neuen** Entwurf an und schaltet auf ihn um –
+        // der vorige bleibt als Variante erhalten.
+        if (aktuelleVarianten().length >= MAX_PLOT_VARIANTS) {
+          setSaveError(
+            `Mehr als ${MAX_PLOT_VARIANTS} Entwürfe werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
+          );
+          return;
+        }
         const { handlung } = await generateScenarioPlot(
           id,
           name.trim(),
           details,
           zusatz.handlung ?? "",
         );
+        const items = [...aktuelleVarianten(), handlung];
+        setVarianten(items);
+        setAktiv(items.length - 1);
         setDetails((d) => ({ ...d, handlung }));
       } else {
         const { beschreibung } = await generateScenarioDescription(
@@ -263,18 +328,37 @@ export default function ScenarioDetailPage({
       .then(({ scenario, characters }) => {
         setName(scenario.name);
         setDetails(scenario.details);
+        setVarianten(scenario.plotVariants.items);
+        setAktiv(scenario.plotVariants.aktiv);
         setCharacters(characters);
         setThumbnail(scenario.thumbnail);
         setSaved(
-          JSON.stringify({ name: scenario.name, details: scenario.details }),
+          JSON.stringify({
+            name: scenario.name,
+            details: scenario.details,
+            plot: scenario.plotVariants,
+          }),
         );
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Fehler."))
       .finally(() => setLoading(false));
   }, [id]);
 
-  const dirty = saved !== "" && JSON.stringify({ name, details }) !== saved;
+  // Der aktuelle Stand als Vergleichswert für den „Ungespeichert"-Balken. Die
+  // Handlungsvarianten gehören dazu: Umschalten und Anhängen sind Änderungen,
+  // die gespeichert werden wollen.
+  const dirty =
+    saved !== "" &&
+    JSON.stringify({
+      name,
+      details,
+      plot: { items: aktuelleVarianten(), aktiv },
+    }) !== saved;
   const nameValid = name.trim().length > 0;
+  // Für die Reiter-Leiste: die Entwürfe im aktuellen (womöglich ungespeicherten)
+  // Stand. Die Leiste erscheint erst ab zwei – bei einem gibt es nichts zu
+  // wählen, und der Handlungsentwurf steht ohnehin im Feld darunter.
+  const variantenAnzeige = aktuelleVarianten();
 
   // -------------------------------------------------------------------------
   // Personen aus dem Handlungsentwurf
@@ -342,13 +426,17 @@ export default function ScenarioDetailPage({
       const aktualisiert = await updateScenario(id, {
         name: name.trim(),
         details,
+        plotVariants: { items: aktuelleVarianten(), aktiv },
       });
       setName(aktualisiert.name);
       setDetails(aktualisiert.details);
+      setVarianten(aktualisiert.plotVariants.items);
+      setAktiv(aktualisiert.plotVariants.aktiv);
       setSaved(
         JSON.stringify({
           name: aktualisiert.name,
           details: aktualisiert.details,
+          plot: aktualisiert.plotVariants,
         }),
       );
     } catch (e) {
@@ -459,9 +547,12 @@ export default function ScenarioDetailPage({
               const s = JSON.parse(saved) as {
                 name: string;
                 details: ScenarioDetails;
+                plot: PlotVariants;
               };
               setName(s.name);
               setDetails(s.details);
+              setVarianten(s.plot.items);
+              setAktiv(s.plot.aktiv);
             }}
             disabled={saving}
             className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
@@ -476,26 +567,43 @@ export default function ScenarioDetailPage({
         </div>
       )}
 
+      {/*
+        Kopfblock wie in der Charakter-Detailansicht: links der Fließtext (dort
+        die Person, hier die Welt), rechts das Bild mit seiner Steuerung
+        darunter. `order-*` zeigt das Bild auf schmalen Schirmen zuerst – wie
+        beim Charakter.
+      */}
       <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
-        <h2 className="mb-1 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
-          Weltbild
-        </h2>
-        <p className="mb-4 text-xs text-foreground/50">
-          Ein Bild der Welt – Ort, Zeit und Stimmung, ohne Figuren. Entsteht aus
-          den Festlegungen oben.
-        </p>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_240px]">
+          {/* Links: die Beschreibung – der Fließtext über die Welt. */}
+          <div className="order-2 md:order-1">
+            <ScenarioFields
+              details={details}
+              onChange={setDetails}
+              disabled={saving}
+              fields={["beschreibung"]}
+              generatable={ERZEUGBAR}
+              onGenerate={handleGenerate}
+              generatingField={generatingField}
+              zusatz={zusatz}
+              onZusatzChange={(key, value) =>
+                setZusatz((z) => ({ ...z, [key]: value }))
+              }
+            />
+          </div>
 
-        <div className="grid gap-5 sm:grid-cols-[16rem_1fr]">
-          {/* Bildfläche: Kandidat (ungespeichert) hat Vorrang vor dem
-              gespeicherten Bild, sonst ein Platzhalter. */}
-          <div>
+          {/* Rechts: das Weltbild samt Steuerung (Bild oben, Knöpfe darunter). */}
+          <div className="order-1 flex flex-col gap-3 md:order-2">
+            <span className="text-sm font-medium">Weltbild</span>
+
+            {/* Kandidat (ungespeichert) hat Vorrang vor dem gespeicherten Bild. */}
             <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.03]">
               {kandidat ? (
                 <Image
                   src={kandidat}
                   alt="Vorschau des Szenario-Bilds"
                   fill
-                  sizes="16rem"
+                  sizes="240px"
                   className="object-cover"
                   unoptimized
                 />
@@ -510,7 +618,7 @@ export default function ScenarioDetailPage({
                     src={thumbnail}
                     alt={`Weltbild von ${name}`}
                     fill
-                    sizes="16rem"
+                    sizes="240px"
                     className="object-cover"
                     unoptimized
                   />
@@ -521,30 +629,28 @@ export default function ScenarioDetailPage({
                 </div>
               )}
             </div>
+
             {kandidat && (
-              <p className="mt-1 text-center text-xs text-amber-700 dark:text-amber-400">
+              <p className="text-center text-xs text-amber-700 dark:text-amber-400">
                 Vorschau – noch nicht gespeichert
               </p>
             )}
-          </div>
 
-          {/* Steuerung */}
-          <div className="flex flex-col gap-3">
             {kandidat ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2">
                 <button
                   type="button"
                   onClick={bildUebernehmen}
                   disabled={bildBusy}
-                  className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                  className="w-full rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
                 >
-                  {bildBusy ? "Speichere …" : "Als Szenario-Bild speichern"}
+                  {bildBusy ? "Speichere …" : "Übernehmen"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setKandidat(null)}
                   disabled={bildBusy}
-                  className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                  className="w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
                 >
                   Verwerfen
                 </button>
@@ -586,18 +692,18 @@ export default function ScenarioDetailPage({
                     onChange={(e) => setBildZusatz(e.target.value)}
                     disabled={bildBusy}
                     maxLength={1000}
-                    placeholder="z. B. Regen, Dämmerung, Blick von oben"
+                    placeholder="z. B. Regen, Dämmerung"
                     title="Zusätzliche Wünsche fürs Bild – Perspektive, Lichtstimmung, Wetter. Wird nicht gespeichert."
                     className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-col gap-2">
                   <button
                     type="button"
                     onClick={bildErzeugen}
                     disabled={bildBusy}
-                    className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                    className="w-full rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
                   >
                     {bildBusy
                       ? "Erzeuge …"
@@ -605,24 +711,26 @@ export default function ScenarioDetailPage({
                         ? "✨ Neu erzeugen"
                         : "✨ Bild erzeugen"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => dateiWahl.current?.click()}
-                    disabled={bildBusy}
-                    className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
-                  >
-                    Hochladen
-                  </button>
-                  {thumbnail && (
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={bildLoeschen}
+                      onClick={() => dateiWahl.current?.click()}
                       disabled={bildBusy}
-                      className="rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 disabled:opacity-50 dark:text-red-400"
+                      className="flex-1 rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
                     >
-                      Löschen
+                      Hochladen
                     </button>
-                  )}
+                    {thumbnail && (
+                      <button
+                        type="button"
+                        onClick={bildLoeschen}
+                        disabled={bildBusy}
+                        className="flex-1 rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 disabled:opacity-50 dark:text-red-400"
+                      >
+                        Löschen
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <input
                   ref={dateiWahl}
@@ -655,6 +763,99 @@ export default function ScenarioDetailPage({
           details={details}
           onChange={setDetails}
           disabled={saving}
+          fields={["genre", "ort", "zeit", "regeln"]}
+          generatable={ERZEUGBAR}
+          onGenerate={handleGenerate}
+          generatingField={generatingField}
+          zusatz={zusatz}
+          onZusatzChange={(key, value) =>
+            setZusatz((z) => ({ ...z, [key]: value }))
+          }
+        />
+      </section>
+
+      {/*
+        Der Handlungsentwurf steht als eigene Karte unter den Festlegungen: Er
+        handelt von den Figuren und ihrer Geschichte, nicht von der Welt selbst.
+        Das Feld trägt seine eigene Beschriftung („Handlungsentwurf"), deshalb
+        hier keine zusätzliche Überschrift.
+      */}
+      <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+        {/*
+          Reiter-Leiste über dem Feld: zwischen mehreren Handlungsentwürfen
+          umschalten. Erscheint erst ab zwei Entwürfen – „✨ Neu erzeugen" im
+          Feld-Kopf hängt jeweils einen weiteren an, statt den vorigen zu
+          ersetzen. Die **aktive** Variante steht im Feld darunter und geht in
+          Personensuche und Export.
+        */}
+        {variantenAnzeige.length >= 1 && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs font-medium text-foreground/50">
+              Entwürfe:
+            </span>
+            {variantenAnzeige.map((text, i) => {
+              // Der letzte verbliebene Entwurf trägt kein ✕ – er lässt sich nicht
+              // über die Leiste löschen, und ohne Löschknopf braucht die Kachel
+              // rechts wieder ihren vollen Rand.
+              const loeschbar = variantenAnzeige.length >= 2;
+              return (
+                <span
+                  key={i}
+                  className={`inline-flex items-center gap-1 rounded-full border text-xs transition ${
+                    i === aktiv
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-black/15 hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => varianteWaehlen(i)}
+                    disabled={saving || generatingField !== null}
+                    title={text.trim().slice(0, 120) || "(leerer Entwurf)"}
+                    className={`py-1 pl-2.5 font-medium disabled:opacity-50 ${
+                      loeschbar ? "pr-1" : "pr-2.5"
+                    }`}
+                  >
+                    Entwurf {i + 1}
+                  </button>
+                  {loeschbar && (
+                    <button
+                      type="button"
+                      onClick={() => varianteLoeschen(i)}
+                      disabled={saving || generatingField !== null}
+                      title={`Entwurf ${i + 1} löschen`}
+                      aria-label={`Entwurf ${i + 1} löschen`}
+                      className={`rounded-full py-1 pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
+                        i === aktiv
+                          ? "hover:text-red-300"
+                          : "hover:text-red-600 dark:hover:text-red-400"
+                      }`}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </span>
+              );
+            })}
+            {/*
+              Bei genau einem Entwurf ist die Leiste keine Umschaltung, sondern
+              ein Hinweis: Sie macht sichtbar, dass „Neu erzeugen" einen weiteren
+              anlegt, statt diesen zu ersetzen. Ohne das käme niemand mit nur
+              einem Entwurf auf die Idee, dass mehrere nebeneinander möglich sind.
+            */}
+            {variantenAnzeige.length === 1 && (
+              <span className="text-xs text-foreground/50">
+                · „✨ Neu erzeugen“ legt einen weiteren an, statt diesen zu
+                ersetzen
+              </span>
+            )}
+          </div>
+        )}
+        <ScenarioFields
+          details={details}
+          onChange={setDetails}
+          disabled={saving}
+          fields={["handlung"]}
           generatable={ERZEUGBAR}
           onGenerate={handleGenerate}
           generatingField={generatingField}
@@ -665,8 +866,8 @@ export default function ScenarioDetailPage({
         />
 
         {/*
-          Personen aus dem Handlungsentwurf – direkt unter den Festlegungen,
-          weil sie sich auf das Feld darüber beziehen.
+          Personen aus dem Handlungsentwurf – direkt unter dem Feld, weil sie
+          sich darauf beziehen.
 
           Bewusst **auf Knopfdruck** und nicht beim Öffnen der Seite: Die Suche
           ist ein KI-Aufruf, und im Projekt löst jede Erzeugung ein Klick aus.
@@ -707,8 +908,8 @@ export default function ScenarioDetailPage({
               ) : (
                 <div className="mt-3">
                   <p className="mb-2 text-xs text-foreground/60">
-                    Noch nicht im Szenario – anklicken, um daraus einen
-                    Charakter anzulegen:
+                    Noch nicht im Szenario – anklicken, um daraus einen Charakter
+                    anzulegen:
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {personen.map((p) => (
@@ -767,7 +968,7 @@ export default function ScenarioDetailPage({
           // Spalten, engere Abstände. Weil eine kleine Kachel keinen Platz für
           // zwei Zeilen Beschreibung hat, steht hier nur der Name – die
           // Kurzbeschreibung wandert in den `title` (Tooltip beim Überfahren).
-          <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
             {characters.map((c) => {
               const preview = primaryImage(c)?.thumbnail;
               return (
@@ -783,7 +984,7 @@ export default function ScenarioDetailPage({
                         src={preview}
                         alt={c.character.name}
                         fill
-                        sizes="(max-width: 640px) 33vw, 12vw"
+                        sizes="(max-width: 640px) 50vw, 16vw"
                         className="object-cover"
                         unoptimized
                       />

@@ -454,7 +454,7 @@ export const SCENARIO_HINTS: Record<keyof ScenarioDetails, string> = {
   regeln:
     "Was in diesem Szenario gilt und für alle Figuren darin wahr ist – Technikstand, Magie, gesellschaftliche Ordnung, Tabus.",
   beschreibung:
-    "Fließtext über die Welt des Szenarios. Lässt sich aus den Feldern darüber erzeugen und danach frei bearbeiten.",
+    "Fließtext über die Welt des Szenarios. Lässt sich aus den Festlegungen weiter unten erzeugen und danach frei bearbeiten.",
   handlung:
     "Wer gerät hier mit wem worüber aneinander? Lässt sich aus den Festlegungen und den zugeordneten Charakteren erzeugen – dafür muss das Szenario gespeichert sein und Figuren enthalten.",
 };
@@ -524,6 +524,62 @@ export function normalizeScenarioDetails(raw: unknown): ScenarioDetails {
     result[key] = typeof value === "string" ? value : "";
   }
   return result as ScenarioDetails;
+}
+
+/**
+ * **Mehrere Handlungsentwürfe je Szenario.**
+ *
+ * Ein Szenario kann mehrere Handlungsentwürfe halten, zwischen denen die
+ * Oberfläche umschaltet; genau **einer** ist aktiv (`aktiv` als Index in
+ * `items`). Die aktive Variante ist zugleich `details.handlung` – dort lesen
+ * Export und Personensuche sie unverändert, ohne von den übrigen zu wissen.
+ *
+ * Bewusst eine **eigene** Struktur (und eigene Spalte `Scenario.plotVariants`)
+ * neben `ScenarioDetails`, nicht ein weiteres Feld darin: Wie `storyHooks` am
+ * Charakter ist das eine Liste, die die Oberfläche führt und die erst später
+ * auf Knopfdruck entsteht – kein Bestandteil der Festlegungen, die den Rahmen
+ * der Welt beschreiben.
+ */
+export const MAX_PLOT_VARIANTS = 20;
+
+export interface PlotVariants {
+  items: string[];
+  aktiv: number;
+}
+
+export const plotVariantsSchema = z
+  .object({
+    items: z
+      .array(z.string().trim().max(SCENARIO_MAXLENGTHS.handlung))
+      .max(MAX_PLOT_VARIANTS),
+    aktiv: z.number().int().nonnegative(),
+  })
+  .refine((v) => (v.items.length === 0 ? v.aktiv === 0 : v.aktiv < v.items.length), {
+    message: "Die aktive Variante liegt außerhalb der Liste.",
+  });
+
+/**
+ * Bringt einen gespeicherten (oder fehlenden) Variantensatz in Form und hält
+ * ihn mit `details.handlung` konsistent:
+ *
+ * - Fehlen gespeicherte Varianten (Altbestand, Import), wird die vorhandene
+ *   `handlung` – sofern nicht leer – zur ersten und einzigen Variante. So hat
+ *   jedes Szenario mit einem Handlungsentwurf genau eine Variante, ohne dass
+ *   irgendwo ein Sonderfall „keine Varianten" nötig wäre.
+ * - Ein `aktiv` außerhalb des gültigen Bereichs fällt auf 0 zurück.
+ */
+export function normalizePlotVariants(
+  raw: unknown,
+  handlung: string,
+): PlotVariants {
+  const src = (raw ?? {}) as { items?: unknown; aktiv?: unknown };
+  let items = Array.isArray(src.items)
+    ? src.items.filter((x): x is string => typeof x === "string")
+    : [];
+  if (items.length === 0) items = handlung.trim() ? [handlung] : [];
+  let aktiv = typeof src.aktiv === "number" ? src.aktiv : 0;
+  if (!Number.isInteger(aktiv) || aktiv < 0 || aktiv >= items.length) aktiv = 0;
+  return { items, aktiv };
 }
 
 /**

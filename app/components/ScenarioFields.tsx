@@ -181,6 +181,7 @@ export function ScenarioFields({
   details,
   onChange,
   disabled = false,
+  fields,
   generatable,
   onGenerate,
   generatingField = null,
@@ -190,6 +191,17 @@ export function ScenarioFields({
   details: ScenarioDetails;
   onChange: (details: ScenarioDetails) => void;
   disabled?: boolean;
+  /**
+   * Welche Felder in welcher Reihenfolge gerendert werden. Ohne Angabe **alle**
+   * (das Anlege-Formular zeigt das ganze Szenario auf einmal). Die
+   * Detailansicht ruft die Komponente dagegen **mehrfach** mit je einer
+   * Teilmenge auf – Beschreibung neben dem Bild, dann Genre/Ort/Zeit/Regeln,
+   * dann der Handlungsentwurf. So bleibt die Feld-Logik (Erzeugen, Würfel,
+   * Stichwörter, Zähler) an genau einer Stelle, statt je Aufrufer neu gebaut zu
+   * werden. Die gemeinsame `generatingField`-Prop hält die Instanzen synchron –
+   * ein laufender Lauf sperrt die Knöpfe in allen.
+   */
+  fields?: Array<keyof ScenarioDetails>;
   /**
    * Welche Felder einen KI-Knopf bekommen. Bewusst von der aufrufenden Seite
    * bestimmt und nicht hier festgelegt: das Anlege-Formular kann noch keinen
@@ -222,14 +234,28 @@ export function ScenarioFields({
   const controlClass =
     "w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
 
+  // Die **Inhalts-Textfelder** (Ort, Zeit, Regeln, Beschreibung,
+  // Handlungsentwurf) tragen keinen eigenen weißen Kasten, sondern nehmen die
+  // Farbe ihres Umfelds an (`bg-transparent`) – so treten die Texte in den
+  // Vordergrund statt der Eingabekästen, wie die randlose Beschreibung in der
+  // Charakter-Detailansicht. Die **Anweisungsfelder** (Stichwörter) und das
+  // Genre-Auswahlfeld bleiben dagegen weiß: Sie sind Bedienelemente, keine
+  // Inhalte, und sollen sich abheben.
+  const contentClass =
+    "w-full rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:focus:border-white/40";
+
   /** Knöpfe und Stichwort-Feld in der Kopfzeile – gleiche Höhe, gleicher Rand. */
   const kopfzeilenClass =
     "rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 dark:border-white/15";
 
+  // Ohne `fields` alle Felder in Schema-Reihenfolge; mit `fields` genau die
+  // genannten, in genau dieser Reihenfolge.
+  const feldListe =
+    fields ?? (Object.keys(SCENARIO_LABELS) as Array<keyof ScenarioDetails>);
+
   return (
     <div className="flex flex-col gap-4">
-      {(Object.keys(SCENARIO_LABELS) as Array<keyof ScenarioDetails>).map(
-        (key) => {
+      {feldListe.map((key) => {
           // Explizite Verknüpfung statt umschließendem `<label>`: In der
           // Kopfzeile steht neben der Beschriftung ein **zweites** Eingabefeld
           // (die Stichwörter). Umschlösse das Label beide, wäre für
@@ -364,7 +390,7 @@ export function ScenarioFields({
                   disabled={disabled}
                   rows={MINDESTZEILEN[key] ?? 6}
                   maxLength={SCENARIO_MAXLENGTHS[key]}
-                  className={controlClass}
+                  className={contentClass}
                 />
               ) : (
                 <input
@@ -404,8 +430,7 @@ export function ScenarioFields({
               </div>
             </div>
           );
-        },
-      )}
+        })}
     </div>
   );
 }

@@ -45,6 +45,14 @@ model Scenario {
   // Optional: Szenarien von vor diesem Feld haben keine Festlegungen.
   details    String?
 
+  // Mehrere Handlungsentwürfe je Szenario als JSON `{ items, aktiv }` – die
+  // **aktive** Variante steht zusätzlich als `details.handlung` (dort lesen sie
+  // Export und Personensuche unverändert). Eigene Spalte statt in `details`,
+  // wie `Character.storyHooks` neben `traits` liegt: eine Liste, die die
+  // Oberfläche hält und die erst später auf Knopfdruck entsteht.
+  // Optional – Altbestände haben nur die eine `details.handlung`.
+  plotVariants String?
+
   // **Ein** Weltbild je Szenario (Establishing-Shot des Ortes, ohne Figuren) –
   // anders als beim Charakter, der beliebig viele Bilder mit Primärmarkierung
   // hat. Ein Szenario ist eine Stimmung, kein Steckbrief; ein repräsentatives

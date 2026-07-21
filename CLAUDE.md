@@ -102,8 +102,9 @@ als eines, das immer dasselbe ist.
 - `GET|POST /api/scenarios` – Liste / Anlegen (`details` optional, s. u.).
 - `GET|PATCH|DELETE /api/scenarios/[id]` – **GET liefert das Szenario samt
   seiner Charaktere** (ohne Bild-Originale, nur Thumbnails – wie die
-  Charakter-Liste); PATCH ist ein Teil-Update von `name` und `details`.
-  **Das Szenario-Bild nicht** – es hat eine eigene Route (s. u.).
+  Charakter-Liste); PATCH ist ein Teil-Update von `name`, `details` und
+  `plotVariants` (die Handlungsentwürfe, s. u.). **Das Szenario-Bild nicht** –
+  es hat eine eigene Route (s. u.).
 - `GET|PUT|DELETE /api/scenarios/[id]/image` – das **eine** Weltbild eines
   Szenarios. GET ist der einzige Weg ans Original (Vollbild, Export), PUT
   setzt/ersetzt es (`imageData` + `thumbnail`), DELETE entfernt es; PUT/DELETE
@@ -580,6 +581,40 @@ Drei Zuschnitte, die zusammengehören:
   Hinweis, was zu tun ist. Ein Handlungsentwurf über niemanden wäre teurer
   Unsinn. Aus demselben Grund ist der Knopf im **Anlege-Formular gar nicht
   vorhanden** – dort gibt es weder Id noch Besetzung.
+
+**Mehrere Entwürfe je Szenario (Varianten).** Jeder Klick auf „✨ Neu erzeugen"
+**hängt einen weiteren** Handlungsentwurf an, statt den vorigen zu ersetzen –
+dieselbe Lehre wie bei den Ansatzpunkten: Der häufigste Fall ist, dass ein
+Entwurf den Konflikt besser trifft und ein anderer das Ende, und man will beide
+nebeneinander halten und das Beste wählen. Eine **Reiter-Leiste** über dem Feld
+(erscheint ab zwei Entwürfen) schaltet zwischen ihnen um; ein ✕ am Reiter löscht
+einen (mit Rückfrage – ein Entwurf ist ein großer, teuer erzeugter Text, anders
+als ein einzelner Ansatzpunkt). Der letzte verbliebene lässt sich über die
+Leiste nicht löschen. Die Rückfrage **vor** dem Erzeugen ist entfallen (der Knopf
+ersetzt nichts mehr); die vor dem Löschen der Beschreibung bleibt.
+
+**Genau eine Variante ist aktiv**, und die ist zugleich `details.handlung` –
+dort lesen **Personensuche und Export** sie unverändert weiter, ohne von den
+übrigen zu wissen. Deshalb liegen die Varianten in einer **eigenen Spalte
+`Scenario.plotVariants`** (JSON `{ items, aktiv }`), nicht als weiteres Feld in
+`details`: Es ist eine Liste, die die Oberfläche führt und die erst auf
+Knopfdruck entsteht – genau wie `storyHooks` neben `traits` liegt und nicht
+darin. So bleiben `ScenarioDetails` und alle `SCENARIO_LABELS`-Karten
+unangetastet, und kein Verbraucher von `handlung` muss etwas wissen.
+
+Im Client ist `details.handlung` die **Wahrheit über die aktive Variante** (das
+Textfeld editiert sie dort live), `varianten` hält die übrigen; zusammengeführt
+wird erst in `aktuelleVarianten()` – so kostet kein Tastendruck eine Spiegelung
+in die Liste. `serializeScenario` erzwingt beim Lesen die Gleichheit
+`details.handlung === items[aktiv]`, damit der Client die beiden nie
+widersprüchlich bekommt (etwa nach einem Import, der nur `details` setzt). Ein
+Altbestand ohne die Spalte bekommt seine vorhandene `handlung` als **einzige**
+Variante (`normalizePlotVariants`) – kein Sonderfall „keine Varianten" nötig.
+Die Obergrenze `MAX_PLOT_VARIANTS` (20) prüft der Client vor dem Erzeugen und
+das PATCH-Schema beim Speichern. *Gegen den Dev-Server geprüft* (Testdaten
+danach entfernt): PATCH persistiert `{items, aktiv}`, `handlung` folgt der
+aktiven Variante, ein `aktiv` außerhalb der Liste wird mit 400 abgewiesen, und
+ein Altbestand liefert genau eine Variante mit `items[0] === handlung`.
 
 Daneben steht ein **Zusatzwunsch** (`zusatz`, max. 1000 Zeichen,
 optional): Stichworte und Inhalte, die der nächste Entwurf berücksichtigen soll
@@ -1141,9 +1176,11 @@ mitwachsende Textarea für die editierbaren Textfelder.
 `isPrimary`; `onDelete: Cascade` – Bilder gehen mit dem Charakter),
 `Scenario` (`details` als JSON-String, dazu **ein** Weltbild direkt als
 `imageData` + `thumbnail` am Szenario – anders als der Charakter, der eine eigene
-Bildtabelle hat; `onDelete: SetNull` – beim Löschen des Szenarios bleiben
-Charaktere erhalten) und `Setting` (Key-Value für App-Einstellungen). SQLite
-lokal.
+Bildtabelle hat; `plotVariants` als JSON-String für die Handlungsentwürfe
+`{ items, aktiv }`, eigene Spalte neben `details` wie `storyHooks` neben `traits`
+– s. o. „Mehrere Entwürfe je Szenario"; `onDelete: SetNull` – beim Löschen des
+Szenarios bleiben Charaktere erhalten) und `Setting` (Key-Value für
+App-Einstellungen). SQLite lokal.
 
 ## Nicht-offensichtliche Fallstricke
 
