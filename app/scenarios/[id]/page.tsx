@@ -25,11 +25,13 @@ import { scenarioFileName } from "@/lib/scenarioFile";
 import {
   DEFAULT_ARC_FORMAT,
   DEFAULT_ARC_LENGTH,
+  DEFAULT_KAPITEL_COUNT,
   MAX_PLOT_VARIANTS,
   SCENARIO_LABELS,
   normalizeScenarioDetails,
   type ArcFormat,
   type ArcLength,
+  type KapitelCount,
   type GeneratedCharacter,
   type PlotPerson,
   type PlotVariants,
@@ -89,11 +91,14 @@ export default function ScenarioDetailPage({
     zusatz: string;
     /** Zufällige Impulse + höhere Temperatur, für Arc **und** Kapitel. */
     kreativ: boolean;
+    /** Wie viele Kapitel ein „Kapitel ableiten" erzeugt. */
+    kapitelAnzahl: KapitelCount;
   }>({
     laenge: DEFAULT_ARC_LENGTH,
     format: DEFAULT_ARC_FORMAT,
     zusatz: "",
     kreativ: false,
+    kapitelAnzahl: DEFAULT_KAPITEL_COUNT,
   });
   /** Welche Station gerade Kapitel erzeugt, und ein etwaiger Fehler dazu. */
   const [kapitelBusy, setKapitelBusy] = useState<number | null>(null);
@@ -515,7 +520,7 @@ export default function ScenarioDetailPage({
           beschreibung: stufe.beschreibung,
           figuren: stufe.figuren,
         },
-        { kreativ: arcParams.kreativ },
+        { kreativ: arcParams.kreativ, anzahl: arcParams.kapitelAnzahl },
       );
       setStoryArc((arc) => ({
         stufen: arc.stufen.map((s, k) =>

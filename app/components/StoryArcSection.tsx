@@ -4,11 +4,13 @@ import {
   ARC_FORMATS,
   ARC_LENGTHS,
   ARC_PHASES,
+  KAPITEL_COUNTS,
   MAX_ARC_STUFEN,
   MAX_KAPITEL_PRO_STUFE,
   type ArcFormat,
   type ArcLength,
   type ArcPhase,
+  type KapitelCount,
   type StoryArc,
 } from "@/lib/schema";
 import { AutoTextarea } from "./AutoTextarea";
@@ -81,18 +83,20 @@ export function StoryArcSection({
   onAbleiten: () => void;
   busy: boolean;
   error: string | null;
-  /** Länge/Format/Zusatz/kreativ des nächsten Laufs – nicht gespeichert. */
+  /** Länge/Format/Zusatz/kreativ/Kapitelzahl des Laufs – nicht gespeichert. */
   params: {
     laenge: ArcLength;
     format: ArcFormat;
     zusatz: string;
     kreativ: boolean;
+    kapitelAnzahl: KapitelCount;
   };
   onParamsChange: (p: {
     laenge: ArcLength;
     format: ArcFormat;
     zusatz: string;
     kreativ: boolean;
+    kapitelAnzahl: KapitelCount;
   }) => void;
   /** Kapitel für die Station am Index ableiten. */
   onKapitelAbleiten: (stufeIndex: number) => void;
@@ -434,6 +438,30 @@ export function StoryArcSection({
                         Kapitel ({s.kapitel.length})
                       </span>
                       <div className="flex items-center gap-1.5">
+                        {/*
+                          Wie viele Kapitel das Ableiten erzeugt – ein globaler
+                          Lauf-Parameter (gilt für alle Stationen), aber hier am
+                          Knopf gezeigt, wo er wirkt.
+                        */}
+                        <select
+                          value={params.kapitelAnzahl}
+                          onChange={(e) =>
+                            onParamsChange({
+                              ...params,
+                              kapitelAnzahl: e.target.value as KapitelCount,
+                            })
+                          }
+                          disabled={disabled || kapitelBusy !== null}
+                          aria-label="Anzahl der Kapitel je Ableiten"
+                          title="Wie viele Kapitel erzeugt werden – gilt für alle Stationen"
+                          className={CHIP_BTN}
+                        >
+                          {KAPITEL_COUNTS.map((k) => (
+                            <option key={k.value} value={k.value}>
+                              {k.label}
+                            </option>
+                          ))}
+                        </select>
                         <button
                           type="button"
                           onClick={() => onKapitelAbleiten(i)}
@@ -444,7 +472,7 @@ export function StoryArcSection({
                           }
                           title={
                             s.beschreibung.trim()
-                              ? "Zerlegt diese Station in zwei bis drei Kapitel"
+                              ? "Zerlegt diese Station in Kapitel"
                               : "Erst die Beschreibung der Station füllen"
                           }
                           className={CHIP_BTN}

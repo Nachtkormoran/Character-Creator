@@ -18,6 +18,7 @@ import type {
   CharacterTraits,
   GeneratedCharacter,
   Kapitel,
+  KapitelCount,
   PlotPerson,
   PlotVariants,
   ScenarioDetails,
@@ -696,7 +697,7 @@ export function generateStoryArcChapters(
     beschreibung: string;
     figuren: string[];
   },
-  options: { kreativ?: boolean } = {},
+  options: { kreativ?: boolean; anzahl?: KapitelCount } = {},
 ) {
   return postJson<{ kapitel: Kapitel[] }>("/api/story-arc-chapters", {
     stufe,

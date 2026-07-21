@@ -3,7 +3,12 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { getTextClient, hatKaputteZeichen } from "@/lib/openai";
 import { buildStoryArcChaptersPrompt } from "@/lib/prompts";
-import { MAX_KAPITEL_PRO_STUFE, kapitelListeSchema } from "@/lib/schema";
+import {
+  DEFAULT_KAPITEL_COUNT,
+  KAPITEL_COUNTS,
+  kapitelListeSchema,
+  kapitelSpanne,
+} from "@/lib/schema";
 import { randomSparks } from "@/lib/storyArcSparks";
 
 export const runtime = "nodejs";
@@ -34,6 +39,12 @@ const bodySchema = z.object({
   // „kreativ": längere, ausgemalte Kapitel mit erlaubter Detailerfindung plus
   // zufällige Impulse; die Temperatur steigt.
   kreativ: z.boolean().optional().default(false),
+  // Wie viele Kapitel erzeugt werden (Spanne) – wie die Arc-Länge nicht
+  // gespeichert.
+  anzahl: z
+    .enum(KAPITEL_COUNTS.map((k) => k.value) as [string, ...string[]])
+    .optional()
+    .default(DEFAULT_KAPITEL_COUNT),
 });
 
 export async function POST(request: Request) {
@@ -47,12 +58,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const { stufe, kreativ } = parsed.data;
+    const { stufe, kreativ, anzahl } = parsed.data;
+    const { min, max } = kapitelSpanne(anzahl);
 
     const { client: openai, model, extraParams } = await getTextClient();
     const prompt = buildStoryArcChaptersPrompt(stufe, {
       kreativ,
       sparks: kreativ ? randomSparks(1, 2) : undefined,
+      min,
+      max,
     });
 
     const versuch = () =>
@@ -96,10 +110,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Nur Kapitel mit Inhalt, und höchstens so viele wie die Stufe trägt.
+    // Nur Kapitel mit Inhalt, und höchstens so viele wie gewählt (die gewählte
+    // Obergrenze ist ≤ MAX_KAPITEL_PRO_STUFE, hält also auch die Speichergrenze).
     const kapitel = ergebnis.kapitel
       .filter((k) => k.titel.trim() || k.inhalt.trim())
-      .slice(0, MAX_KAPITEL_PRO_STUFE);
+      .slice(0, max);
 
     return NextResponse.json({ kapitel });
   } catch (err) {

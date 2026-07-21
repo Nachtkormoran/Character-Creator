@@ -605,8 +605,9 @@ ${sparksBlock}${zusatzBlock}`;
 }
 
 /**
- * Baut den Prompt für die **Kapitel einer Story-Arc-Station** – zwei bis drei
- * Kapitel, jedes mit Überschrift und zwei bis drei Sätzen.
+ * Baut den Prompt für die **Kapitel einer Story-Arc-Station** – eine wählbare
+ * Zahl (Spanne `min`–`max`), jedes mit Überschrift und zwei bis drei Sätzen (im
+ * Kreativ-Modus mehr).
  *
  * Bewusst die Zerlegung **der Station**, nicht der Besetzung: Kapitel gliedern
  * den Stationstext feiner auf (eine Ebene unter dem Akt), sie erfinden nichts
@@ -620,9 +621,18 @@ export function buildStoryArcChaptersPrompt(
     beschreibung: string;
     figuren: string[];
   },
-  options: { kreativ?: boolean; sparks?: string[] } = {},
+  options: {
+    kreativ?: boolean;
+    sparks?: string[];
+    /** Spanne der Kapitelzahl. Vorgabe 2–3 (die bisherige feste Zahl). */
+    min?: number;
+    max?: number;
+  } = {},
 ): string {
   const kreativ = !!options.kreativ;
+  const min = options.min ?? 2;
+  const max = options.max ?? 3;
+  const anzahlText = `${min} bis ${max} Kapitel`;
   const figuren = stufe.figuren.filter((f) => f.trim());
   const figurenZeile =
     figuren.length > 0 ? `\nBeteiligte Figuren: ${figuren.join(", ")}.` : "";
@@ -644,13 +654,13 @@ export function buildStoryArcChaptersPrompt(
           .join("\n")}\n`
       : "";
 
-  return `Zerlege die folgende Station eines Story Arcs in zwei bis drei Kapitel.
+  return `Zerlege die folgende Station eines Story Arcs in ${anzahlText}.
 
 Station: ${stufe.titel.trim() || "(ohne Titel)"}
 Was in ihr geschieht:
 ${stufe.beschreibung.trim() || "(keine Beschreibung)"}${figurenZeile}
 
-Am Ende müssen zwei bis drei Kapitel dastehen. Sie schreiten die Station in ihrer Reihenfolge ab und decken sie zusammen lückenlos ab.
+Am Ende müssen ${anzahlText} dastehen. Sie schreiten die Station in ihrer Reihenfolge ab und decken sie zusammen lückenlos ab.
 
 Jedes Kapitel besteht aus:
 - einer kurzen Überschrift (2–6 Wörter),

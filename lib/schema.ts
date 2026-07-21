@@ -672,8 +672,29 @@ export const ARC_PHASE_LABELS = Object.fromEntries(
  */
 export const MAX_ARC_STUFEN = 20;
 
-/** Wie viele Kapitel eine Stufe höchstens trägt (erzeugt werden 2–3). */
+/** Wie viele Kapitel eine Stufe höchstens trägt (der größten Wahl entsprechend). */
 export const MAX_KAPITEL_PRO_STUFE = 8;
+
+/**
+ * **Wie viele Kapitel ein „Kapitel ableiten" erzeugt** – als Spanne, aus der das
+ * Modell wählt. Wie die Arc-Länge ein Lauf-Parameter (nicht gespeichert). Die
+ * größte `max` bleibt ≤ `MAX_KAPITEL_PRO_STUFE`, damit die Wahl nie über die
+ * Speichergrenze hinausläuft.
+ */
+export const KAPITEL_COUNTS = [
+  { value: "wenig", label: "2–3", min: 2, max: 3 },
+  { value: "mittel", label: "4–5", min: 4, max: 5 },
+  { value: "viel", label: "6–8", min: 6, max: 8 },
+] as const;
+
+export type KapitelCount = (typeof KAPITEL_COUNTS)[number]["value"];
+export const DEFAULT_KAPITEL_COUNT: KapitelCount = "wenig";
+
+/** Spanne (min/max) zu einer Kapitelzahl-Wahl (Fallback: 2–3). */
+export function kapitelSpanne(value: string): { min: number; max: number } {
+  const e = KAPITEL_COUNTS.find((k) => k.value === value);
+  return e ? { min: e.min, max: e.max } : { min: 2, max: 3 };
+}
 
 /**
  * **Länge des Arcs** – steuert, in wie viele Stationen der Handlungsentwurf
