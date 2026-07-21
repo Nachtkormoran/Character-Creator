@@ -171,6 +171,14 @@ export default function ScenarioDetailPage({
    */
   const [handlungAlsBasis, setHandlungAlsBasis] = useState(false);
 
+  /**
+   * Ob der nächste Handlungsentwurf eine **vollständige Geschichte** skizziert
+   * (Checkbox „Handlung weiterspinnen") statt einer offenen Ausgangslage. Gilt
+   * unabhängig von der Basis-Option – frisch wie auf Basis eines vorhandenen
+   * Entwurfs. Nicht gespeichert (beschreibt einen Lauf).
+   */
+  const [handlungWeiterspinnen, setHandlungWeiterspinnen] = useState(false);
+
   // -------------------------------------------------------------------------
   // Weltbild des Szenarios
   // -------------------------------------------------------------------------
@@ -297,6 +305,7 @@ export default function ScenarioDetailPage({
           details,
           zusatz.handlung ?? "",
           basis,
+          handlungWeiterspinnen,
         );
         const items = [...aktuelleVarianten(), handlung];
         setVarianten(items);
@@ -868,27 +877,49 @@ export default function ScenarioDetailPage({
             )}
           </div>
         )}
-        {/*
-          Nächsten Entwurf auf dem aktuellen aufbauen. Erscheint nur, wenn es
-          einen gibt – ohne Grundlage ist die Wahl leer. Die Stichwörter im
-          Feld-Kopf steuern dann zusätzlich, wohin sich die neue Fassung
-          verschiebt.
-        */}
-        {details.handlung.trim() && (
+        <div className="mb-3 flex flex-col gap-2">
+          {/*
+            Handlung weiterspinnen – **immer** sichtbar, denn es gilt auch für
+            den frischen Entwurf: eine vollständige Geschichte (mit Ende) statt
+            der offenen Ausgangslage.
+          */}
           <label
-            className="mb-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
-            title="Der nächste „✨ Neu erzeugen“-Lauf nimmt den angezeigten Entwurf als Grundlage und formt daraus eine neue Fassung – statt frei aus Welt und Figuren zu beginnen. Die Stichwörter wirken zusätzlich."
+            className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+            title="Angehakt skizziert „✨ Neu erzeugen“ eine vollständige Geschichte – von der Ausgangslage über die Zuspitzung bis zu einem Ende – statt einer offenen Ausgangslage. Gilt auch beim Aufbauen auf einem vorhandenen Entwurf."
           >
             <input
               type="checkbox"
-              checked={handlungAlsBasis}
-              onChange={(e) => setHandlungAlsBasis(e.target.checked)}
+              checked={handlungWeiterspinnen}
+              onChange={(e) => setHandlungWeiterspinnen(e.target.checked)}
               disabled={saving || generatingField !== null}
               className="size-4 accent-foreground"
             />
-            aktuellen Handlungsentwurf bei neuem Entwurf verwenden
+            🧵 Handlung weiterspinnen – vollständige Geschichte statt offener
+            Ausgangslage
           </label>
-        )}
+
+          {/*
+            Nächsten Entwurf auf dem aktuellen aufbauen. Erscheint nur, wenn es
+            einen gibt – ohne Grundlage ist die Wahl leer. Die Stichwörter im
+            Feld-Kopf steuern dann zusätzlich, wohin sich die neue Fassung
+            verschiebt.
+          */}
+          {details.handlung.trim() && (
+            <label
+              className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+              title="Der nächste „✨ Neu erzeugen“-Lauf nimmt den angezeigten Entwurf als Grundlage und formt daraus eine neue Fassung – statt frei aus Welt und Figuren zu beginnen. Die Stichwörter wirken zusätzlich."
+            >
+              <input
+                type="checkbox"
+                checked={handlungAlsBasis}
+                onChange={(e) => setHandlungAlsBasis(e.target.checked)}
+                disabled={saving || generatingField !== null}
+                className="size-4 accent-foreground"
+              />
+              aktuellen Handlungsentwurf bei neuem Entwurf verwenden
+            </label>
+          )}
+        </div>
         <ScenarioFields
           details={details}
           onChange={setDetails}

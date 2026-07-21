@@ -31,6 +31,9 @@ const bodySchema = z.object({
   // die anderen Handlungsfelder – der Entwurf ist das längste Feld eines
   // Szenarios. Leer = wie bisher aus Welt und Figuren.
   basis: z.string().trim().max(20000).optional().default(""),
+  // „weiterspinnen": eine vollständige Geschichte (bis zum Ende) statt einer
+  // offenen Ausgangslage. Unabhängig von `basis`.
+  weiterspinnen: z.boolean().optional().default(false),
 });
 
 export async function POST(request: Request) {
@@ -44,7 +47,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenarioId, name, details, zusatz, basis } = parsed.data;
+    const { scenarioId, name, details, zusatz, basis, weiterspinnen } =
+      parsed.data;
 
     const rows = await prisma.character.findMany({
       where: { scenarioId },
@@ -92,8 +96,9 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content:
-            "Du bist Dramaturg. Du entwirfst Ausgangslagen, aus denen sich Geschichten entwickeln, und antwortest ausschließlich mit dem Entwurf selbst.",
+          content: weiterspinnen
+            ? "Du bist Dramaturg. Du entwirfst vollständige Geschichten – von der Ausgangslage bis zu einem Ende – und antwortest ausschließlich mit dem Entwurf selbst."
+            : "Du bist Dramaturg. Du entwirfst Ausgangslagen, aus denen sich Geschichten entwickeln, und antwortest ausschließlich mit dem Entwurf selbst.",
         },
         {
           role: "user",
@@ -103,6 +108,7 @@ export async function POST(request: Request) {
             characters,
             zusatz,
             basis,
+            weiterspinnen,
           ),
         },
       ],

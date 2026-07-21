@@ -365,6 +365,14 @@ export function buildScenarioPlotPrompt(
    * Figuren wie bisher.
    */
   basis?: string,
+  /**
+   * **Handlung weiterspinnen**: Statt einer Ausgangslage mit offenem Ausgang
+   * skizziert der Entwurf eine **vollständige Geschichte** – von der
+   * Ausgangslage über die Zuspitzung bis zu einem Ende. Gilt unabhängig von
+   * `basis`: sowohl beim frischen Entwurf als auch beim Weiterspinnen eines
+   * vorhandenen.
+   */
+  weiterspinnen?: boolean,
 ): string {
   const nutzeBasis = !!basis?.trim();
   const welt =
@@ -422,11 +430,16 @@ export function buildScenarioPlotPrompt(
     ? `\nBesonders wichtig – zusätzliche Wünsche für diesen Entwurf:\n${zusatz.trim()}\n`
     : "";
 
-  // Auftrag und Grundlage hängen daran, ob ein bestehender Entwurf mitkommt:
-  // ohne ihn eine Handlung aus Welt und Figuren, mit ihm eine neue Fassung.
+  // Auftrag: zwei Achsen, unabhängig voneinander. **Basis** – frisch aus Welt
+  // und Figuren oder aus einem vorhandenen Entwurf. **Weiterspinnen** – eine
+  // offene Ausgangslage oder eine vollständige Geschichte bis zum Ende.
   const auftrag = nutzeBasis
-    ? "Überarbeite den vorhandenen Handlungsentwurf zu einer eigenständigen neuen Fassung – dieselbe Welt, dieselben Figuren, aber ein frischer Wurf."
-    : "Entwirf die Handlung für ein Szenario: die Ausgangslage, aus der sich eine Geschichte zwischen diesen Figuren entwickeln kann.";
+    ? weiterspinnen
+      ? "Überarbeite den vorhandenen Handlungsentwurf und spinne ihn zu einer vollständigen Geschichte weiter – dieselbe Welt, dieselben Figuren, aber von der Ausgangslage bis zu einem Ende."
+      : "Überarbeite den vorhandenen Handlungsentwurf zu einer eigenständigen neuen Fassung – dieselbe Welt, dieselben Figuren, aber ein frischer Wurf."
+    : weiterspinnen
+      ? "Entwirf die Handlung für ein Szenario: eine vollständige Geschichte, die sich zwischen diesen Figuren entfaltet – von der Ausgangslage über die Zuspitzung bis zu einem Ende."
+      : "Entwirf die Handlung für ein Szenario: die Ausgangslage, aus der sich eine Geschichte zwischen diesen Figuren entwickeln kann.";
 
   const basisBlock = nutzeBasis
     ? `\nBisheriger Handlungsentwurf – deine Grundlage:\n${basis!.trim()}\n`
@@ -435,6 +448,17 @@ export function buildScenarioPlotPrompt(
   const basisAnforderung = nutzeBasis
     ? "\n- Nimm den bisherigen Entwurf als Ausgangspunkt: Behalte seinen tragenden Konflikt und die beteiligten Figuren, forme daraus aber eine **eigenständige neue Fassung** – kein bloßes Umformulieren, sondern eine echte Alternative, die Schwerpunkte verschiebt und den Auslöser schärft."
     : "";
+
+  // Länge und Ergebnis-Anforderung hängen am Weiterspinnen: eine vollständige
+  // Geschichte braucht etwas mehr Platz und **schreibt** ihr Ende, eine offene
+  // Ausgangslage lässt es bewusst weg.
+  const laengeZeile = weiterspinnen
+    ? "- Drei bis fünf kurze Absätze (insgesamt ca. 1000–1800 Zeichen)."
+    : "- Drei bis vier kurze Absätze (insgesamt ca. 900–1400 Zeichen).";
+
+  const ergebnisAnforderung = weiterspinnen
+    ? "- Skizziere eine **vollständige Geschichte**: von der Ausgangslage über Zuspitzung und Wendepunkt bis zu einem Ende, das aus den Figuren und ihrem Konflikt folgt. Schreibe auch, **wie es ausgeht**."
+    : "- Kein fertiger Plot mit Auflösung: eine Ausgangslage mit offenem Ausgang. Schreibe nicht, wie es endet.";
 
   return `${auftrag}
 
@@ -445,14 +469,14 @@ Diese Figuren gibt es, und nur diese:
 ${figuren}
 ${basisBlock}
 Anforderungen:${basisAnforderung}
-- Drei bis vier kurze Absätze (insgesamt ca. 900–1400 Zeichen).
+${laengeZeile}
 - **Erfinde keine neuen Hauptfiguren.** Arbeite mit den Genannten. Nebenfiguren dürfen vorkommen, aber die Handlung muss von diesen Personen getragen werden.
 - Benenne, **wer was von wem will** und woran es sich entzündet. Ein Konflikt braucht mindestens zwei Personen mit unvereinbaren Absichten.
 - Lies die Beschreibungen genau: Dort steht die Vorgeschichte, und dort liegen die Reibungsflächen zwischen den Figuren. Auch scheinbare Nebensachen aus den Merkmalen – Herkunft, eine Narbe, ein Hobby – taugen als Anknüpfungspunkt.
 - Sind offene Ansatzpunkte genannt, greife sie auf und verbinde sie: Das Interessante entsteht dort, wo das Anliegen der einen die Wunde der anderen trifft.
 - Nenne einen konkreten **Auslöser** – ein Ereignis, ein Termin, eine Nachricht –, der die Lage in Bewegung bringt.
 - Alles muss den Regeln des Szenarios gehorchen. Was dort gilt, gilt auch hier.
-- Kein fertiger Plot mit Auflösung: eine Ausgangslage mit offenem Ausgang. Schreibe nicht, wie es endet.
+${ergebnisAnforderung}
 - Reiner Fließtext auf Deutsch, ohne Markdown, ohne Überschriften, ohne Aufzählung.
 ${zusatzBlock}
 Antworte mit nichts als dem Entwurf selbst.`;

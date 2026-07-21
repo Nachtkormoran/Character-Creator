@@ -655,10 +655,15 @@ export function generateScenarioPlot(
    * Handlungsentwurf verwenden"). Leer = wie bisher aus Welt und Figuren.
    */
   basis = "",
+  /**
+   * „Handlung weiterspinnen": eine vollständige Geschichte statt einer offenen
+   * Ausgangslage. Unabhängig von `basis`.
+   */
+  weiterspinnen = false,
 ) {
   return postJson<{ handlung: string; characters: number }>(
     "/api/scenario-plot",
-    { scenarioId, name, details, zusatz, basis },
+    { scenarioId, name, details, zusatz, basis, weiterspinnen },
   );
 }
 
