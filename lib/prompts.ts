@@ -436,6 +436,97 @@ Antworte mit nichts als dem Entwurf selbst.`;
 }
 
 /**
+ * Baut den Prompt für den **Story Arc** – die dramaturgische Zerlegung eines
+ * Handlungsentwurfs in eine geordnete Folge von Stationen (Fünfakter).
+ *
+ * Das Gegenstück zu `buildScenarioPlotPrompt`: Der Entwurf sagt *worum es geht*,
+ * der Arc *in welcher Reihenfolge es sich entfaltet*. Er erfindet **keine neue
+ * Geschichte**, sondern gliedert die vorhandene – dieselbe Abgrenzung wie
+ * Beschreibung ↔ Handlungsentwurf, eine Fassung derselben Sache auf anderer
+ * Ebene, die der Quelle nie widersprechen darf.
+ *
+ * Die dokumentierten Lehren des Projekts zahlen sich hier direkt aus:
+ *
+ * - **Prüfbarer Endzustand statt Verfahren.** Nicht „arbeite den Entwurf in
+ *   Akte um", sondern: am Ende müssen genau N Stationen dastehen, die den
+ *   Entwurf lückenlos abschreiten und jeweils die Lage verändern. (Wie beim
+ *   „Rahmen + zwei Schauplätze" der Ortserzeugung.)
+ * - **Zerlegung, keine Neuerfindung.** Der Entwurf ist die Obergrenze der
+ *   Wahrheit – die `eng`-Bindung der Ansatzpunkte, hier als Default.
+ * - **Rückbindung mit Nachweis.** Jede Stufe nennt die tragenden Figuren, und
+ *   die müssen aus der Besetzung stammen (grobe Nachprüfung serverseitig).
+ * - **Ausgabeform ausdrücklich.** Keine Nummerierung – Nummern zählt das Modell
+ *   nicht zu „Aufzählung", das musste bei der Ortserzeugung explizit werden.
+ *
+ * Wie bei `buildScenarioPlotPrompt` gehen Kurzbeschreibung, langer Text,
+ * Merkmale **und** Ansatzpunkte der Figuren mit – die Vorgeschichte trägt die
+ * Konflikte, die eine Station braucht.
+ */
+export function buildStoryArcPrompt(
+  handlung: string,
+  characters: PlotCharacter[],
+  anzahl: number,
+): string {
+  /** Rückt einen mehrzeiligen Block ein, damit die Zuordnung zur Figur hält. */
+  const einrücken = (text: string, tiefe = "     ") =>
+    text
+      .split("\n")
+      .filter((z) => z.trim())
+      .map((z) => tiefe + z.trim())
+      .join("\n");
+
+  const figuren = characters
+    .map((c, i) => {
+      const m = c.merkmale;
+      const merkmale = (Object.keys(TRAIT_LABELS) as Array<keyof CharacterTraits>)
+        .map((key) => {
+          const wert = String(m[key] ?? "").trim();
+          return wert && wert !== "0" ? `${TRAIT_LABELS[key]}: ${wert}` : null;
+        })
+        .filter(Boolean)
+        .join(" · ");
+      const zeilen = [
+        c.kurzbeschreibung && `   ${c.kurzbeschreibung}`,
+        merkmale && `   Merkmale: ${merkmale}`,
+        c.beschreibung && `   Beschreibung:\n${einrücken(c.beschreibung)}`,
+        c.storyHooks && `   Offene Ansatzpunkte:\n${einrücken(c.storyHooks)}`,
+      ].filter(Boolean);
+      return [`${i + 1}. ${c.name}`, ...zeilen].join("\n");
+    })
+    .join("\n\n");
+
+  // Die Namen der Besetzung, an die die `figuren`-Rückbindung jeder Stufe
+  // gebunden ist – im Prompt genannt, damit das Modell keine erfindet.
+  const namen = characters
+    .map((c) => c.name.trim())
+    .filter(Boolean)
+    .join(", ");
+
+  return `Zerlege den folgenden Handlungsentwurf in einen Story Arc: eine geordnete Folge von Stationen, die die Geschichte von ihrer Ausgangslage bis zu ihrer Auflösung abschreitet.
+
+Der Handlungsentwurf:
+${handlung.trim()}
+
+Diese Figuren gibt es, und nur diese:
+
+${figuren}
+
+Am Ende müssen genau ${anzahl} Stationen dastehen, in dieser dramaturgischen Abfolge (eine je Stufe):
+1. exposition – die Ausgangslage: wer, wo, welche Spannung liegt in der Luft.
+2. steigerung – der Konflikt bricht auf und eskaliert.
+3. hoehepunkt – die Entscheidung, der Punkt ohne Umkehr.
+4. fall – die Folgen der Entscheidung, es wird enger.
+5. aufloesung – der neue Zustand, in dem die Geschichte zur Ruhe kommt.
+
+Anforderungen:
+- **Zerlege, erfinde nicht.** Der Entwurf ist die Obergrenze der Wahrheit: Baue keine Ereignisse ein, die nicht in ihm angelegt sind. Lässt er etwas offen, konkretisiere es aus den Figuren – aber erfinde keine neue Wendung und kein neues Ende.
+- Jede Station **verändert die Lage** gegenüber der vorigen. Keine zwei Stationen, die dasselbe noch einmal sagen.
+- Jede Station nennt in ihren Figuren die Namen, die sie tragen – **ausschließlich** aus dieser Besetzung: ${namen}. Erfinde keine neuen Namen.
+- Titel kurz und prägnant (2–5 Wörter). Beschreibung als Fließtext, ohne Nummerierung, ohne Aufzählungszeichen.
+- Alles auf Deutsch.`;
+}
+
+/**
  * Baut den Prompt für ein **aus einem Charakter abgeleitetes Szenario**.
  *
  * Die Gegenrichtung zu `scenarioToInput`: dort prägt eine fertige Welt eine

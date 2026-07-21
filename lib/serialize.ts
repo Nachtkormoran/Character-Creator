@@ -7,6 +7,7 @@ import {
   normalizeInputGenre,
   normalizePlotVariants,
   normalizeScenarioDetails,
+  normalizeStoryArc,
   normalizeTraits,
 } from "./schema";
 import type {
@@ -14,6 +15,7 @@ import type {
   GeneratedCharacter,
   PlotVariants,
   ScenarioDetails,
+  StoryArc,
 } from "./schema";
 
 /** Client-Repräsentation eines einzelnen Bildes. */
@@ -130,6 +132,13 @@ export interface StoredScenario {
    */
   plotVariants: PlotVariants;
   /**
+   * Der Story Arc – die dramaturgische Zerlegung des aktiven Handlungsentwurfs.
+   * `stufen: []`, solange keiner abgeleitet wurde (Altbestand, oder verworfen);
+   * bewusst kein `null`, damit Anzeige und Bearbeitung keinen Sonderfall
+   * brauchen – dieselbe Idee wie bei `plotVariants`.
+   */
+  storyArc: StoryArc;
+  /**
    * Vorschau des Weltbilds (WebP, ~40 KB) oder `null`. Das Original
    * (`imageData`, ~2 MB) reist **nie** in einer Antwort mit – es wird bei
    * Bedarf einzeln über `GET /api/scenarios/[id]/image` geholt (Vollbild,
@@ -160,12 +169,16 @@ export function serializeScenario(row: ScenarioRow): StoredScenario {
   // Die aktive Variante ist die maßgebliche Handlung – so bekommt der Client die
   // beiden nie widersprüchlich (etwa nach einem Import, der nur `details` setzt).
   details.handlung = plotVariants.items[plotVariants.aktiv] ?? details.handlung;
+  const storyArc = normalizeStoryArc(
+    row.storyArc ? JSON.parse(row.storyArc) : null,
+  );
   return {
     id: row.id,
     createdAt: row.createdAt.toISOString(),
     name: row.name,
     details,
     plotVariants,
+    storyArc,
     thumbnail: row.thumbnail ?? null,
     count: row._count?.characters ?? 0,
   };

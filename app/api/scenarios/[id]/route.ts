@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { plotVariantsSchema, scenarioDetailsSchema } from "@/lib/schema";
+import {
+  plotVariantsSchema,
+  scenarioDetailsSchema,
+  storyArcStoredSchema,
+} from "@/lib/schema";
 import { serializeCharacter, serializeScenario } from "@/lib/serialize";
 
 export const runtime = "nodejs";
@@ -22,6 +26,9 @@ const patchSchema = z
     // aktive Variante steht zusätzlich in `details.handlung`; der Client hält
     // beide gleich, `serializeScenario` zieht sie beim Lesen wieder zusammen.
     plotVariants: plotVariantsSchema,
+    // Der Story Arc – eigene Spalte, wie `plotVariants`. Wird die Struktur leer
+    // (`stufen: []`) geschickt, ist das ein bewusstes „Arc verworfen".
+    storyArc: storyArcStoredSchema,
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, {
@@ -78,11 +85,17 @@ export async function PATCH(request: Request, { params }: Context) {
       );
     }
     const p = parsed.data;
-    const data: { name?: string; details?: string; plotVariants?: string } = {};
+    const data: {
+      name?: string;
+      details?: string;
+      plotVariants?: string;
+      storyArc?: string;
+    } = {};
     if (p.name !== undefined) data.name = p.name;
     if (p.details !== undefined) data.details = JSON.stringify(p.details);
     if (p.plotVariants !== undefined)
       data.plotVariants = JSON.stringify(p.plotVariants);
+    if (p.storyArc !== undefined) data.storyArc = JSON.stringify(p.storyArc);
 
     const row = await prisma.scenario.update({
       where: { id },

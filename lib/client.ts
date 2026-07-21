@@ -20,6 +20,7 @@ import type {
   ScenarioDetails,
   ScenarioDraft,
   Settings,
+  StoryArc,
   StoryHookAnchor,
 } from "./schema";
 import type { StoredCharacter, StoredScenario } from "./serialize";
@@ -619,6 +620,20 @@ export function generateScenarioPlot(
   );
 }
 
+/**
+ * Leitet den **Story Arc** aus dem aktiven Handlungsentwurf ab. Wie
+ * `generateScenarioPlot` lädt die Route die Figuren selbst über die `scenarioId`
+ * (Rückbindung der Stationen); der Entwurf kommt im aktuellen, womöglich
+ * ungespeicherten Stand aus dem Request. **Persistiert nichts** – gespeichert
+ * wird über `updateScenario({ storyArc })`.
+ */
+export function generateStoryArc(scenarioId: string, handlung: string) {
+  return postJson<{ storyArc: StoryArc }>("/api/scenario-arc", {
+    scenarioId,
+    handlung,
+  });
+}
+
 /** Einzelnes Szenario samt seiner Charaktere (ohne Bild-Originale). */
 export async function getScenario(
   id: string,
@@ -631,7 +646,12 @@ export async function getScenario(
 
 export async function updateScenario(
   id: string,
-  patch: { name?: string; details?: ScenarioDetails; plotVariants?: PlotVariants },
+  patch: {
+    name?: string;
+    details?: ScenarioDetails;
+    plotVariants?: PlotVariants;
+    storyArc?: StoryArc;
+  },
 ): Promise<StoredScenario> {
   const res = await fetch(`/api/scenarios/${id}`, {
     method: "PATCH",

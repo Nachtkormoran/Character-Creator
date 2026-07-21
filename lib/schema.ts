@@ -634,6 +634,138 @@ export function normalizePlotVariants(
   return { items, aktiv };
 }
 
+// ---------------------------------------------------------------------------
+// Story Arc – die dramaturgische Zerlegung des Handlungsentwurfs
+// ---------------------------------------------------------------------------
+
+/**
+ * Die fünf Stufen der klassischen (deutschen) Dramaturgie nach Freytag –
+ * bewusst der Fünfakter und nicht die Drehbuch-Beat-Sheets, weil das Ziel
+ * „Buch/Spiel" ist. Die Reihenfolge **ist** die Dramaturgie: Sie steigt zum
+ * Höhepunkt und fällt zur Auflösung. Deshalb encodiert die Oberfläche sie über
+ * eine Farbfolge (echte Struktur, keine Deko), und der Prompt verlangt genau
+ * diese Abfolge.
+ */
+export const ARC_PHASES = [
+  { value: "exposition", label: "Exposition" },
+  { value: "steigerung", label: "Steigerung" },
+  { value: "hoehepunkt", label: "Höhepunkt" },
+  { value: "fall", label: "Fall" },
+  { value: "aufloesung", label: "Auflösung" },
+] as const;
+
+export type ArcPhase = (typeof ARC_PHASES)[number]["value"];
+
+const ARC_PHASE_VALUES = ARC_PHASES.map((p) => p.value) as [
+  ArcPhase,
+  ...ArcPhase[],
+];
+
+/** Ein Label je Phase, für die Anzeige (Chip in der Zeitleiste). */
+export const ARC_PHASE_LABELS = Object.fromEntries(
+  ARC_PHASES.map((p) => [p.value, p.label]),
+) as Record<ArcPhase, string>;
+
+/**
+ * Die Obergrenze der Stationen. Der MVP erzeugt fest fünf (Fünfakter); die
+ * Grenze liegt darüber, damit von Hand hinzugefügte oder später über einen
+ * Längen-Parameter erzeugte Stufen Platz haben.
+ */
+export const MAX_ARC_STUFEN = 12;
+
+/**
+ * **Die Structured-Output-Fassung** einer Stufe (geht an OpenAI). Alle Felder
+ * sind Pflicht, tragen ihre Anweisung im `.describe()` und – wie überall im
+ * Projekt – **keine** Längen-Constraints (`.max()` erzeugt `maxLength`, das
+ * Structured Outputs ebenso ablehnt wie `.int()` `minimum`/`maximum`). Die
+ * Bindung an die Stufenzahl und die Zeichenlängen prüft erst das
+ * Speicher-Schema unten.
+ */
+export const arcStufeSchema = z.object({
+  titel: z
+    .string()
+    .describe("Kurzer, prägnanter Titel dieser Station (2–5 Wörter)"),
+  phase: z
+    .enum(ARC_PHASE_VALUES)
+    .describe(
+      "Die Dramaturgie-Stufe: exposition (Ausgangslage), steigerung (der Konflikt eskaliert), hoehepunkt (die Entscheidung), fall (die Folgen), aufloesung (der neue Zustand). Die Stationen müssen in genau dieser Reihenfolge stehen.",
+    ),
+  beschreibung: z
+    .string()
+    .describe(
+      "Was in dieser Station geschieht, als Fließtext ohne Nummerierung – ein bis zwei Sätze mehr genügen. Sie verändert die Lage gegenüber der vorigen Station.",
+    ),
+  figuren: z
+    .array(z.string())
+    .describe(
+      "Die Namen der Figuren aus der mitgelieferten Besetzung, die diese Station tragen – exakt so geschrieben. Keine erfundenen Namen.",
+    ),
+});
+
+export type ArcStufe = z.infer<typeof arcStufeSchema>;
+
+/**
+ * Die Antwort der Route – ein umschließendes Objekt, weil Structured Outputs
+ * auf oberster Ebene ein Objekt verlangt.
+ */
+export const storyArcSchema = z.object({
+  stufen: z.array(arcStufeSchema),
+});
+
+export type StoryArc = z.infer<typeof storyArcSchema>;
+
+/**
+ * **Die Speicher-/PATCH-Fassung** (kommt aus dem Client, geht in die Spalte).
+ * Hier sitzen die Grenzen: die Stufenzahl (`MAX_ARC_STUFEN`) und großzügige
+ * Zeichenlängen. Großzügig, weil ein zu enges Limit – die Lehre aus
+ * `storyHooks` und `ort`/`zeit` – **spät** zuschlägt: erst beim Speichern, wenn
+ * die Arbeit getan ist. Die Phase bleibt an das Enum gebunden.
+ */
+export const storyArcStoredSchema = z.object({
+  stufen: z
+    .array(
+      z.object({
+        titel: z.string().trim().max(200),
+        phase: z.enum(ARC_PHASE_VALUES),
+        beschreibung: z.string().trim().max(5000),
+        figuren: z.array(z.string().trim().max(120)).max(30),
+      }),
+    )
+    .max(MAX_ARC_STUFEN),
+});
+
+/**
+ * Bringt einen gespeicherten (oder fehlenden) Arc in Form – für Altbestände und
+ * Szenarien ohne abgeleiteten Arc `{ stufen: [] }`. Dieselbe Idee wie
+ * `normalizePlotVariants`: kein Sonderfall „kein Arc" nötig, die leere Liste
+ * ist der ruhende Zustand. Unbekannte Phasen fallen auf `exposition` zurück,
+ * damit eine später umbenannte Stufe die gesamte Struktur nicht ungültig macht.
+ */
+export function normalizeStoryArc(raw: unknown): StoryArc {
+  const src = (raw ?? {}) as { stufen?: unknown };
+  const stufen = Array.isArray(src.stufen)
+    ? src.stufen.flatMap((s): ArcStufe[] => {
+        if (!s || typeof s !== "object") return [];
+        const o = s as Record<string, unknown>;
+        const phase = ARC_PHASE_VALUES.includes(o.phase as ArcPhase)
+          ? (o.phase as ArcPhase)
+          : "exposition";
+        return [
+          {
+            titel: typeof o.titel === "string" ? o.titel : "",
+            phase,
+            beschreibung:
+              typeof o.beschreibung === "string" ? o.beschreibung : "",
+            figuren: Array.isArray(o.figuren)
+              ? o.figuren.filter((x): x is string => typeof x === "string")
+              : [],
+          },
+        ];
+      })
+    : [];
+  return { stufen };
+}
+
 /**
  * Der Szenario-Vorschlag, den das Modell aus **einem Charakter** ableitet.
  *

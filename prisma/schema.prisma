@@ -53,6 +53,14 @@ model Scenario {
   // Optional – Altbestände haben nur die eine `details.handlung`.
   plotVariants String?
 
+  // Der **Story Arc**: die dramaturgische Zerlegung des aktiven
+  // Handlungsentwurfs (`details.handlung`) in eine geordnete Folge von Stationen
+  // als JSON `{ stufen }`. Eigene Spalte statt in `details`, aus demselben
+  // Grund wie `plotVariants`: eine Struktur, die die Oberfläche führt und die
+  // erst auf Knopfdruck entsteht – kein Bestandteil der Festlegungen.
+  // Optional – Altbestände und Szenarien ohne abgeleiteten Arc haben keinen.
+  storyArc   String?
+
   // **Ein** Weltbild je Szenario (Establishing-Shot des Ortes, ohne Figuren) –
   // anders als beim Charakter, der beliebig viele Bilder mit Primärmarkierung
   // hat. Ein Szenario ist eine Stimmung, kein Steckbrief; ein repräsentatives

@@ -12,6 +12,7 @@ import {
   generateScenarioDescription,
   generateScenarioField,
   generateScenarioPlot,
+  generateStoryArc,
   getScenario,
   listScenarios,
   updateCharacterContent,
@@ -28,6 +29,7 @@ import {
   type PlotPerson,
   type PlotVariants,
   type ScenarioDetails,
+  type StoryArc,
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
 import {
@@ -39,6 +41,7 @@ import { CharacterDetailModal } from "../../components/CharacterDetailModal";
 import { PlotPersonModal } from "../../components/PlotPersonModal";
 import { ScenarioFields } from "../../components/ScenarioFields";
 import { ScenarioImageModal } from "../../components/ScenarioImageModal";
+import { StoryArcSection } from "../../components/StoryArcSection";
 
 export default function ScenarioDetailPage({
   params,
@@ -61,6 +64,15 @@ export default function ScenarioDetailPage({
    */
   const [varianten, setVarianten] = useState<string[]>([]);
   const [aktiv, setAktiv] = useState(0);
+  /**
+   * Der Story Arc – die dramaturgische Zerlegung des aktiven Handlungsentwurfs.
+   * Wie die Varianten lebt er im Bearbeitungs-Zustand: „Änderungen speichern"
+   * legt ihn ab, „Verwerfen" holt den gespeicherten zurück. `stufen: []` ist
+   * der ruhende Zustand (noch keiner abgeleitet).
+   */
+  const [storyArc, setStoryArc] = useState<StoryArc>({ stufen: [] });
+  const [arcBusy, setArcBusy] = useState(false);
+  const [arcFehler, setArcFehler] = useState<string | null>(null);
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
   /**
    * Der angeklickte Charakter – öffnet dasselbe Detail-Modal wie in der
@@ -261,6 +273,7 @@ export default function ScenarioDetailPage({
         setDetails(scenario.details);
         setVarianten(scenario.plotVariants.items);
         setAktiv(scenario.plotVariants.aktiv);
+        setStoryArc(scenario.storyArc);
         setCharacters(characters);
         setThumbnail(scenario.thumbnail);
         setSaved(
@@ -268,6 +281,7 @@ export default function ScenarioDetailPage({
             name: scenario.name,
             details: scenario.details,
             plot: scenario.plotVariants,
+            arc: scenario.storyArc,
           }),
         );
       })
@@ -343,6 +357,7 @@ export default function ScenarioDetailPage({
       name,
       details,
       plot: { items: aktuelleVarianten(), aktiv },
+      arc: storyArc,
     }) !== saved;
   const nameValid = name.trim().length > 0;
   // Für die Reiter-Leiste: die Entwürfe im aktuellen (womöglich ungespeicherten)
@@ -408,6 +423,31 @@ export default function ScenarioDetailPage({
     router.push(`/?scenario=${id}`);
   }
 
+  /**
+   * Den Story Arc aus dem **aktiven** Handlungsentwurf ableiten. Das Ergebnis
+   * landet als ungespeicherte Änderung im Bearbeitungs-Zustand – wie überall
+   * muss „Verwerfen" den vorherigen Arc zurückbringen können. Der Entwurf geht
+   * im aktuellen, womöglich ungespeicherten Stand mit (`details.handlung`); die
+   * Figuren lädt die Route selbst über die gespeicherte Zuordnung.
+   *
+   * Keine Rückfrage vor dem Überschreiben eines vorhandenen Arcs: „Verwerfen"
+   * ist der Rückweg, und ein Ableiten ist selten ein Versehen (der Knopf sagt,
+   * was er tut).
+   */
+  async function storyArcAbleiten() {
+    if (arcBusy || !details.handlung.trim()) return;
+    setArcBusy(true);
+    setArcFehler(null);
+    try {
+      const { storyArc: neu } = await generateStoryArc(id, details.handlung);
+      setStoryArc(neu);
+    } catch (e) {
+      setArcFehler(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setArcBusy(false);
+    }
+  }
+
   async function save() {
     if (!dirty || !nameValid || saving) return;
     setSaving(true);
@@ -417,16 +457,19 @@ export default function ScenarioDetailPage({
         name: name.trim(),
         details,
         plotVariants: { items: aktuelleVarianten(), aktiv },
+        storyArc,
       });
       setName(aktualisiert.name);
       setDetails(aktualisiert.details);
       setVarianten(aktualisiert.plotVariants.items);
       setAktiv(aktualisiert.plotVariants.aktiv);
+      setStoryArc(aktualisiert.storyArc);
       setSaved(
         JSON.stringify({
           name: aktualisiert.name,
           details: aktualisiert.details,
           plot: aktualisiert.plotVariants,
+          arc: aktualisiert.storyArc,
         }),
       );
     } catch (e) {
@@ -538,11 +581,13 @@ export default function ScenarioDetailPage({
                 name: string;
                 details: ScenarioDetails;
                 plot: PlotVariants;
+                arc: StoryArc;
               };
               setName(s.name);
               setDetails(s.details);
               setVarianten(s.plot.items);
               setAktiv(s.plot.aktiv);
+              setStoryArc(s.arc);
             }}
             disabled={saving}
             className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
@@ -798,6 +843,23 @@ export default function ScenarioDetailPage({
           </div>
         )}
       </section>
+
+      {/*
+        Der Story Arc sitzt direkt unter dem Handlungsentwurf: Er ist dessen
+        dramaturgische Zerlegung und leitet sich aus der **aktiven** Variante ab.
+        Wie die Varianten und Ansatzpunkte lebt er im Bearbeitungs-Zustand und
+        geht über „Änderungen speichern" bzw. „Verwerfen".
+      */}
+      <StoryArcSection
+        storyArc={storyArc}
+        onChange={setStoryArc}
+        onAbleiten={storyArcAbleiten}
+        busy={arcBusy}
+        error={arcFehler}
+        disabled={saving}
+        handlung={details.handlung}
+        quelleLabel={`Entwurf ${aktiv + 1}`}
+      />
 
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
