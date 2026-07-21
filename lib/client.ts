@@ -677,6 +677,7 @@ export function generateStoryArc(
     format?: ArcFormat;
     zusatz?: string;
     kreativ?: boolean;
+    weiterspinnen?: boolean;
   } = {},
 ) {
   return postJson<{ storyArc: StoryArc }>("/api/scenario-arc", {

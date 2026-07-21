@@ -91,6 +91,8 @@ export default function ScenarioDetailPage({
     zusatz: string;
     /** Zufällige Impulse + höhere Temperatur, für Arc **und** Kapitel. */
     kreativ: boolean;
+    /** Aus der offenen Ausgangslage eine vollständige Geschichte entwickeln. */
+    weiterspinnen: boolean;
     /** Wie viele Kapitel ein „Kapitel ableiten" erzeugt. */
     kapitelAnzahl: KapitelCount;
   }>({
@@ -98,6 +100,7 @@ export default function ScenarioDetailPage({
     format: DEFAULT_ARC_FORMAT,
     zusatz: "",
     kreativ: false,
+    weiterspinnen: false,
     kapitelAnzahl: DEFAULT_KAPITEL_COUNT,
   });
   /** Welche Station gerade Kapitel erzeugt, und ein etwaiger Fehler dazu. */
@@ -492,6 +495,7 @@ export default function ScenarioDetailPage({
         format: arcParams.format,
         zusatz: arcParams.zusatz,
         kreativ: arcParams.kreativ,
+        weiterspinnen: arcParams.weiterspinnen,
       });
       setStoryArc(neu);
     } catch (e) {

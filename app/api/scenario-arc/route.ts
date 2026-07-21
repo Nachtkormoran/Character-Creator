@@ -57,6 +57,9 @@ const bodySchema = z.object({
   // „kreativ": zufällige erzählerische Impulse fließen ein und die Temperatur
   // steigt – der Arc darf freier ausfallen, bleibt aber am Entwurf.
   kreativ: z.boolean().optional().default(false),
+  // „weiterspinnen": aus der offenen Ausgangslage eine vollständige Geschichte
+  // entwickeln (Zuspitzung, Wendepunkt, Ende) statt sie nur zu gliedern.
+  weiterspinnen: z.boolean().optional().default(false),
 });
 
 export async function POST(request: Request) {
@@ -70,7 +73,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenarioId, handlung, laenge, format, zusatz, kreativ } =
+    const { scenarioId, handlung, laenge, format, zusatz, kreativ, weiterspinnen } =
       parsed.data;
     const anzahl = arcStationen(laenge);
 
@@ -116,24 +119,26 @@ export async function POST(request: Request) {
       format as "buch" | "spiel",
       zusatz,
       sparks,
+      weiterspinnen,
     );
+
+    // Die System-Rolle folgt dem Auftrag: gliedern oder weiterentwickeln.
+    const systemRolle = weiterspinnen
+      ? "Du bist Dramaturg. Aus einer gegebenen Ausgangslage entwickelst du eine vollständige Geschichte und bringst sie in dramaturgische Stationen – du bleibst Figuren und Welt treu, führst die Handlung aber bis zu einem Ende."
+      : "Du bist Dramaturg. Du zerlegst eine gegebene Handlung in ihre dramaturgischen Stationen – du erfindest keine neue Geschichte, sondern gliederst die vorhandene.";
 
     const versuch = () =>
       openai.chat.completions.parse({
         model,
         ...extraParams,
         messages: [
-          {
-            role: "system",
-            content:
-              "Du bist Dramaturg. Du zerlegst eine gegebene Handlung in ihre dramaturgischen Stationen – du erfindest keine neue Geschichte, sondern gliederst die vorhandene.",
-          },
+          { role: "system", content: systemRolle },
           { role: "user", content: prompt },
         ],
         response_format: zodResponseFormat(storyArcSchema, "story_arc"),
-        // Normal niedrig-mittig (gegliedert wird Vorhandenes); bei „kreativ"
-        // höher, damit die Impulse auch Wirkung zeigen.
-        temperature: kreativ ? 0.9 : 0.5,
+        // Niedrig-mittig beim Gliedern; höher, wenn erfunden wird – „kreativ"
+        // (Impulse) am höchsten, „weiterspinnen" (Ende erfinden) dazwischen.
+        temperature: kreativ ? 0.9 : weiterspinnen ? 0.75 : 0.5,
       });
 
     let ergebnis = (await versuch()).choices[0]?.message.parsed;

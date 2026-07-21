@@ -83,12 +83,13 @@ export function StoryArcSection({
   onAbleiten: () => void;
   busy: boolean;
   error: string | null;
-  /** Länge/Format/Zusatz/kreativ/Kapitelzahl des Laufs – nicht gespeichert. */
+  /** Länge/Format/Zusatz/kreativ/weiterspinnen/Kapitelzahl – nicht gespeichert. */
   params: {
     laenge: ArcLength;
     format: ArcFormat;
     zusatz: string;
     kreativ: boolean;
+    weiterspinnen: boolean;
     kapitelAnzahl: KapitelCount;
   };
   onParamsChange: (p: {
@@ -96,6 +97,7 @@ export function StoryArcSection({
     format: ArcFormat;
     zusatz: string;
     kreativ: boolean;
+    weiterspinnen: boolean;
     kapitelAnzahl: KapitelCount;
   }) => void;
   /** Kapitel für die Station am Index ableiten. */
@@ -254,13 +256,36 @@ export function StoryArcSection({
       </div>
 
       {/*
+        Handlung weiterspinnen – bestimmt den **Grundcharakter** des Arcs und
+        steht deshalb zuerst: Der Handlungsentwurf ist eine Ausgangslage mit
+        offenem Ausgang. Angehakt entwickelt der Arc daraus eine vollständige
+        Geschichte (Zuspitzung, Wendepunkt, Ende), statt sie nur zu gliedern.
+        Wirkt nur auf „Ableiten", nicht auf die Kapitel.
+      */}
+      <label
+        className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+        title="Der Handlungsentwurf ist eine Ausgangslage mit offenem Ende. Angehakt entwickelt der Arc daraus eine vollständige Geschichte mit Zuspitzung und Ende, statt die offene Lage nur in Stationen zu gliedern. Wirkt nur auf „Ableiten“."
+      >
+        <input
+          type="checkbox"
+          checked={params.weiterspinnen}
+          onChange={(e) =>
+            onParamsChange({ ...params, weiterspinnen: e.target.checked })
+          }
+          disabled={disabled || busy}
+          className="size-4 accent-foreground"
+        />
+        🧵 Handlung weiterspinnen – zur vollständigen Geschichte
+      </label>
+
+      {/*
         Kreativ-Haken – gilt für **beide** Erzeugungen (Arc und Kapitel): Es
         fließen zufällige erzählerische Impulse ein, die Kapitel werden länger
         und ausgemalt, und die Temperatur steigt. Deshalb steht er oben im
         Abschnitt, nicht bei einem einzelnen Knopf.
       */}
       <label
-        className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+        className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
         title="Zufällige Impulse und mehr Freiheit: Der Arc fällt lebendiger aus, Kapitel werden länger und mit Details ausgearbeitet. Wirkt auf „Ableiten“ und auf die Kapitel-Erzeugung."
       >
         <input

@@ -502,6 +502,15 @@ export function buildStoryArcPrompt(
    * untergeordnet: Was nicht passt, lässt das Modell fallen.
    */
   sparks?: string[],
+  /**
+   * **Handlung weiterspinnen** (Checkbox): Der Handlungsentwurf ist bewusst eine
+   * Ausgangslage mit offenem Ausgang. Angehakt **entwickelt** der Arc daraus
+   * eine vollständige Geschichte (er erfindet Zuspitzung, Wendepunkt und Ende),
+   * statt die offene Lage nur zu gliedern. Damit löst sich der sonst eingebaute
+   * Widerspruch – ein Arc über eine offene Lage müsste Fall und Auflösung ohnehin
+   * erfinden, obwohl der Zerlege-Modus „kein neues Ende" verlangt.
+   */
+  weiterspinnen?: boolean,
 ): string {
   /** Rückt einen mehrzeiligen Block ein, damit die Zuordnung zur Figur hält. */
   const einrücken = (text: string, tiefe = "     ") =>
@@ -575,7 +584,19 @@ export function buildStoryArcPrompt(
   );
   const folgeListe = folge.map((p, i) => `${i + 1}. ${p}`).join("\n");
 
-  return `Zerlege den folgenden Handlungsentwurf in einen Story Arc: eine geordnete Folge von Stationen, die die Geschichte von ihrer Ausgangslage bis zu ihrer Auflösung abschreitet.
+  // Zwei grundverschiedene Aufträge: **zerlegen** (die vorhandene, offene
+  // Ausgangslage nur gliedern) oder **weiterspinnen** (aus ihr eine ganze
+  // Geschichte mit Ende entwickeln). Nur Einleitung und Kern-Anforderung
+  // wechseln – Phasenfolge, Figurenbindung, Format und Ausgabeform bleiben.
+  const einleitung = weiterspinnen
+    ? "Der folgende Handlungsentwurf ist eine Ausgangslage mit offenem Ausgang. Spinne sie zu einer vollständigen Geschichte weiter und gliedere diese in einen Story Arc: eine geordnete Folge von Stationen, die von der Ausgangslage bis zu einem Ende führt."
+    : "Zerlege den folgenden Handlungsentwurf in einen Story Arc: eine geordnete Folge von Stationen, die die Geschichte von ihrer Ausgangslage bis zu ihrer Auflösung abschreitet.";
+
+  const kernAnforderung = weiterspinnen
+    ? "- **Spinne die Handlung weiter.** Die Ausgangslage liefert Anfang, Figuren und Konflikt; daraus entwickelst du eine ganze Geschichte. Erfinde die Zuspitzung, den Wendepunkt und ein Ende, das aus Figuren und Konflikt zwingend folgt. Die späteren Phasen (Höhepunkt, Fall, Auflösung) sind hier **keine Zusammenfassung des Vorhandenen, sondern neue Handlung, die du erfindest** – bleib dabei Welt, Figuren und dem Kern des Konflikts treu und widersprich der Ausgangslage nie."
+    : "- **Zerlege, erfinde nicht.** Der Entwurf ist die Obergrenze der Wahrheit: Baue keine Ereignisse ein, die nicht in ihm angelegt sind. Lässt er etwas offen, konkretisiere es aus den Figuren – aber erfinde keine neue Wendung und kein neues Ende.";
+
+  return `${einleitung}
 
 Der Handlungsentwurf:
 ${handlung.trim()}
@@ -595,7 +616,7 @@ Der Arc hat **genau ${anzahl} Stationen** mit diesen Phasen, in dieser Reihenfol
 ${folgeListe}
 
 Anforderungen:
-- **Zerlege, erfinde nicht.** Der Entwurf ist die Obergrenze der Wahrheit: Baue keine Ereignisse ein, die nicht in ihm angelegt sind. Lässt er etwas offen, konkretisiere es aus den Figuren – aber erfinde keine neue Wendung und kein neues Ende.
+${kernAnforderung}
 - Jede Station **verändert die Lage** gegenüber der vorigen. Keine zwei Stationen, die dasselbe noch einmal sagen.
 - Jede Station nennt in ihren Figuren die Namen, die sie tragen – **ausschließlich** aus dieser Besetzung: ${namen}. Erfinde keine neuen Namen.
 ${formatZeile}
