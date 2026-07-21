@@ -477,88 +477,6 @@ export default function ScenarioDetailPage({
       )}
 
       <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
-        <h2 className="mb-4 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
-          Festlegungen
-        </h2>
-        <ScenarioFields
-          details={details}
-          onChange={setDetails}
-          disabled={saving}
-          generatable={ERZEUGBAR}
-          onGenerate={handleGenerate}
-          generatingField={generatingField}
-          zusatz={zusatz}
-          onZusatzChange={(key, value) =>
-            setZusatz((z) => ({ ...z, [key]: value }))
-          }
-        />
-
-        {/*
-          Personen aus dem Handlungsentwurf – direkt unter den Festlegungen,
-          weil sie sich auf das Feld darüber beziehen.
-
-          Bewusst **auf Knopfdruck** und nicht beim Öffnen der Seite: Die Suche
-          ist ein KI-Aufruf, und im Projekt löst jede Erzeugung ein Klick aus.
-          Ein Aufruf, der beim bloßen Ansehen eines Szenarios Geld kostet, wäre
-          der erste seiner Art.
-        */}
-        {details.handlung.trim() && (
-          <div className="mt-4 border-t border-black/10 pt-4 dark:border-white/10">
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={personenSuchen}
-                disabled={suchend}
-                title="Sucht im Handlungsentwurf nach Personen, die dem Szenario noch nicht zugeordnet sind"
-                className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
-              >
-                {suchend ? "Sucht …" : "🔍 Personen im Entwurf suchen"}
-              </button>
-              {personen === null && !suchend && (
-                <span className="text-xs text-foreground/50">
-                  Findet Namen, für die es noch keinen Charakter gibt.
-                </span>
-              )}
-            </div>
-
-            {suchFehler && (
-              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
-                {suchFehler}
-              </p>
-            )}
-
-            {personen !== null &&
-              (personen.length === 0 ? (
-                <p className="mt-2 text-xs text-foreground/50">
-                  Keine neuen Personen – der Entwurf nennt nur Figuren, die dem
-                  Szenario schon zugeordnet sind.
-                </p>
-              ) : (
-                <div className="mt-3">
-                  <p className="mb-2 text-xs text-foreground/60">
-                    Noch nicht im Szenario – anklicken, um daraus einen
-                    Charakter anzulegen:
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {personen.map((p) => (
-                      <button
-                        key={p.name}
-                        type="button"
-                        onClick={() => setGewaehlt(p)}
-                        title={`Charakter für „${p.name}" anlegen`}
-                        className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-500/20 dark:text-amber-300"
-                      >
-                        + {p.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
         <h2 className="mb-1 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
           Weltbild
         </h2>
@@ -729,6 +647,88 @@ export default function ScenarioDetailPage({
         </div>
       </section>
 
+      <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+        <h2 className="mb-4 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+          Festlegungen
+        </h2>
+        <ScenarioFields
+          details={details}
+          onChange={setDetails}
+          disabled={saving}
+          generatable={ERZEUGBAR}
+          onGenerate={handleGenerate}
+          generatingField={generatingField}
+          zusatz={zusatz}
+          onZusatzChange={(key, value) =>
+            setZusatz((z) => ({ ...z, [key]: value }))
+          }
+        />
+
+        {/*
+          Personen aus dem Handlungsentwurf – direkt unter den Festlegungen,
+          weil sie sich auf das Feld darüber beziehen.
+
+          Bewusst **auf Knopfdruck** und nicht beim Öffnen der Seite: Die Suche
+          ist ein KI-Aufruf, und im Projekt löst jede Erzeugung ein Klick aus.
+          Ein Aufruf, der beim bloßen Ansehen eines Szenarios Geld kostet, wäre
+          der erste seiner Art.
+        */}
+        {details.handlung.trim() && (
+          <div className="mt-4 border-t border-black/10 pt-4 dark:border-white/10">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={personenSuchen}
+                disabled={suchend}
+                title="Sucht im Handlungsentwurf nach Personen, die dem Szenario noch nicht zugeordnet sind"
+                className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              >
+                {suchend ? "Sucht …" : "🔍 Personen im Entwurf suchen"}
+              </button>
+              {personen === null && !suchend && (
+                <span className="text-xs text-foreground/50">
+                  Findet Namen, für die es noch keinen Charakter gibt.
+                </span>
+              )}
+            </div>
+
+            {suchFehler && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {suchFehler}
+              </p>
+            )}
+
+            {personen !== null &&
+              (personen.length === 0 ? (
+                <p className="mt-2 text-xs text-foreground/50">
+                  Keine neuen Personen – der Entwurf nennt nur Figuren, die dem
+                  Szenario schon zugeordnet sind.
+                </p>
+              ) : (
+                <div className="mt-3">
+                  <p className="mb-2 text-xs text-foreground/60">
+                    Noch nicht im Szenario – anklicken, um daraus einen
+                    Charakter anzulegen:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {personen.map((p) => (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => setGewaehlt(p)}
+                        title={`Charakter für „${p.name}" anlegen`}
+                        className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-500/20 dark:text-amber-300"
+                      >
+                        + {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </section>
+
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
@@ -763,14 +763,19 @@ export default function ScenarioDetailPage({
             .
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          // Rund halb so große Kacheln wie in der Galerie: doppelt so viele
+          // Spalten, engere Abstände. Weil eine kleine Kachel keinen Platz für
+          // zwei Zeilen Beschreibung hat, steht hier nur der Name – die
+          // Kurzbeschreibung wandert in den `title` (Tooltip beim Überfahren).
+          <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
             {characters.map((c) => {
               const preview = primaryImage(c)?.thumbnail;
               return (
                 <Link
                   key={c.id}
                   href="/gallery"
-                  className="flex flex-col overflow-hidden rounded-xl border border-black/10 bg-white transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
+                  title={c.character.kurzbeschreibung}
+                  className="flex flex-col overflow-hidden rounded-lg border border-black/10 bg-white transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
                 >
                   <div className="relative aspect-square w-full bg-black/[0.03] dark:bg-white/[0.03]">
                     {preview ? (
@@ -778,24 +783,19 @@ export default function ScenarioDetailPage({
                         src={preview}
                         alt={c.character.name}
                         fill
-                        sizes="(max-width: 640px) 50vw, 25vw"
+                        sizes="(max-width: 640px) 33vw, 12vw"
                         className="object-cover"
                         unoptimized
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center text-3xl opacity-30">
+                      <div className="flex h-full items-center justify-center text-2xl opacity-30">
                         🧑
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-col gap-1 p-3">
-                    <span className="truncate font-medium">
-                      {c.character.name}
-                    </span>
-                    <span className="line-clamp-2 text-xs text-foreground/60">
-                      {c.character.kurzbeschreibung}
-                    </span>
-                  </div>
+                  <span className="truncate p-1.5 text-xs font-medium">
+                    {c.character.name}
+                  </span>
                 </Link>
               );
             })}
