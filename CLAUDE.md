@@ -79,7 +79,8 @@ als eines, das immer dasselbe ist.
 - `POST /api/generate-text`, `POST /api/generate-image`,
   `POST /api/generate-name`, `POST /api/regenerate-text`,
   `POST /api/scenario-description`, `POST /api/scenario-plot`,
-  `POST /api/story-hooks` – OpenAI (persistieren nichts).
+  `POST /api/scenario-image`, `POST /api/story-hooks` – OpenAI (persistieren
+  nichts).
 - `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional
   `scenarioId`, `imageData` und `thumbnail`; ein mitgegebenes Bild wird das erste
   und primäre). **Keine Route liefert `imageData` in einer Liste** (`omit`),
@@ -102,6 +103,13 @@ als eines, das immer dasselbe ist.
 - `GET|PATCH|DELETE /api/scenarios/[id]` – **GET liefert das Szenario samt
   seiner Charaktere** (ohne Bild-Originale, nur Thumbnails – wie die
   Charakter-Liste); PATCH ist ein Teil-Update von `name` und `details`.
+  **Das Szenario-Bild nicht** – es hat eine eigene Route (s. u.).
+- `GET|PUT|DELETE /api/scenarios/[id]/image` – das **eine** Weltbild eines
+  Szenarios. GET ist der einzige Weg ans Original (Vollbild, Export), PUT
+  setzt/ersetzt es (`imageData` + `thumbnail`), DELETE entfernt es; PUT/DELETE
+  geben das aktualisierte Szenario zurück (ohne `imageData`). Bewusst getrennt
+  vom `PATCH` oben, weil ein Bild ~2 MB ist und nicht bei jedem Namensspeichern
+  mitreisen soll.
 - `GET|PATCH /api/settings` – App-Einstellungen (`imageModel`, `imageQuality`).
 - `GET|POST /api/backup` – Datenbank sichern / wiederherstellen. **POST
   ersetzt den gesamten Bestand** (Bestätigung passiert in der UI).
@@ -210,6 +218,42 @@ verbliebener Export-Knopf ist der fürs **PDF**. Der Bild-Export sitzt an der
 einzelnen Kachel, damit jedes Bild einzeln herunterladbar ist – bei mehr als
 einem Bild bekommt die Datei ihre Position angehängt (`Name_2.png`), sonst
 überschrieben sich die Downloads gegenseitig.
+
+**Ein Bild pro Szenario (Weltbild):** Das bewusste Gegenteil zum Charakter. Ein
+Szenario hat **genau ein** Bild, direkt als Spalten `imageData` + `thumbnail`
+am `Scenario` (kein eigenes `ScenarioImage`, keine `isPrimary`-Logik). Ein
+Szenario ist eine **Stimmung, kein Steckbrief**; ein repräsentatives Bild
+genügt, und die Mehrbild-Maschinerie wäre hier Aufwand ohne Gewinn – so, wie
+der Charakter es vor der Mehrbild-Umstellung hielt. Wie dort liefert **keine
+Listen-Route `imageData`** (`omit`), nur das Thumbnail; das Original holt
+`GET …/image` einzeln (Vollbild).
+
+Das Bild zeigt die **Welt, keine Figuren** – ein Establishing-Shot des Ortes.
+Nicht nur, weil das die Wahl war, sondern weil ein Szenario für viele Figuren
+zugleich gilt und keine einzelne es bebildern sollte. `buildScenarioImagePrompt`
+baut den Prompt aus `ScenarioDetails` (Ort trägt das Motiv, Zeit + Genre die
+Epoche über `BILDWELTEN`, Beschreibung die Stimmung; **Regeln gehen nicht ein** –
+Technikstand ist selten ein Bildmotiv). Das „**keine Personen**" steht betont und
+doppelt im Prompt: Bild-Modelle setzen sonst reflexhaft einen Menschen als Anker
+in die Szene. Stehen mehrere Schauplätze im Ort-Feld, wählt das Modell **einen**
+Blick, statt sie zu collagieren. Die **Stilauswahl ist dieselbe wie beim
+Charakter** (`IMAGE_STYLES`), die Stiltexte sind aber auf eine Szene statt ein
+Portrait gemünzt (die „Skizze" ist hier eine Landschaftsstudie, keine Büste).
+
+Die Route `POST /api/scenario-image` **persistiert nichts** (wie alle
+Erzeugen-Routen) und liest die Festlegungen **aus dem Request** – in der
+Detailansicht können sie ungespeichert bearbeitet sein. Die UI führt Erzeugtes
+und Hochgeladenes zuerst als **Kandidat** (ungespeichert): Erst „Als
+Szenario-Bild speichern" ersetzt das vorhandene Bild über
+`PUT …/image`. So zerstört ein probeweises „Neu erzeugen" das gute alte Bild
+nicht, bis eins gefällt. Das Speichern des Bildes ist **unabhängig** vom
+„Änderungen speichern" der Festlegungen (eigene Route, sofort). Daneben ein
+Stichwörter-Feld (`extraPrompt`, Perspektive/Lichtstimmung, nicht gespeichert).
+Auf den Übersichtskarten unter `/scenarios` erscheint das Thumbnail links.
+
+**Noch nicht dabei** (mögliche Folgeschritte): Das Weltbild ist **nicht** Teil
+der Szenario-Exportdatei (`scenarioFile.ts`) und **nicht** im Charakter-PDF.
+Beides ließe sich analog nachrüsten.
 
 **Text neu erzeugen & Ansatzpunkte:** Zwei Knöpfe in der Detailansicht der
 Galerie, beide **nur dort** – sie setzen einen fertigen Charakter voraus.
@@ -369,15 +413,108 @@ Regel wie in `backgrounds.ts`. Die Zuordnung Feld → Funktion steht in der Kart
 Knopf. Der Würfel sitzt **in der Komponente**, nicht in den Seiten: nur sie
 kennt das gerade gewählte Genre.
 
-Der Unterschied zwischen den drei: **Ort und Zeit ziehen genau einen Eintrag**
-(ein Szenario spielt an einem Ort, zu einer Zeit), **Regeln ziehen zwei bis
-drei** über `pickSome` – eine Welt entsteht erst aus dem Zusammentreffen
-mehrerer Festlegungen. Regeln sind deshalb **vollständige Sätze mit Punkt** und
+**Der Würfel überschreibt nichts mehr.** Er sieht nur, ob das Feld leer ist –
+lesen kann er nicht, was dasteht:
+
+| Feld | leeres Feld | gefülltes Feld |
+|---|---|---|
+| Ort | Rahmen + 2 Schauplätze | hängt **einen Schauplatz** an |
+| Zeit | Rahmen + Spanne | hängt **eine Spanne** an |
+| Regeln | 2–3 Regeln (`pickSome`) | hängt **eine Regel** an |
+
+Dahinter steckt eine Annahme: Was Leute selbst tippen, ist die obere Ebene –
+„Berlin", „Sommer 1923". Was ihnen fehlt, ist das Konkrete darunter. Vorher warf
+jeder Klick weg, was im Feld stand; das war richtig, solange ein Wurf ein
+vollständiger Ort war, und wurde falsch, als das Feld mehrere Ebenen aufnahm.
+Das Anhängen erledigt `anhaengen` in `ScenarioFields.tsx` (Zeilenumbruch bei Ort
+und Zeit, Leerzeichen bei den Regeln – so, wie die Felder es jeweils halten).
+
+**Die Ortslisten haben dafür zwei Ebenen bekommen** (`*_AREAS` / `*_SPOTS`,
+`*_PLACES` bleibt als Zusammenfassung für alles, was die ganze Liste will).
+Rahmen ist, worin gespielt wird (Stadt, Landstrich, Station); Schauplätze sind
+Orte *darin*, an denen sich fremde Leben kreuzen. Das war **keine neue
+Textarbeit**: Die Gliederung stand seit jeher als Rubrik-Kommentar in den Listen
+(„Stadt", „Provinz & Land" gegen „Arbeitsplätze", „Einrichtungen"), sie musste
+nur aus den Kommentaren in den Code. Sie ist damit auch nur so genau wie diese
+Rubriken – ein einzelner Eintrag kann auf der falschen Ebene sitzen.
+
+**Bei der Zeit ging das nicht:** Deren Rubriken sind thematisch (Jahreszeit,
+Herrschaft, Krieg), die Dimension „Zeitraum" kam in den Daten **gar nicht** vor –
+alle 900 Einträge sind Zeitpunkte. Dafür gibt es jetzt `SPANS`, rund 40 Spannen
+und die **einzige nach Genre ungetrennte Liste** im Projekt: Zwei Winter sind in
+jeder Welt zwei Winter, das Genre steckt im Rahmen darüber. Die dritte Dimension
+des Zeitfeldes – **was sich in der Spanne verschiebt** – fehlt dort absichtlich:
+Das ist keine Zufallsentscheidung, sondern der Anfang einer Geschichte. Dafür
+ist der KI-Knopf da.
+
+Regeln sind **vollständige Sätze mit Punkt** und
 werden mit **Leerzeichen** verbunden, nicht mit Semikolon wie Aussehen und
 Hintergrund (das sind Satzteile). Sie enthalten bewusst keine Zahlen,
 Eigennamen oder Aussagen über die Regierungsform – zwei gezogene Regeln müssen
 nebeneinander stehen können, ohne sich zu widersprechen, und über Ort und Zeit
 sagen sie nichts, dafür gibt es die anderen Felder.
+
+**Ort, Zeit und Regeln lassen sich zusätzlich per KI ergänzen** (`POST
+/api/scenario-field`) – der Knopf heißt dort „✨ Ergänzen", nicht „Neu
+erzeugen", und das ist der ganze Unterschied zum Würfel: Was im Feld steht,
+geht als **Vorgabe** in den Prompt und kommt im Ergebnis wieder vor (dieselbe
+Regel wie bei `regenerate-text`). Ein Knopf, der „Berlin" durch „Hamburg"
+ersetzt, weil das besser zu seinem Einfall passt, wäre unbrauchbar. Deshalb
+fragt hier auch nichts nach, bevor er läuft – es kann nichts verlorengehen.
+
+Das Modell kann, was eine Liste prinzipiell nicht kann: Es liest den Feldinhalt
+**und die Nachbarfelder**. „Berlin" plus Zeit „Anfang des 19. Jahrhunderts"
+ergibt Kutschen und Kohlengeruch, nicht die S-Bahn.
+
+**Die Antwort muss ins Feld passen, und das Feld hat ein Limit.** Beim Ergänzen
+enthält die Antwort das Vorhandene **mit** – die ganze Antwort zählt gegen das
+Limit, nicht nur das Neue. Ein zu langer Ergänzen-Lauf schlug deshalb erst beim
+Speichern zu („Too big"), wenn die Arbeit getan war. Dreifach abgesichert: Der
+Prompt nennt das Zeichenbudget (bei Bestand den **Rest**, nicht das volle Limit,
+sonst reizt das Modell es punktgenau aus), `max_tokens` in der Route ist aus dem
+Limit bemessen (`maxLen/3 + 80`, gedeckelt – Deutsch ~3 Zeichen/Token), und als
+letzte Absicherung kürzt die Route eine dennoch zu lange Antwort an einer
+Wortgrenze. Das Formular zeigt zusätzlich unter jedem Feld die aktuelle **und**
+die maximale Länge (`… / 2000`, bernsteinfarben ab 90 %) und setzt `maxLength`.
+
+**Die Limits stehen an genau einer Stelle** (`SCENARIO_MAXLENGTHS` in
+`schema.ts`): `scenarioDetailsSchema` zieht sein `.max(...)` von dort, das
+Formular Zähler und `maxLength`, die Route Prompt-Budget und `max_tokens`. Sonst
+liefe die Erzeugung irgendwann über ein Limit, das das Formular längst höher
+gesetzt hat. Die Konstante trägt bewusst **keine** Typ-Annotation über
+`keyof ScenarioDetails` (das wäre ein Zirkelbezug, weil der Typ aus dem Schema
+kommt, das die Werte liest); die Vollständigkeit prüft `_maxlengthsCheck`
+darunter, sobald `ScenarioDetails` existiert.
+
+**Welche Nachbarfelder ein Feld sehen darf, steht in `SCENARIO_READS`**
+(`schema.ts`) – die Festlegungen haben eine Richtung:
+
+```
+Genre ──► Ort ──► Beschreibung ──► Handlung
+      └──► Zeit ─┘                    ▲
+      └──► Regeln ────────────────────┘
+```
+
+Erzeugt wird **nur aus dem, was oberhalb steht**. Flösse die Beschreibung in die
+Ort-Erzeugung zurück, entstünde ein Kreis: Sie wurde aus dem alten Ort
+geschrieben, der neue Ort entstünde aus ihr – und danach passt sie nicht mehr zu
+dem Ort, aus dem sie stammt. Beim Handlungsentwurf wäre es schlimmer: Er hängt
+an den Figuren, und dann definierten die Ereignisse einer einzelnen Geschichte
+rückwirkend die Welt. **Gefiltert wird serverseitig**, obwohl der Client die
+kompletten Festlegungen schickt – so kann eine neue Aufrufstelle die Regel nicht
+umgehen, und sie steht an genau einer Stelle. *Geprüft:* Erfundene Namen aus
+`beschreibung` und `handlung` tauchen im erzeugten Ort nicht auf.
+
+*Eine Lehre aus der Messung:* Die Aufgabe steht im Prompt als **prüfbarer
+Endzustand** („Am Ende muss im Feld beides stehen: ein Rahmen und zwei bis drei
+Schauplätze") und nicht als Verfahren („prüfe erst, was fehlt, dann ergänze").
+Mit der Verfahrensfassung hängte das Modell an „In einem anonymen Wohnblock"
+drei weitere Schauplätze an und ließ den Rahmen weg – es klassifizierte gar
+nicht erst. Dieselbe Erfahrung wie beim „wäre der Satz noch wahr, wenn die Figur
+wegzöge" der Ableitung: Eine am Ergebnis prüfbare Bedingung hält besser als eine
+Anweisung, die unterwegs eine Entscheidung verlangt. Ebenso musste die
+**Ausgabeform** ausdrücklich werden – „keine Aufzählungszeichen" allein ließ das
+Modell nummerieren, Nummern zählt es nicht dazu.
 
 Die **Beschreibung** lässt sich per KI erzeugen (`POST
 /api/scenario-description`), aus Genre, Ort, Zeit und Regeln. Sie steht deshalb
@@ -1002,7 +1139,9 @@ mitwachsende Textarea für die editierbaren Textfelder.
 `CharacterImage`
 (`imageData` als Base64-Data-URL, `thumbnail` als verkleinerte Fassung davon,
 `isPrimary`; `onDelete: Cascade` – Bilder gehen mit dem Charakter),
-`Scenario` (`details` als JSON-String, `onDelete: SetNull` – beim Löschen des Szenarios bleiben
+`Scenario` (`details` als JSON-String, dazu **ein** Weltbild direkt als
+`imageData` + `thumbnail` am Szenario – anders als der Charakter, der eine eigene
+Bildtabelle hat; `onDelete: SetNull` – beim Löschen des Szenarios bleiben
 Charaktere erhalten) und `Setting` (Key-Value für App-Einstellungen). SQLite
 lokal.
 

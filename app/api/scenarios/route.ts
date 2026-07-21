@@ -17,9 +17,12 @@ const createSchema = z.object({
 });
 
 // Alle Szenarien (alphabetisch, inkl. Anzahl zugeordneter Charaktere).
+// `imageData` bleibt draußen (nur Thumbnail) – dieselbe Regel wie in der
+// Charakter-Liste: die Originale sind je ~2 MB.
 export async function GET() {
   const rows = await prisma.scenario.findMany({
     orderBy: { name: "asc" },
+    omit: { imageData: true },
     include: { _count: { select: { characters: true } } },
   });
   return NextResponse.json({ scenarios: rows.map(serializeScenario) });
@@ -43,6 +46,7 @@ export async function POST(request: Request) {
           ? JSON.stringify(parsed.data.details)
           : null,
       },
+      omit: { imageData: true },
       include: { _count: { select: { characters: true } } },
     });
     return NextResponse.json({ scenario: serializeScenario(row) });

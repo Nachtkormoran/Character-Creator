@@ -1050,8 +1050,92 @@ export const TIMES_BY_GENRE: Record<string, string[]> = {
   superhelden: SUPERHELDEN_TIMES,
 };
 
-/** Eine Zeitangabe, passend zum Genre. Ohne bekanntes Genre: „Gegenwart". */
-export function randomTime(genre?: string): string {
+/**
+ * **Spannen** – über welchen Zeitraum sich Geschichten in diesem Szenario
+ * erstrecken.
+ *
+ * Die einzige Liste in diesem Projekt, die **nicht** nach Genre getrennt ist,
+ * und das aus einem sachlichen Grund: Zwei Winter sind in jeder Welt zwei
+ * Winter. Was ein Genre eigen macht, steckt im Rahmen darüber („Kurz vor dem
+ * Turnier", „Im dritten Quartal nach der Fusion") – die Dauer selbst ist
+ * genreneutral. Deshalb hier eine geteilte Liste statt neunmal derselben
+ * Einträge, dieselbe Überlegung wie bei `NEUTRAL_APPEARANCE`.
+ *
+ * Bewusst **ohne Jahreszahlen und ohne Ereignisse**: Beides steht im Rahmen,
+ * und eine Spanne, die ihrerseits etwas festlegt, könnte ihm widersprechen.
+ * Hier steht nur die Dauer und, wo es trägt, ihr Takt.
+ *
+ * Die dritte Dimension, die das Zeitfeld kennt – **was sich in der Spanne
+ * verschiebt** – fehlt hier absichtlich. Das ist keine Zufallsentscheidung,
+ * sondern der Anfang einer Geschichte: Es hängt an Ort, Regeln und Figuren
+ * zugleich. Dafür ist der KI-Knopf da, oder der Mensch.
+ */
+export const SPANS: string[] = [
+  // Kurz – Tage bis Wochen
+  "über wenige Tage, in denen sich alles entscheidet",
+  "über eine einzige Woche",
+  "über zwei, drei Wochen, in denen niemand zur Ruhe kommt",
+  "über einen einzigen langen Tag und die Nacht danach",
+  "über die Tage zwischen Ankündigung und Vollzug",
+  "über eine Woche, die alle später anders erzählen",
+  "über die Frist, die gesetzt wurde und abläuft",
+  "über zehn Tage, länger hält die Vorbereitung nicht",
+  "über ein paar Tage, die eigentlich kürzer geplant waren",
+  "über die Nächte einer einzigen Woche",
+  // Mittel – Monate, eine Saison
+  "über eine Saison",
+  "über einen Sommer",
+  "über einen Winter, der zu lang wird",
+  "über drei Monate, vom ersten Verdacht bis zur Gewissheit",
+  "über ein halbes Jahr",
+  "über die Monate bis zur Ernte",
+  "über die Zeit von der Ankündigung bis zum letzten Abend",
+  "über die Zeit zwischen zwei Festen",
+  "über einen Herbst und den Winter, der ihm folgt",
+  "über die Monate, die ein Bau nach dem Fundament braucht",
+  // Lang – Jahre
+  "über ein Jahr, vom einen Frühling zum nächsten",
+  "über zwei Winter hinweg",
+  "über drei Jahre, mit Lücken dazwischen",
+  "über fünf Jahre, in Sprüngen erzählt",
+  "über ein knappes Jahrzehnt",
+  "über die Jahre, die ein Kind zum Erwachsenen braucht",
+  "über zwei Amtszeiten, wie lang sie hier auch dauern",
+  "über die Zeit, die ein Bau vom Fundament bis zum Dach braucht",
+  "über sieben Jahre, wie man sie später zählt",
+  "über ein Jahrzehnt, in dem sich alles langsam dreht",
+  // Sehr lang – Generationen
+  "über eine Generation",
+  "über zwei Generationen, mit einem Sprung in der Mitte",
+  "über ein halbes Jahrhundert, in wenigen Bildern",
+  "über die Zeit, die aus einem Streit eine Feindschaft macht",
+  "über drei Leben, die einander nur kurz berühren",
+  "über so lange, dass die Anfänge zur Erzählung geworden sind",
+  // Besondere Takte
+  "immer wieder, in Abständen von Jahren",
+  "in einer einzigen Nacht, die sich anfühlt wie ein Jahr",
+  "in Rückblenden, die weit auseinanderliegen",
+  "in zwei Zeitebenen, die sich langsam berühren",
+];
+
+/**
+ * Eine Zeitangabe, passend zum Genre. Ohne bekanntes Genre: „Gegenwart".
+ *
+ * `ergaenzen` unterscheidet dieselben zwei Lagen wie bei `randomPlace`:
+ *
+ * - **Leeres Feld** (`false`): Rahmen **und** Spanne, zusammengesetzt.
+ * - **Gefülltes Feld** (`true`): nur eine **Spanne**, die angehängt wird. Was
+ *   Leute selbst eintippen, ist der Zeitpunkt („Sommer 1923"); die Dauer ist
+ *   das, woran man beim Aufschreiben nicht denkt.
+ *
+ * Der Rahmen endet in den Listen ohne Satzzeichen, deshalb der Punkt beim
+ * Zusammensetzen – zwei Sätze, wie das Feld sie erwartet.
+ */
+export function randomTime(genre?: string, ergaenzen = false): string {
+  const spanne = SPANS[Math.floor(Math.random() * SPANS.length)];
+  if (ergaenzen) return `Erzählt ${spanne}.`;
+
   const pool = TIMES_BY_GENRE[genre ?? ""] ?? GEGENWART_TIMES;
-  return pool[Math.floor(Math.random() * pool.length)];
+  const rahmen = pool[Math.floor(Math.random() * pool.length)];
+  return `${rahmen.replace(/[.\s]+$/, "")}. Erzählt ${spanne}.`;
 }

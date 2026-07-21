@@ -45,6 +45,19 @@ model Scenario {
   // Optional: Szenarien von vor diesem Feld haben keine Festlegungen.
   details    String?
 
+  // **Ein** Weltbild je Szenario (Establishing-Shot des Ortes, ohne Figuren) –
+  // anders als beim Charakter, der beliebig viele Bilder mit Primärmarkierung
+  // hat. Ein Szenario ist eine Stimmung, kein Steckbrief; ein repräsentatives
+  // Bild genügt, und die Mehrbild-Maschinerie (eigene Tabelle, `isPrimary`)
+  // wäre hier Aufwand ohne Gewinn. Deshalb direkt als Spalten, wie der
+  // Charakter es vor der Mehrbild-Umstellung hielt.
+  //
+  // `imageData` ist das Original (~2 MB Base64), `thumbnail` die kleine
+  // WebP-Fassung für die Anzeige. **Keine Listen-Route liefert `imageData`
+  // mit** (`omit`) – dieselbe Regel wie bei `CharacterImage`.
+  imageData  String?
+  thumbnail  String?
+
   characters Character[]
 }
 

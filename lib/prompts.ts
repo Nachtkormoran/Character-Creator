@@ -5,6 +5,7 @@ import type {
   CharacterInput,
   CharacterTraits,
   GeneratedCharacter,
+  ScenarioDetails,
   StoryHookAnchor,
 } from "./schema";
 
@@ -851,4 +852,202 @@ Wichtig: **Erfinde nichts.** Sagt der Entwurf zum Aussehen nichts, bleibt das Fe
 
 Kommt keine neue Person vor, gib eine leere Liste zurück.
 Alle Angaben auf Deutsch.`;
+}
+
+/**
+ * Baut den Prompt für das **Ergänzen einer einzelnen Festlegung** eines
+ * Szenarios (Ort, Zeit oder Regeln).
+ *
+ * Der Unterschied zum Würfel: Der zieht aus Listen und weiß nicht, was schon
+ * dasteht – „Berlin" und ein Dorfgasthof können nebeneinander landen. Dieser
+ * Prompt bekommt beides: **was im Feld selbst steht** und **was in den
+ * erlaubten Nachbarfeldern steht** (`SCENARIO_READS`, gefiltert von der Route).
+ * Das ist genau das, was eine feste Liste prinzipiell nicht kann.
+ *
+ * **Das Vorhandene ist Vorgabe, nicht Vorschlag.** Es geht wörtlich in den
+ * Prompt und bleibt unangetastet – dieselbe Regel wie bei `regenerate-text`,
+ * wo Name und Merkmale eingehen und nicht verändert werden. Ein Knopf, der
+ * „Berlin" durch „Hamburg" ersetzt, weil das besser zu seinem Einfall passt,
+ * wäre unbrauchbar. Deshalb heißt er „ergänzen" und nicht „erzeugen".
+ */
+export function buildScenarioFieldPrompt(
+  feld: "ort" | "zeit" | "regeln",
+  name: string,
+  /** Nur die Felder, die dieses Feld laut `SCENARIO_READS` lesen darf. */
+  umfeld: Partial<Record<string, string>>,
+  /** Was im Feld selbst steht – darf leer sein. */
+  vorhanden: string,
+  zusatz?: string,
+  /**
+   * Höchstlänge des Feldes in Zeichen (`SCENARIO_MAXLENGTHS[feld]`). Bei
+   * „ergänzen" enthält die Antwort das Vorhandene **mit** – die ganze Antwort
+   * muss also ins Feld passen, nicht nur das Neue. Steht sie im Prompt, hält
+   * sich das Modell meist daran; die Route deckelt zusätzlich `max_tokens`.
+   */
+  maxLen?: number,
+): string {
+  const kontext =
+    line("Szenario", name) +
+    line("Genre", umfeld.genre ? genreLabel(umfeld.genre) : undefined) +
+    line("Ort", umfeld.ort) +
+    line("Zeit", umfeld.zeit) +
+    line("Regeln", umfeld.regeln);
+
+  const bestand = vorhanden.trim();
+
+  // Die Aufgabe je Feld. Zwei Fassungen: mit und ohne Bestand – die Aufgabe
+  // ist eine andere, nicht bloß eine Abwandlung. „Fülle auf, was fehlt" an ein
+  // leeres Feld gerichtet ergäbe nichts.
+  const AUFGABE = {
+    ort: {
+      leer: `Entwirf den **Ort** dieses Szenarios: zuerst den Rahmen (Land, Region, Stadt) in einem Satz – wovon er lebt und wo seine Grenzen verlaufen –, dann zwei bis drei konkrete Schauplätze darin, je in einem Satz.`,
+      // Als **Endzustand** formuliert und nicht als Verfahren („prüfe erst,
+      // dann ergänze"). Gemessen: Mit der Verfahrensfassung hängte das Modell
+      // an „In einem anonymen Wohnblock" drei weitere Schauplätze an und ließ
+      // den Rahmen weg – es klassifizierte gar nicht erst. Eine Bedingung, die
+      // am fertigen Text prüfbar ist, hält besser als eine Anweisung, die
+      // unterwegs eine Entscheidung verlangt.
+      voll: `**Ergänze** den Ort dieses Szenarios. Am Ende muss im Feld **beides** stehen:
+
+1. **ein Rahmen** – Land, Region oder Stadt: worin das Ganze spielt, wovon es lebt, wo seine Grenzen verlaufen;
+2. **zwei bis drei Schauplätze darin**, je in einem Satz.
+
+Sieh nach, was davon schon dasteht, und ergänze nur das Fehlende. Steht dort bloß ein Stadt- oder Ländername, fehlen die Schauplätze. Steht dort ein einzelner Ort – eine Werkstatt, ein Wohnblock, ein Gasthaus –, dann fehlt der **Rahmen**: Nenne zuerst die Stadt oder Gegend, in der er liegt und die zu ihm passt, und ergänze ein bis zwei weitere Orte auf seiner Höhe.`,
+      regeln: `- Jeder Schauplatz nennt **ein Detail, das ihn kippen lässt**: etwas Kaputtes, Verschwiegenes oder Unfertiges. Ein Ort ohne Riss ist eine Kulisse.
+- **Die richtige Höhe ist der öffentliche Ort, nicht die Adresse.** Ein Szenario hält fest, was für *alle* Figuren gilt; eine bestimmte Wohnung ist der Schauplatz einer Szene und gehört nicht hierher. Prüfe jeden Ort so: Haben dort mehrere Menschen zu tun, die einander nicht kennen? Wenn nein, nimm die Ebene darüber.
+- Orte, die zueinander in Spannung stehen, sind besser als drei gleichartige.`,
+    },
+    zeit: {
+      leer: `Entwirf die **Zeit** dieses Szenarios: die Epoche oder das Jahr als Rahmen, die Spanne, über die sich Geschichten hier erstrecken (wenige Wochen bis Jahrzehnte), und was sich in dieser Spanne verschiebt.`,
+      // Ebenfalls als Endzustand – aus demselben Grund wie beim Ort.
+      voll: `**Ergänze** die Zeit dieses Szenarios. Am Ende muss im Feld **alles drei** stehen:
+
+1. **der Rahmen** – Epoche, Jahr oder Jahreszeit;
+2. **die Spanne**, über die sich Geschichten hier erstrecken: wenige Wochen, eine Saison, Jahre, Jahrzehnte;
+3. **was sich in dieser Spanne verschiebt** – was am Anfang noch gilt und am Ende nicht mehr.
+
+Sieh nach, was davon schon dasteht, und ergänze nur das Fehlende. Steht dort bloß eine Jahreszahl oder eine Jahreszeit, fehlen Spanne und Verschiebung.`,
+      regeln: `- Die **Verschiebung** ist der Kern: Was gilt am Anfang noch und am Ende nicht mehr? Ein Zeitraum, in dem nichts in Bewegung ist, ist ein Zeitpunkt mit mehr Wörtern.
+- Keine Handlung und keine Figuren – nur der Zustand der Welt und seine Bewegung.`,
+    },
+    regeln: {
+      leer: `Entwirf die **Regeln** dieses Szenarios: was darin gilt und für **alle** Figuren wahr ist – Technikstand, Magie, gesellschaftliche und politische Ordnung, Tabus, Machtverhältnisse. Zwei bis vier Sätze.`,
+      voll: `**Ergänze** die Regeln dieses Szenarios um ein bis zwei weitere. Sie müssen zu den vorhandenen passen, ohne sie zu wiederholen – eine Regel, die dasselbe in anderen Worten sagt, ist keine zweite.`,
+      regeln: `- Vollständige Sätze, jeder für sich verständlich und ohne die anderen lesbar.
+- Sie gelten für **alle**: keine Aussage über eine einzelne Person, keine Eigennamen, keine Jahreszahlen.
+- Nichts über Ort und Zeit – dafür gibt es die anderen Felder.`,
+    },
+  }[feld];
+
+  const bestandBlock = bestand
+    ? `\nDas steht bereits im Feld und ist **Vorgabe, nicht Vorschlag** – übernimm es unverändert und baue darum herum:\n${bestand}\n`
+    : "";
+
+  const zusatzBlock = zusatz?.trim()
+    ? `\nBesonders wichtig – zusätzliche Wünsche für dieses Feld:\n${zusatz.trim()}\n`
+    : "";
+
+  // Das Feld hat eine harte Obergrenze, und bei „ergänzen" zählt das Vorhandene
+  // mit hinein – die **ganze** Antwort muss hineinpassen, nicht nur das Neue.
+  // Deshalb der verbleibende Rest, nicht das volle Limit: Steht schon viel im
+  // Feld, ist wenig Platz für Neues, und das Modell soll es wissen, bevor es
+  // schreibt. Fällt der Rest knapp aus, wird die Grenze als „knapp" benannt –
+  // eine reine Zahl verleitet das Modell, sie punktgenau auszureizen.
+  const budgetBlock = maxLen
+    ? (() => {
+        const rest = maxLen - bestand.length;
+        const knapp = rest < maxLen * 0.35;
+        return `- **Länge:** Die gesamte Antwort (das Vorhandene eingeschlossen) muss unter ${maxLen} Zeichen bleiben.${
+          bestand
+            ? ` Für Neues sind damit noch etwa ${Math.max(rest, 0)} Zeichen frei${
+                knapp ? " – fasse dich also knapp" : ""
+              }.`
+            : " Schreibe kompakt."
+        }\n`
+      })()
+    : "";
+
+  return `${bestand ? AUFGABE.voll : AUFGABE.leer}
+
+Was über dieses Szenario schon feststeht:
+${kontext || "- (noch nichts)\n"}${bestandBlock}
+Anforderungen:
+${AUFGABE.regeln}
+${budgetBlock}- **Alles muss zu den Festlegungen oben passen.** Widersprich ihnen nie; wo sie schweigen, ergänze Stimmiges. Das Genre bindet dabei am stärksten: Was zu ihm nicht passt, gehört nicht hierher, auch wenn es für sich genommen gut wäre.
+- Halte dich an die Welt, die schon dasteht: Nennt sie einen echten Ort, bleib bei echten; ist sie erfunden, erfinde weiter.
+- Konkret und sinnlich statt allgemein – ein Geräusch, ein Geruch, eine Gewohnheit sagen mehr als ein Adjektiv.
+- Auf Deutsch, nüchtern und ohne Kitsch.
+${zusatzBlock}
+Form der Antwort: ${
+    feld === "regeln"
+      ? "vollständige Sätze hintereinander, als Fließtext."
+      : "**eine Zeile je Angabe**, durch Zeilenumbrüche getrennt, jede ein einzelner Satz."
+  } Keine Nummerierung, keine Spiegelstriche, keine Doppelpunkt-Überschriften wie „Hafenviertel: …", kein Markdown, keine Einleitung und keine Erklärung. Antworte mit **nichts als dem fertigen Feldinhalt** – einschließlich des Vorhandenen, an der richtigen Stelle eingefügt.`;
+}
+
+/**
+ * Baut den Prompt für das **Szenario-Bild** – einen Establishing-Shot der Welt.
+ *
+ * Der entscheidende Unterschied zum Charakter-Bild: Ein Szenario ist kein
+ * Mensch, sondern ein **Ort zu einer Zeit**. Das Bild zeigt deshalb die
+ * Umgebung und **keine Figuren** – nicht nur, weil das die Entscheidung war,
+ * sondern weil ein Szenario für viele Figuren zugleich gilt und keine einzelne
+ * es bebildern sollte. Das „keine Personen" steht daher betont und mehrfach im
+ * Prompt: Bild-Modelle setzen sonst reflexhaft einen Menschen in die Szene.
+ *
+ * Wiederverwendet wird die Welt-Karte `BILDWELTEN` (Genre → Epoche, Umgebung,
+ * Beispielorte) und dieselbe **Stilauswahl** wie beim Charakter
+ * (`IMAGE_STYLES`); die Stiltexte sind hier aber auf eine **Szene** statt auf
+ * ein Portrait gemünzt. „Skizze" zeigt beim Charakter eine Büste ohne Umgebung –
+ * das ergäbe für ein Weltbild keinen Sinn, hier ist es eine lose gemalte
+ * Landschaftsstudie.
+ *
+ * Quelle ist `ScenarioDetails`: **Ort** trägt das Motiv, **Zeit** und Genre die
+ * Epoche, **Beschreibung** die Stimmung. Ort und Beschreibung können lang sein
+ * (bis 2000 Zeichen mit mehreren Schauplätzen); für ein einzelnes Bild wird
+ * daraus der Anfang genommen und das Modell angewiesen, **einen** Blick zu
+ * wählen, nicht alle Schauplätze zugleich zu zeigen. Die **Regeln** gehen
+ * bewusst nicht ein – Technikstand und Gesellschaftsordnung sind selten ein
+ * Bildmotiv und lenken eher ab.
+ */
+export function buildScenarioImagePrompt(
+  details: ScenarioDetails,
+  imageStyle: string,
+  options: { extraPrompt?: string } = {},
+): string {
+  const welt = BILDWELTEN[details.genre ?? ""] ?? BILDWELTEN[DEFAULT_GENRE];
+
+  // Ort und Beschreibung tragen das Motiv bzw. die Stimmung, dürfen aber lang
+  // sein. Für einen Bild-Prompt genügt der Anfang – der Rahmen steht vorn, die
+  // einzelnen Schauplätze und Verschiebungen dahinter (s. Ableitungs-Prompt).
+  const ort = details.ort.trim().slice(0, 600);
+  const zeit = details.zeit.trim().slice(0, 300);
+  const stimmung = details.beschreibung.trim().slice(0, 600);
+
+  // Szenen-Stiltexte, parallel zu `buildImagePrompt`, aber auf eine Umgebung
+  // statt ein Gesicht gemünzt.
+  const stilBeschreibung: Record<string, string> = {
+    illustration: `Stylized environment concept art, in the style of high-end digital concept art / movie key art. Clearly an illustration and NOT a photograph: visible digital brushwork and painterly rendering, slightly stylized and idealized shapes, artistic illustrative shading. Polished and detailed, with cinematic lighting, atmospheric depth and rich, slightly heightened color grading.`,
+    malerisch: `Expressive painterly landscape, in the style of a fine-art oil / gouache painting. Clearly a hand-painted artwork with visible brush strokes, thick impasto texture and an artistic, slightly loose rendering — NOT a photograph. Rich, harmonious palette and warm painterly light, with soft atmospheric depth.`,
+    fotorealistisch: `Photorealistic establishing photograph of a place. Shot on a full-frame camera, natural lighting, realistic textures and materials, high detail, deep depth of field. Looks like a real photograph, not an illustration.`,
+    skizze: `Soft painted environment study, like a loose digital sketch in gouache or matte oil. Muted, warm earthy palette (ochre, cream, olive, soft browns) with gentle, diffuse light and no dramatic contrast. Visible dry brush strokes and loose, sketchy edges — the painting fades out towards the borders and looks slightly unfinished, on a subtly textured paper-like surface. Calm, quiet, intimate mood.`,
+  };
+  const stil = stilBeschreibung[imageStyle] || stilBeschreibung.illustration;
+
+  const setzung =
+    line("Place", ort) +
+    line("Era / time", [zeit, welt.epoche].filter(Boolean).join(" — ")) +
+    line("Mood and atmosphere", stimmung);
+
+  const extraBlock = options.extraPrompt?.trim()
+    ? `\nAdditional instructions from the user (important – incorporate these): ${options.extraPrompt.trim()}\n`
+    : "";
+
+  // „Keine Personen" doppelt: einmal als Bildinhalt, einmal als Rahmen. Das
+  // Modell setzt sonst gern eine einzelne Figur als „Anker" in die Szene.
+  return `Establishing shot of a place — the world of a story, depicted as an empty scene with NO people. ${stil}
+${setzung || `- A ${welt.umgebung} (e.g. ${welt.orte})\n`}${extraBlock}
+Show a single, coherent view of this world — if several locations are described, choose ONE fitting vantage point rather than combining them. Convey the era through architecture, materials, vehicles and objects.
+
+Framing: wide environmental / landscape composition, the place itself is the subject, with atmospheric depth. Absolutely NO people, NO characters, NO figures, NO portraits, NO crowds — an unpopulated scene. No text, no watermark, no labels.`;
 }

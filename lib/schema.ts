@@ -360,26 +360,68 @@ export function normalizeInputGenre(raw: unknown): CharacterInput {
  * Alles ist optional und darf leer bleiben. Ein Szenario entsteht oft, bevor
  * feststeht, wo es spielt – ein Pflichtfeld würde nur zu Platzhaltern führen.
  */
+/**
+ * **Das Zeichenlimit je Szenario-Feld – eine Quelle für drei Verbraucher.**
+ *
+ * Das Schema unten zieht sein `.max(...)` von hier, das Formular zeigt die Zahl
+ * unter dem Feld an und setzt `maxLength`, und die Ergänzen-Route bemisst danach
+ * ihr `max_tokens` und das Budget im Prompt. Stünde die Zahl an jeder dieser
+ * Stellen einzeln, liefe die KI-Erzeugung irgendwann über ein Limit, das das
+ * Formular längst höher gesetzt hat – der Fehler fiele erst beim Speichern auf.
+ *
+ * Ort und Zeit waren einmal auf 300 bzw. 200 Zeichen bemessen, als dort ein
+ * Schauplatz und ein Datum standen („Ein Fischerdorf an der Nordküste",
+ * „Spätherbst 1923"). Seit die Ableitung ein **Gebiet mit mehreren Orten** und
+ * einen **Zeitraum samt dem, was sich in ihm verschiebt** liefert, sind es
+ * mehrere Sätze – dieselbe Lehre wie bei `storyHooks`: Ein zu enges Limit
+ * schlägt nicht früh zu, sondern spät, erst beim Speichern.
+ */
+// Bewusst **ohne** Typ-Annotation über `keyof ScenarioDetails`: Dieser Typ wird
+// aus `scenarioDetailsSchema` abgeleitet, das seinerseits die Werte hier liest –
+// eine solche Annotation wäre ein Zirkelbezug. Die Vollständigkeit gegen das
+// Schema wird stattdessen weiter unten geprüft (`_maxlengthsCheck`), sobald
+// `ScenarioDetails` existiert.
+export const SCENARIO_MAXLENGTHS = {
+  genre: 60,
+  ort: 2000,
+  zeit: 1000,
+  regeln: 4000,
+  beschreibung: 4000,
+  handlung: 4000,
+} as const;
+
 export const scenarioDetailsSchema = z.object({
-  genre: z.string().trim().max(60).optional().default(""),
-  // Ort und Zeit waren auf 300 bzw. 200 Zeichen bemessen, als dort ein
-  // Schauplatz und ein Datum standen („Ein Fischerdorf an der Nordküste",
-  // „Spätherbst 1923"). Seit die Ableitung ein **Gebiet mit mehreren Orten**
-  // und einen **Zeitraum samt dem, was sich in ihm verschiebt** liefert, sind
-  // es mehrere Sätze – gemessen 400–800 Zeichen für den Ort.
-  //
-  // Dieselbe Lehre wie bei `storyHooks`: Ein zu enges Limit schlägt nicht früh
-  // zu, sondern spät. Es hielt weder das Formular noch die Erzeugung auf,
-  // sondern erst das Speichern – mit „Too big: expected string to have <=300
-  // characters", wenn die Arbeit längst getan war.
-  ort: z.string().trim().max(2000).optional().default(""),
-  zeit: z.string().trim().max(1000).optional().default(""),
-  regeln: z.string().trim().max(4000).optional().default(""),
-  beschreibung: z.string().trim().max(4000).optional().default(""),
-  handlung: z.string().trim().max(4000).optional().default(""),
+  genre: z.string().trim().max(SCENARIO_MAXLENGTHS.genre).optional().default(""),
+  ort: z.string().trim().max(SCENARIO_MAXLENGTHS.ort).optional().default(""),
+  zeit: z.string().trim().max(SCENARIO_MAXLENGTHS.zeit).optional().default(""),
+  regeln: z
+    .string()
+    .trim()
+    .max(SCENARIO_MAXLENGTHS.regeln)
+    .optional()
+    .default(""),
+  beschreibung: z
+    .string()
+    .trim()
+    .max(SCENARIO_MAXLENGTHS.beschreibung)
+    .optional()
+    .default(""),
+  handlung: z
+    .string()
+    .trim()
+    .max(SCENARIO_MAXLENGTHS.handlung)
+    .optional()
+    .default(""),
 });
 
 export type ScenarioDetails = z.infer<typeof scenarioDetailsSchema>;
+
+// Sichert die Vollständigkeit von `SCENARIO_MAXLENGTHS` gegen das Schema, ohne
+// den Zirkelbezug, den eine Typ-Annotation an der Konstante selbst erzeugte:
+// Fehlte hier ein Feld, schlüge diese Zuweisung fehl.
+const _maxlengthsCheck: Record<keyof ScenarioDetails, number> =
+  SCENARIO_MAXLENGTHS;
+void _maxlengthsCheck;
 
 /**
  * Reihenfolge & Anzeigenamen der Szenario-Felder. Wie bei `TRAIT_LABELS` ist
@@ -415,6 +457,43 @@ export const SCENARIO_HINTS: Record<keyof ScenarioDetails, string> = {
     "Fließtext über die Welt des Szenarios. Lässt sich aus den Feldern darüber erzeugen und danach frei bearbeiten.",
   handlung:
     "Wer gerät hier mit wem worüber aneinander? Lässt sich aus den Festlegungen und den zugeordneten Charakteren erzeugen – dafür muss das Szenario gespeichert sein und Figuren enthalten.",
+};
+
+/**
+ * **Welches Feld welche anderen lesen darf, wenn es per KI erzeugt wird.**
+ *
+ * Die Festlegungen stehen nicht gleichberechtigt nebeneinander, sie haben eine
+ * Richtung:
+ *
+ * ```
+ * Genre ──► Ort ──► Beschreibung ──► Handlung
+ *       └──► Zeit ─┘                    ▲
+ *       └──► Regeln ────────────────────┘
+ * ```
+ *
+ * Erzeugt wird deshalb **nur aus dem, was oberhalb steht**. Flösse die
+ * Beschreibung in die Ort-Erzeugung zurück, entstünde ein Kreis: Die
+ * Beschreibung wurde aus dem alten Ort geschrieben, der neue Ort entstünde aus
+ * ihr – und danach passt die Beschreibung nicht mehr zu dem Ort, aus dem sie
+ * stammt. Beim Handlungsentwurf wäre es schlimmer: Er hängt an den zugeordneten
+ * Figuren, und dann definierten die Ereignisse einer einzelnen Geschichte
+ * rückwirkend die Welt, in der alle anderen spielen.
+ *
+ * Die Karte gilt **serverseitig**: Die Routen filtern danach, was in den Prompt
+ * darf. Der Client schickt die ganzen Festlegungen – so kann eine neue
+ * Aufrufstelle die Regel nicht versehentlich umgehen.
+ *
+ * `genre` kommt als **Ziel** nicht vor: Es wird nie erzeugt, sondern gewählt.
+ * Als **Quelle** steht es überall, denn es bindet alles andere.
+ */
+export const SCENARIO_READS: Partial<
+  Record<keyof ScenarioDetails, Array<keyof ScenarioDetails>>
+> = {
+  ort: ["genre", "zeit", "regeln"],
+  zeit: ["genre", "ort", "regeln"],
+  regeln: ["genre", "ort", "zeit"],
+  beschreibung: ["genre", "ort", "zeit", "regeln"],
+  handlung: ["genre", "ort", "zeit", "regeln", "beschreibung"],
 };
 
 /**

@@ -3,6 +3,7 @@
 import {
   SCENARIO_HINTS,
   SCENARIO_LABELS,
+  SCENARIO_MAXLENGTHS,
   SCENARIO_MULTILINE,
   type ScenarioDetails,
 } from "@/lib/schema";
@@ -22,12 +23,37 @@ import { useAutoGrow } from "./useAutoGrow";
  * zurück (so wie `randomBackground` es seit jeher tut).
  */
 const WUERFEL: Partial<
-  Record<keyof ScenarioDetails, (genre?: string) => string>
+  Record<keyof ScenarioDetails, (genre?: string, ergaenzen?: boolean) => string>
 > = {
   ort: randomPlace,
   zeit: randomTime,
   regeln: randomRules,
 };
+
+/**
+ * Wie ein Würfelwurf ins Feld kommt: **anhängen statt ersetzen**, sobald dort
+ * etwas steht.
+ *
+ * Vorher warf jeder Klick weg, was im Feld stand. Das war richtig, solange ein
+ * Wurf ein vollständiger Ort war – und wurde falsch, als das Feld anfing,
+ * mehrere Ebenen aufzunehmen: Wer „Berlin" eingetippt hat und Vorschläge für
+ * Schauplätze will, darf sein Berlin nicht verlieren. Die Zieh-Funktionen
+ * liefern deshalb bei `ergaenzen` einen **Baustein** statt eines vollen Satzes
+ * (Begründung je Funktion in `scenarioPlaces.ts` / `scenarioTimes.ts`).
+ *
+ * Verbunden wird verschieden: Ort und Zeit sind untereinander lesbare Zeilen,
+ * die Regeln bleiben ein Fließtext aus Sätzen – so, wie die Felder es jeweils
+ * schon halten.
+ */
+function anhaengen(
+  key: keyof ScenarioDetails,
+  vorhanden: string,
+  neu: string,
+): string {
+  const alt = vorhanden.trimEnd();
+  if (!alt) return neu;
+  return key === "regeln" ? `${alt} ${neu}` : `${alt}\n${neu}`;
+}
 
 /**
  * Mindesthöhe der mehrzeiligen Felder in Zeilen. Nur die **Untergrenze** –
@@ -62,6 +88,7 @@ function AutoGrowTextarea({
   onChange,
   disabled,
   rows,
+  maxLength,
   className,
 }: {
   id: string;
@@ -69,6 +96,7 @@ function AutoGrowTextarea({
   onChange: (value: string) => void;
   disabled: boolean;
   rows: number;
+  maxLength: number;
   className: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -82,6 +110,7 @@ function AutoGrowTextarea({
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
       rows={rows}
+      maxLength={maxLength}
       // `resize-none`, nicht mehr `resize-y`: Das Feld passt sich ohnehin an,
       // und von Hand gezogene Höhe würde beim nächsten Tastendruck wieder
       // überschrieben – ein Griff, der sichtbar nichts hält, ist schlechter
@@ -103,12 +132,31 @@ function AutoGrowTextarea({
  * `title` (s. u.), der ohnehin mehr Raum hat als jeder Platzhalter.
  */
 const ZUSATZ_PLATZHALTER: Partial<Record<keyof ScenarioDetails, string>> = {
+  ort: "Stichwörter – am Wasser, geteilte Stadt …",
+  zeit: "Stichwörter – kurz vor dem Umbruch …",
+  regeln: "Stichwörter – wer schweigt, wer zahlt …",
   beschreibung: "Stichwörter – Regen, misstrauisch …",
   handlung: "Stichwörter – Streit am Hafen, kein Toter …",
 };
 
+/**
+ * Felder, deren KI-Knopf **ergänzt statt ersetzt**: Was dort steht, geht als
+ * Vorgabe in den Prompt und kommt im Ergebnis wieder vor. Steuert nur die
+ * Beschriftung – die Sache selbst entscheidet die aufrufende Seite, die weiß,
+ * welche Route sie ruft.
+ */
+const ERGAENZT: ReadonlySet<keyof ScenarioDetails> = new Set([
+  "ort",
+  "zeit",
+  "regeln",
+]);
+
 /** Was der KI-Knopf je Feld tut – als Titel am Knopf. */
 const GENERATE_HINTS: Partial<Record<keyof ScenarioDetails, string>> = {
+  ort: "Ergänzt den Ort passend zu Genre, Zeit und Regeln – was schon dasteht, bleibt stehen",
+  zeit: "Ergänzt die Zeit passend zu Genre, Ort und Regeln – was schon dasteht, bleibt stehen",
+  regeln:
+    "Ergänzt die Regeln passend zu Genre, Ort und Zeit – was schon dasteht, bleibt stehen",
   beschreibung: "Erzeugt die Beschreibung aus Genre, Ort, Zeit und Regeln",
   handlung:
     "Erzeugt einen Handlungsentwurf aus den Festlegungen und den zugeordneten Charakteren samt ihren Ansatzpunkten",
@@ -234,16 +282,31 @@ export function ScenarioFields({
                   {WUERFEL[key] && (
                     <button
                       type="button"
-                      onClick={() => set(key, WUERFEL[key]!(details.genre))}
+                      onClick={() =>
+                        set(
+                          key,
+                          anhaengen(
+                            key,
+                            details[key],
+                            WUERFEL[key]!(
+                              details.genre,
+                              details[key].trim() !== "",
+                            ),
+                          ),
+                        )
+                      }
                       disabled={disabled}
                       title={
-                        details.genre
-                          ? `Zufälliger Vorschlag, passend zum Genre – ersetzt den Inhalt`
-                          : `Zufälliger Vorschlag – ohne gewähltes Genre aus der Gegenwart`
+                        (details[key].trim()
+                          ? "Hängt einen weiteren Vorschlag an – löscht nichts. "
+                          : "Zufälliger Vorschlag. ") +
+                        (details.genre
+                          ? "Passend zum gewählten Genre."
+                          : "Ohne gewähltes Genre aus der Gegenwart.")
                       }
                       className={`${kopfzeilenClass} hover:bg-black/[0.04] dark:hover:bg-white/[0.06]`}
                     >
-                      🎲 Würfeln
+                      {details[key].trim() ? "🎲 Ergänzen" : "🎲 Würfeln"}
                     </button>
                   )}
                   {generatable?.has(key) && onGenerate && (
@@ -258,11 +321,20 @@ export function ScenarioFields({
                       title={GENERATE_HINTS[key]}
                       className={`${kopfzeilenClass} whitespace-nowrap hover:bg-black/[0.04] dark:hover:bg-white/[0.06]`}
                     >
+                      {/*
+                        Drei Beschriftungen, weil der Knopf drei verschiedene
+                        Dinge tut. Bei Ort, Zeit und Regeln **ergänzt** er und
+                        verliert nichts; bei den Textfeldern ersetzt er. Ein
+                        gemeinsames „Neu erzeugen" hätte am Ortsfeld gedroht,
+                        etwas wegzunehmen, was dort bleibt.
+                      */}
                       {generatingField === key
                         ? "Schreibt …"
-                        : details[key].trim()
-                          ? "✨ Neu erzeugen"
-                          : "✨ Erzeugen"}
+                        : !details[key].trim()
+                          ? "✨ Erzeugen"
+                          : ERGAENZT.has(key)
+                            ? "✨ Ergänzen"
+                            : "✨ Neu erzeugen"}
                     </button>
                   )}
                 </div>
@@ -291,6 +363,7 @@ export function ScenarioFields({
                   onChange={(v) => set(key, v)}
                   disabled={disabled}
                   rows={MINDESTZEILEN[key] ?? 6}
+                  maxLength={SCENARIO_MAXLENGTHS[key]}
                   className={controlClass}
                 />
               ) : (
@@ -299,13 +372,36 @@ export function ScenarioFields({
                   value={details[key]}
                   onChange={(e) => set(key, e.target.value)}
                   disabled={disabled}
+                  maxLength={SCENARIO_MAXLENGTHS[key]}
                   className={controlClass}
                 />
               )}
 
-              <span className="text-xs text-foreground/50">
-                {SCENARIO_HINTS[key]}
-              </span>
+              {/*
+                Hinweis und Zähler in einer Zeile: links „wofür", rechts „wie
+                lang". Das Genre ist ein Auswahlfeld mit fester Wortliste – ein
+                Zeichenzähler wäre dort sinnlos. Der Zähler nennt die tatsächliche
+                **und** die maximale Länge, weil die Ergänzen-Funktion die Grenze
+                erreichen kann und man dann sehen soll, wie nah man ihr ist; er
+                färbt sich bernsteinfarben, sobald es eng wird.
+              */}
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <span className="text-xs text-foreground/50">
+                  {SCENARIO_HINTS[key]}
+                </span>
+                {key !== "genre" && (
+                  <span
+                    className={`shrink-0 text-xs tabular-nums ${
+                      details[key].length >= SCENARIO_MAXLENGTHS[key] * 0.9
+                        ? "text-amber-600 dark:text-amber-500"
+                        : "text-foreground/40"
+                    }`}
+                    aria-label={`${details[key].length} von ${SCENARIO_MAXLENGTHS[key]} Zeichen`}
+                  >
+                    {details[key].length} / {SCENARIO_MAXLENGTHS[key]}
+                  </span>
+                )}
+              </div>
             </div>
           );
         },

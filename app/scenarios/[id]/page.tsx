@@ -1,21 +1,29 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   buildScenarioFile,
   deleteScenario,
+  deleteScenarioImage,
   findPlotPersons,
   generateScenarioDescription,
+  generateScenarioField,
+  generateScenarioImage,
   generateScenarioPlot,
   getScenario,
+  getScenarioImage,
+  saveScenarioImage,
   updateScenario,
 } from "@/lib/client";
 import { downloadBlob, safeFileName } from "@/lib/download";
+import { fileToDataUrl } from "@/lib/image";
 import { scenarioFileName } from "@/lib/scenarioFile";
 import {
+  DEFAULT_IMAGE_STYLE,
+  IMAGE_STYLES,
   SCENARIO_LABELS,
   normalizeScenarioDetails,
   type PlotPerson,
@@ -23,6 +31,7 @@ import {
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
 import { primaryImage, type StoredCharacter } from "@/lib/serialize";
+import { ImageLightbox } from "../../components/ImageLightbox";
 import { PlotPersonModal } from "../../components/PlotPersonModal";
 import { ScenarioFields } from "../../components/ScenarioFields";
 
@@ -79,8 +88,41 @@ export default function ScenarioDetailPage({
     Partial<Record<keyof ScenarioDetails, string>>
   >({});
 
-  /** Hier sind beide Textfelder erzeugbar – das Szenario ist gespeichert. */
+  // -------------------------------------------------------------------------
+  // Weltbild des Szenarios
+  // -------------------------------------------------------------------------
+
+  /**
+   * Das **gespeicherte** Bild als Thumbnail (oder `null`). Das Original reist
+   * nicht mit – es wird für das Vollbild einzeln über `getScenarioImage`
+   * geholt, wie bei den Charakter-Bildern.
+   */
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+
+  /**
+   * Ein frisch erzeugtes oder hochgeladenes Bild, das **noch nicht gespeichert**
+   * ist. Solange ein Kandidat vorliegt, wird er statt des gespeicherten Bilds
+   * gezeigt – erst „Übernehmen" ersetzt das gespeicherte. So zerstört ein
+   * probeweises „Neu erzeugen" das vorhandene Bild nicht, bis eins gefällt.
+   */
+  const [kandidat, setKandidat] = useState<string | null>(null);
+  const [bildStil, setBildStil] = useState<string>(DEFAULT_IMAGE_STYLE);
+  const [bildZusatz, setBildZusatz] = useState("");
+  const [bildBusy, setBildBusy] = useState(false);
+  const [bildFehler, setBildFehler] = useState<string | null>(null);
+  /** Original fürs Vollbild – geladen bei Klick auf das gespeicherte Bild. */
+  const [vollbild, setVollbild] = useState<string | null>(null);
+  const dateiWahl = useRef<HTMLInputElement>(null);
+
+  /**
+   * Hier ist alles erzeugbar: Ort, Zeit und Regeln lassen sich ergänzen, die
+   * beiden Textfelder erzeugen. Der Handlungsentwurf kann nur hier stehen – er
+   * braucht ein gespeichertes Szenario mit Besetzung.
+   */
   const ERZEUGBAR: ReadonlySet<keyof ScenarioDetails> = new Set([
+    "ort",
+    "zeit",
+    "regeln",
     "beschreibung",
     "handlung",
   ]);
@@ -97,7 +139,12 @@ export default function ScenarioDetailPage({
    */
   async function handleGenerate(key: keyof ScenarioDetails) {
     if (generatingField) return;
+    // Ort, Zeit und Regeln werden **ergänzt** – dort kann nichts verlorengehen,
+    // also fragt auch nichts nach. Beschreibung und Handlungsentwurf werden
+    // ersetzt; von Hand Geschriebenes wäre sonst still weg.
+    const ersetzt = key === "beschreibung" || key === "handlung";
     if (
+      ersetzt &&
       details[key].trim() &&
       !confirm(`${SCENARIO_LABELS[key]} wird ersetzt. Fortfahren?`)
     )
@@ -105,7 +152,18 @@ export default function ScenarioDetailPage({
     setGeneratingField(key);
     setSaveError(null);
     try {
-      if (key === "handlung") {
+      if (key === "ort" || key === "zeit" || key === "regeln") {
+        // Ergänzen statt ersetzen: Was im Feld steht, geht als Vorgabe mit und
+        // kommt im Ergebnis wieder vor. Deshalb hier auch keine Rückfrage –
+        // es kann nichts verlorengehen.
+        const { wert } = await generateScenarioField(
+          key,
+          name.trim(),
+          details,
+          zusatz[key] ?? "",
+        );
+        setDetails((d) => ({ ...d, [key]: wert }));
+      } else if (key === "handlung") {
         const { handlung } = await generateScenarioPlot(
           id,
           name.trim(),
@@ -128,12 +186,85 @@ export default function ScenarioDetailPage({
     }
   }
 
+  /**
+   * Ein Weltbild erzeugen. Es landet als **Kandidat** (ungespeichert) – das
+   * gespeicherte Bild bleibt, bis „Übernehmen" es ersetzt. Die Festlegungen
+   * gehen im aktuellen, womöglich ungespeicherten Stand mit; die Route
+   * persistiert nichts.
+   */
+  async function bildErzeugen() {
+    if (bildBusy) return;
+    setBildBusy(true);
+    setBildFehler(null);
+    try {
+      const { imageData } = await generateScenarioImage(details, bildStil, {
+        extraPrompt: bildZusatz.trim() || undefined,
+      });
+      setKandidat(imageData);
+    } catch (e) {
+      setBildFehler(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setBildBusy(false);
+    }
+  }
+
+  /** Ein eigenes Bild hochladen – ebenfalls erst Kandidat, dann „Übernehmen". */
+  async function bildHochladen(file: File) {
+    setBildFehler(null);
+    try {
+      setKandidat(await fileToDataUrl(file));
+    } catch (e) {
+      setBildFehler(e instanceof Error ? e.message : "Datei fehlerhaft.");
+    }
+  }
+
+  /** Den Kandidaten speichern – ersetzt das bisherige Bild. */
+  async function bildUebernehmen() {
+    if (!kandidat || bildBusy) return;
+    setBildBusy(true);
+    setBildFehler(null);
+    try {
+      const s = await saveScenarioImage(id, kandidat);
+      setThumbnail(s.thumbnail);
+      setKandidat(null);
+    } catch (e) {
+      setBildFehler(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setBildBusy(false);
+    }
+  }
+
+  async function bildLoeschen() {
+    if (bildBusy || !thumbnail) return;
+    if (!confirm("Das Szenario-Bild löschen?")) return;
+    setBildBusy(true);
+    setBildFehler(null);
+    try {
+      const s = await deleteScenarioImage(id);
+      setThumbnail(s.thumbnail);
+    } catch (e) {
+      setBildFehler(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
+    } finally {
+      setBildBusy(false);
+    }
+  }
+
+  /** Original fürs Vollbild nachladen (das Thumbnail ist nur die Vorschau). */
+  async function vollbildOeffnen() {
+    try {
+      setVollbild(await getScenarioImage(id));
+    } catch (e) {
+      setBildFehler(e instanceof Error ? e.message : "Bild laden fehlgeschlagen.");
+    }
+  }
+
   useEffect(() => {
     getScenario(id)
       .then(({ scenario, characters }) => {
         setName(scenario.name);
         setDetails(scenario.details);
         setCharacters(characters);
+        setThumbnail(scenario.thumbnail);
         setSaved(
           JSON.stringify({ name: scenario.name, details: scenario.details }),
         );
@@ -427,6 +558,177 @@ export default function ScenarioDetailPage({
         )}
       </section>
 
+      <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+        <h2 className="mb-1 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+          Weltbild
+        </h2>
+        <p className="mb-4 text-xs text-foreground/50">
+          Ein Bild der Welt – Ort, Zeit und Stimmung, ohne Figuren. Entsteht aus
+          den Festlegungen oben.
+        </p>
+
+        <div className="grid gap-5 sm:grid-cols-[16rem_1fr]">
+          {/* Bildfläche: Kandidat (ungespeichert) hat Vorrang vor dem
+              gespeicherten Bild, sonst ein Platzhalter. */}
+          <div>
+            <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.03]">
+              {kandidat ? (
+                <Image
+                  src={kandidat}
+                  alt="Vorschau des Szenario-Bilds"
+                  fill
+                  sizes="16rem"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : thumbnail ? (
+                <button
+                  type="button"
+                  onClick={vollbildOeffnen}
+                  title="In voller Größe ansehen"
+                  className="absolute inset-0 h-full w-full cursor-zoom-in"
+                >
+                  <Image
+                    src={thumbnail}
+                    alt={`Weltbild von ${name}`}
+                    fill
+                    sizes="16rem"
+                    className="object-cover"
+                    unoptimized
+                  />
+                </button>
+              ) : (
+                <div className="flex h-full items-center justify-center text-4xl opacity-25">
+                  🏞️
+                </div>
+              )}
+            </div>
+            {kandidat && (
+              <p className="mt-1 text-center text-xs text-amber-700 dark:text-amber-400">
+                Vorschau – noch nicht gespeichert
+              </p>
+            )}
+          </div>
+
+          {/* Steuerung */}
+          <div className="flex flex-col gap-3">
+            {kandidat ? (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={bildUebernehmen}
+                  disabled={bildBusy}
+                  className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {bildBusy ? "Speichere …" : "Als Szenario-Bild speichern"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setKandidat(null)}
+                  disabled={bildBusy}
+                  className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                >
+                  Verwerfen
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="bild-stil"
+                    className="text-xs font-medium text-foreground/70"
+                  >
+                    Stil
+                  </label>
+                  <select
+                    id="bild-stil"
+                    value={bildStil}
+                    onChange={(e) => setBildStil(e.target.value)}
+                    disabled={bildBusy}
+                    className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                  >
+                    {IMAGE_STYLES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label
+                    htmlFor="bild-zusatz"
+                    className="text-xs font-medium text-foreground/70"
+                  >
+                    Stichwörter (optional)
+                  </label>
+                  <input
+                    id="bild-zusatz"
+                    value={bildZusatz}
+                    onChange={(e) => setBildZusatz(e.target.value)}
+                    disabled={bildBusy}
+                    maxLength={1000}
+                    placeholder="z. B. Regen, Dämmerung, Blick von oben"
+                    title="Zusätzliche Wünsche fürs Bild – Perspektive, Lichtstimmung, Wetter. Wird nicht gespeichert."
+                    className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={bildErzeugen}
+                    disabled={bildBusy}
+                    className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    {bildBusy
+                      ? "Erzeuge …"
+                      : thumbnail
+                        ? "✨ Neu erzeugen"
+                        : "✨ Bild erzeugen"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dateiWahl.current?.click()}
+                    disabled={bildBusy}
+                    className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                  >
+                    Hochladen
+                  </button>
+                  {thumbnail && (
+                    <button
+                      type="button"
+                      onClick={bildLoeschen}
+                      disabled={bildBusy}
+                      className="rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 disabled:opacity-50 dark:text-red-400"
+                    >
+                      Löschen
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={dateiWahl}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) bildHochladen(f);
+                    e.target.value = "";
+                  }}
+                />
+              </>
+            )}
+
+            {bildFehler && (
+              <p className="text-xs text-red-600 dark:text-red-400">
+                {bildFehler}
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
@@ -559,6 +861,14 @@ export default function ScenarioDetailPage({
           dirty={dirty}
           onConfirm={() => personAnlegen(gewaehlt)}
           onClose={() => setGewaehlt(null)}
+        />
+      )}
+
+      {vollbild && (
+        <ImageLightbox
+          src={vollbild}
+          alt={`Weltbild von ${name}`}
+          onClose={() => setVollbild(null)}
         />
       )}
     </div>

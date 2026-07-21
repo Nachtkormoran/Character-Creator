@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   createScenario,
   generateScenarioDescription,
+  generateScenarioField,
   importScenarioFile,
   listScenarios,
 } from "@/lib/client";
@@ -83,6 +85,9 @@ export default function ScenariosPage() {
    * der Detailansicht, statt hier zu sitzen und zu scheitern.
    */
   const ERZEUGBAR: ReadonlySet<keyof ScenarioDetails> = new Set([
+    "ort",
+    "zeit",
+    "regeln",
     "beschreibung",
   ]);
 
@@ -93,7 +98,9 @@ export default function ScenariosPage() {
    */
   async function handleGenerate(key: keyof ScenarioDetails) {
     if (generatingField) return;
+    // Nur die Beschreibung wird ersetzt; Ort, Zeit und Regeln werden ergänzt.
     if (
+      key === "beschreibung" &&
       details[key].trim() &&
       !confirm(`${SCENARIO_LABELS[key]} wird ersetzt. Fortfahren?`)
     )
@@ -101,12 +108,22 @@ export default function ScenariosPage() {
     setGeneratingField(key);
     setFormError(null);
     try {
-      const { beschreibung } = await generateScenarioDescription(
-        name.trim(),
-        details,
-        zusatz.beschreibung ?? "",
-      );
-      setDetails((d) => ({ ...d, beschreibung }));
+      if (key === "ort" || key === "zeit" || key === "regeln") {
+        const { wert } = await generateScenarioField(
+          key,
+          name.trim(),
+          details,
+          zusatz[key] ?? "",
+        );
+        setDetails((d) => ({ ...d, [key]: wert }));
+      } else {
+        const { beschreibung } = await generateScenarioDescription(
+          name.trim(),
+          details,
+          zusatz.beschreibung ?? "",
+        );
+        setDetails((d) => ({ ...d, beschreibung }));
+      }
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Fehler.");
     } finally {
@@ -334,9 +351,21 @@ export default function ScenariosPage() {
               <li key={s.id}>
                 <Link
                   href={`/scenarios/${s.id}`}
-                  className="flex items-center justify-between gap-4 rounded-xl border border-black/10 bg-white p-4 transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
+                  className="flex items-center gap-4 rounded-xl border border-black/10 bg-white p-4 transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
                 >
-                  <div className="min-w-0">
+                  {s.thumbnail && (
+                    <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-black/[0.03] dark:bg-white/[0.03]">
+                      <Image
+                        src={s.thumbnail}
+                        alt=""
+                        fill
+                        sizes="56px"
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
                     <span className="font-medium">{s.name}</span>
                     <p className="truncate text-sm text-foreground/60">
                       {zeile || "Noch keine Festlegungen"}

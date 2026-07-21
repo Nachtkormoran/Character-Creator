@@ -560,6 +560,29 @@ export function generateScenarioFromCharacter(
 }
 
 /**
+ * Ort, Zeit oder Regeln eines Szenarios **ergänzen**.
+ *
+ * Anders als der Würfel kennt das Modell den Feldinhalt und die Nachbarfelder;
+ * was schon dasteht, bleibt stehen. Welche Nachbarfelder es zu sehen bekommt,
+ * entscheidet die Route über `SCENARIO_READS` – hier gehen bewusst die
+ * **kompletten** Festlegungen raus, damit die Regel an genau einer Stelle
+ * steht und nicht an jeder Aufrufstelle neu.
+ */
+export function generateScenarioField(
+  feld: "ort" | "zeit" | "regeln",
+  name: string,
+  details: ScenarioDetails,
+  zusatz = "",
+) {
+  return postJson<{ wert: string }>("/api/scenario-field", {
+    feld,
+    name,
+    details,
+    zusatz,
+  });
+}
+
+/**
  * Beschreibung eines Szenarios aus seinen übrigen Festlegungen erzeugen.
  * Persistiert nichts – der Text geht ins Formularfeld.
  */
@@ -623,4 +646,64 @@ export async function deleteScenario(id: string): Promise<void> {
     const data = await res.json().catch(() => ({}));
     throw new Error(data?.error || "Szenario löschen fehlgeschlagen.");
   }
+}
+
+// --- Szenario-Bild --------------------------------------------------------
+
+/**
+ * Erzeugt das Weltbild eines Szenarios (ohne Figuren) und liefert es als
+ * Data-URL. **Persistiert nichts** – gespeichert wird erst über
+ * `saveScenarioImage`. Die Festlegungen gehen im aktuellen, womöglich
+ * ungespeicherten Stand mit.
+ */
+export function generateScenarioImage(
+  details: ScenarioDetails,
+  imageStyle: string,
+  options: { extraPrompt?: string; referenceImages?: string[] } = {},
+) {
+  return postJson<{ imageData: string }>("/api/scenario-image", {
+    details,
+    imageStyle,
+    ...options,
+  });
+}
+
+/**
+ * Speichert (oder ersetzt) das Weltbild eines Szenarios. Das Thumbnail entsteht
+ * hier im Client (`safeThumbnail`), damit keine Aufrufstelle es vergessen kann –
+ * derselbe Weg wie bei `saveCharacter`/`addCharacterImage`.
+ */
+export async function saveScenarioImage(
+  id: string,
+  imageData: string,
+): Promise<StoredScenario> {
+  const res = await fetch(`/api/scenarios/${id}/image`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      imageData,
+      thumbnail: await safeThumbnail(imageData),
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Bild speichern fehlgeschlagen.");
+  return data.scenario as StoredScenario;
+}
+
+export async function deleteScenarioImage(id: string): Promise<StoredScenario> {
+  const res = await fetch(`/api/scenarios/${id}/image`, { method: "DELETE" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Löschen fehlgeschlagen.");
+  return data.scenario as StoredScenario;
+}
+
+/**
+ * Holt das Original des Weltbilds (~2 MB) – der einzige Weg daran, wie
+ * `getImage` beim Charakter. Für Vollbild und Export.
+ */
+export async function getScenarioImage(id: string): Promise<string> {
+  const res = await fetch(`/api/scenarios/${id}/image`, { cache: "no-store" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Bild laden fehlgeschlagen.");
+  return data.imageData as string;
 }

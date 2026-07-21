@@ -1068,7 +1068,13 @@ export const RULES_BY_GENRE: Record<string, string[]> = {
  * vollständige Sätze mit Punkt, und ein Semikolon dazwischen ergäbe Unsinn.
  * (Bei Aussehen und Hintergrund ist es umgekehrt – das sind Satzteile.)
  */
-export function randomRules(genre?: string): string {
+export function randomRules(genre?: string, ergaenzen = false): string {
   const pool = RULES_BY_GENRE[genre ?? ""] ?? GEGENWART_RULES;
-  return pickSome(pool, 2, 3).join(" ");
+  // Ins gefüllte Feld kommt **eine** weitere Regel, nicht wieder zwei bis drei:
+  // Der Knopf ergänzt dort, statt zu ersetzen, und wer mehr will, drückt noch
+  // einmal. Anders als bei Ort und Zeit gibt es hier keine zweite Ebene – eine
+  // Regel ist eine Regel, ob sie als erste oder als vierte dazukommt.
+  return ergaenzen
+    ? pool[Math.floor(Math.random() * pool.length)]
+    : pickSome(pool, 2, 3).join(" ");
 }

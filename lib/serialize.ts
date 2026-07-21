@@ -120,12 +120,27 @@ export interface StoredScenario {
    * braucht und ein später ergänztes Feld Altbestände nicht bricht.
    */
   details: ScenarioDetails;
+  /**
+   * Vorschau des Weltbilds (WebP, ~40 KB) oder `null`. Das Original
+   * (`imageData`, ~2 MB) reist **nie** in einer Antwort mit – es wird bei
+   * Bedarf einzeln über `GET /api/scenarios/[id]/image` geholt (Vollbild,
+   * Export), genau wie bei den Charakter-Bildern.
+   */
+  thumbnail: string | null;
   count: number;
 }
 
-export function serializeScenario(
-  row: Scenario & { _count?: { characters: number } },
-): StoredScenario {
+/**
+ * `imageData` ist bewusst optional: Alle Abfragen `omit`ten es (es ist groß),
+ * die Zeile trägt es dann gar nicht. `serializeScenario` liest es ohnehin nie –
+ * der Typ macht nur sichtbar, dass die Spalte hier nicht erwartet wird.
+ */
+type ScenarioRow = Omit<Scenario, "imageData"> & {
+  imageData?: string | null;
+  _count?: { characters: number };
+};
+
+export function serializeScenario(row: ScenarioRow): StoredScenario {
   return {
     id: row.id,
     createdAt: row.createdAt.toISOString(),
@@ -133,6 +148,7 @@ export function serializeScenario(
     details: normalizeScenarioDetails(
       row.details ? JSON.parse(row.details) : {},
     ),
+    thumbnail: row.thumbnail ?? null,
     count: row._count?.characters ?? 0,
   };
 }
