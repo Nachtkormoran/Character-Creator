@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getOpenAI, TEXT_MODEL } from "@/lib/openai";
+import { getTextClient } from "@/lib/openai";
 import { buildNamePrompt } from "@/lib/prompts";
 import { characterInputSchema, characterTraitsSchema } from "@/lib/schema";
 import { z } from "zod";
@@ -39,13 +39,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const openai = getOpenAI();
+    const { client: openai, model, extraParams } = await getTextClient();
 
     // Bewusst `create` statt `parse` mit Structured Outputs: ein Name ist ein
     // einzelner String, das JSON-Schema drumherum wäre reiner Token-Aufschlag.
     // `max_tokens` deckelt zusätzlich den Fall, dass das Modell doch schwatzt.
     const completion = await openai.chat.completions.create({
-      model: TEXT_MODEL,
+      model,
+      ...extraParams,
       messages: [
         {
           role: "system",

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getOpenAI, TEXT_MODEL } from "@/lib/openai";
+import { getTextClient } from "@/lib/openai";
 import { buildScenarioDescriptionPrompt } from "@/lib/prompts";
 import { scenarioDetailsSchema } from "@/lib/schema";
 
@@ -36,13 +36,14 @@ export async function POST(request: Request) {
     }
 
     const { name, details, zusatz } = parsed.data;
-    const openai = getOpenAI();
+    const { client: openai, model, extraParams } = await getTextClient();
 
     // Freitext statt Structured Outputs: das Ergebnis ist ein einzelner Text
     // in einem frei bearbeitbaren Feld – dieselbe Überlegung wie bei
     // `regenerate-text` und `story-hooks`.
     const completion = await openai.chat.completions.create({
-      model: TEXT_MODEL,
+      model,
+      ...extraParams,
       messages: [
         {
           role: "system",

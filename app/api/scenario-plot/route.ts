@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getOpenAI, TEXT_MODEL } from "@/lib/openai";
+import { getTextClient } from "@/lib/openai";
 import { buildScenarioPlotPrompt, type PlotCharacter } from "@/lib/prompts";
 import { normalizeTraits, scenarioDetailsSchema } from "@/lib/schema";
 import { prisma } from "@/lib/prisma";
@@ -80,9 +80,10 @@ export async function POST(request: Request) {
       storyHooks: r.storyHooks ?? "",
     }));
 
-    const openai = getOpenAI();
+    const { client: openai, model, extraParams } = await getTextClient();
     const completion = await openai.chat.completions.create({
-      model: TEXT_MODEL,
+      model,
+      ...extraParams,
       messages: [
         {
           role: "system",

@@ -105,11 +105,41 @@ export const IMAGE_PRICES_USD: Record<
 export const IMAGE_PRICES_AS_OF = "18.07.2026";
 
 /**
+ * Anbieter für die **Text**-Erzeugung. `openai` ist der Standard (kostenpflichtig,
+ * sehr zuverlässig auch bei Structured Outputs), `gemini` die kostenlose
+ * Alternative über Google AI Studio. Beide laufen über denselben OpenAI-SDK-Client
+ * – Gemini über seinen OpenAI-kompatiblen Endpunkt (`baseURL`). Die **Bilder**
+ * bleiben davon unberührt und laufen weiter über OpenAI (`gpt-image-*`).
+ */
+export const TEXT_PROVIDERS = [
+  {
+    value: "openai",
+    label: "OpenAI (gpt-4o)",
+    hint: "Bisheriges Modell. Kostenpflichtig, sehr zuverlässig – auch bei strukturierten Ausgaben (Charakter- und Szenario-Erzeugung).",
+  },
+  {
+    value: "gemini",
+    label: "Google Gemini",
+    hint: "Kostenloses Kontingent über Google AI Studio. Braucht GEMINI_API_KEY in .env.local. Bei strukturierten Ausgaben (Charakter erzeugen, Szenario ableiten) noch nicht garantiert – im Zweifel wieder auf OpenAI stellen.",
+  },
+] as const;
+
+export type TextProvider = (typeof TEXT_PROVIDERS)[number]["value"];
+
+/** Default bleibt OpenAI, damit sich ohne Zutun nichts am Verhalten ändert. */
+export const DEFAULT_TEXT_PROVIDER: TextProvider = "openai";
+
+export const textProviderSchema = z.enum(
+  TEXT_PROVIDERS.map((p) => p.value) as [TextProvider, ...TextProvider[]],
+);
+
+/**
  * Was der Client schicken darf – hier greift die Allowlist.
  */
 export const settingsPatchSchema = z.object({
   imageModel: imageModelSchema,
   imageQuality: imageQualitySchema,
+  textProvider: textProviderSchema,
 });
 
 /**
@@ -120,6 +150,7 @@ export const settingsPatchSchema = z.object({
 export interface Settings {
   imageModel: string;
   imageQuality: ImageQuality;
+  textProvider: TextProvider;
 }
 
 /** Steht das Modell in der Auswahlliste (oder kommt es aus der Env)? */
@@ -174,6 +205,19 @@ export const characterInputSchema = z.object({
   imageStyle: z
     .enum(IMAGE_STYLES.map((s) => s.value) as [string, ...string[]])
     .default(DEFAULT_IMAGE_STYLE),
+
+  /**
+   * **KI-Modell, mit dem der Beschreibungstext erzeugt wurde** – ein Protokoll
+   * des Erstellungszeitpunkts wie die übrigen Vorgaben, und wie sie reine
+   * Anzeige. Kein Formularfeld: Welches Modell lief, weiß erst die Route
+   * (`getTextClient`); der Client hängt den Wert beim Speichern an
+   * (`{ ...input, imageStyle, model }`, wie schon `imageStyle`). Optional und
+   * **leer bei Altbeständen und Importen** – die Vorgaben-Ansicht zeigt das dann
+   * als „— nichts angegeben —". Bewusst der rohe Modellname (z. B.
+   * `gemini-flash-lite-latest`), nicht der Anbieter: der Name ist eindeutig und
+   * die Anzeige leitet den Anbieter daraus ab.
+   */
+  model: z.string().trim().max(120).optional().default(""),
 });
 
 export type CharacterInput = z.infer<typeof characterInputSchema>;
@@ -302,6 +346,7 @@ export const INPUT_LABELS: Record<keyof CharacterInput, string> = {
   background: "Hintergrund",
   notes: "Weitere Wünsche",
   imageStyle: "Bild-Stil",
+  model: "Erzeugt mit",
 };
 
 /**
@@ -320,6 +365,13 @@ export function inputDisplayValue(
   }
   // Gespeichert ist die Id („western"), angezeigt gehört das Label hin.
   if (key === "genre") return genreLabel(raw);
+  // Der rohe Modellname ist eindeutig; für die Anzeige den Anbieter davorsetzen.
+  // Unbekannte Namen (eigenes `OPENAI_TEXT_MODEL` o. Ä.) bleiben roh stehen.
+  if (key === "model") {
+    if (raw.startsWith("gemini")) return `Google Gemini · ${raw}`;
+    if (raw.startsWith("gpt")) return `OpenAI · ${raw}`;
+    return raw;
+  }
   return raw;
 }
 

@@ -13,9 +13,11 @@ import {
   IMAGE_PRICES_USD,
   IMAGE_QUALITIES,
   isKnownImageModel,
+  TEXT_PROVIDERS,
   type ImageModel,
   type ImageQuality,
   type Settings,
+  type TextProvider,
 } from "@/lib/schema";
 
 /** Preis als Cent-Angabe, z. B. 0.042 → "4,2 ct". */
@@ -57,6 +59,23 @@ export default function SettingsPage() {
     }
   }
 
+  async function chooseTextProvider(textProvider: TextProvider) {
+    const previous = settings;
+    setSettings((s) => (s ? { ...s, textProvider } : s)); // optimistisch
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      setSettings(await updateSettings({ textProvider }));
+      setSaved(true);
+    } catch (e) {
+      setSettings(previous); // Rollback bei Fehler
+      setError(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Ein über OPENAI_IMAGE_MODEL gesetztes, nicht gelistetes Modell soll
   // sichtbar sein statt stillschweigend als "nichts ausgewählt" zu erscheinen.
   const fromEnv =
@@ -80,6 +99,64 @@ export default function SettingsPage() {
         <p className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
           {error}
         </p>
+      )}
+
+      {!loading && settings && (
+        <section className="flex flex-col gap-4 rounded-lg border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+          <div>
+            <h2 className="font-medium">Textmodell</h2>
+            <p className="text-sm text-foreground/60">
+              Welcher Anbieter die Texte erzeugt (Beschreibungen, Namen,
+              Szenarien, Ansatzpunkte …). Die <strong>Bilder</strong> laufen
+              unabhängig davon immer über OpenAI.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {TEXT_PROVIDERS.map((p) => {
+              const active = settings.textProvider === p.value;
+              return (
+                <label
+                  key={p.value}
+                  className={`flex cursor-pointer gap-3 rounded-md border p-3 transition ${
+                    active
+                      ? "border-foreground/40 bg-foreground/[0.06]"
+                      : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="textProvider"
+                    value={p.value}
+                    checked={active}
+                    onChange={() => chooseTextProvider(p.value)}
+                    disabled={saving}
+                    className="mt-1"
+                  />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="font-medium">
+                      {p.label}
+                      {p.value === "openai" && (
+                        <span className="ml-2 text-xs font-normal text-foreground/50">
+                          Standard
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-xs text-foreground/60">{p.hint}</span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+
+          <p className="text-xs text-foreground/50">
+            {saving
+              ? "Speichere …"
+              : saved
+                ? "Gespeichert."
+                : "Änderungen werden sofort gespeichert."}
+          </p>
+        </section>
       )}
 
       {!loading && settings && (

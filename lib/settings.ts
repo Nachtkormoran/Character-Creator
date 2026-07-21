@@ -2,11 +2,14 @@ import { prisma } from "./prisma";
 import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_IMAGE_QUALITY,
+  DEFAULT_TEXT_PROVIDER,
   imageModelSchema,
   imageQualitySchema,
+  textProviderSchema,
   type ImageModel,
   type ImageQuality,
   type Settings,
+  type TextProvider,
 } from "./schema";
 
 /**
@@ -20,6 +23,7 @@ import {
 
 const IMAGE_MODEL_KEY = "imageModel";
 const IMAGE_QUALITY_KEY = "imageQuality";
+const TEXT_PROVIDER_KEY = "textProvider";
 
 /** Prüft einen Wert gegen die Allowlist; liefert null, wenn er nicht passt. */
 function parseImageModel(value: string | undefined | null): ImageModel | null {
@@ -34,9 +38,18 @@ function parseImageQuality(
   return result.success ? result.data : null;
 }
 
+function parseTextProvider(
+  value: string | undefined | null,
+): TextProvider | null {
+  const result = textProviderSchema.safeParse(value);
+  return result.success ? result.data : null;
+}
+
 export async function getSettings(): Promise<Settings> {
   const rows = await prisma.setting.findMany({
-    where: { key: { in: [IMAGE_MODEL_KEY, IMAGE_QUALITY_KEY] } },
+    where: {
+      key: { in: [IMAGE_MODEL_KEY, IMAGE_QUALITY_KEY, TEXT_PROVIDER_KEY] },
+    },
   });
   const byKey = new Map(rows.map((r) => [r.key, r.value]));
 
@@ -55,17 +68,26 @@ export async function getSettings(): Promise<Settings> {
     parseImageQuality(process.env.OPENAI_IMAGE_QUALITY) ??
     DEFAULT_IMAGE_QUALITY;
 
-  return { imageModel, imageQuality };
+  // Wie beim Bildmodell: gespeicherter Wert → Env (`TEXT_PROVIDER`) → Default.
+  const textProvider =
+    parseTextProvider(byKey.get(TEXT_PROVIDER_KEY)) ??
+    parseTextProvider(process.env.TEXT_PROVIDER) ??
+    DEFAULT_TEXT_PROVIDER;
+
+  return { imageModel, imageQuality, textProvider };
 }
 
 /** Speichert einzelne Einstellungen und liefert den neuen Gesamtstand. */
 export async function updateSettings(patch: {
   imageModel?: ImageModel;
   imageQuality?: ImageQuality;
+  textProvider?: TextProvider;
 }): Promise<Settings> {
   const writes: Array<[string, string]> = [];
   if (patch.imageModel) writes.push([IMAGE_MODEL_KEY, patch.imageModel]);
   if (patch.imageQuality) writes.push([IMAGE_QUALITY_KEY, patch.imageQuality]);
+  if (patch.textProvider)
+    writes.push([TEXT_PROVIDER_KEY, patch.textProvider]);
 
   for (const [key, value] of writes) {
     await prisma.setting.upsert({

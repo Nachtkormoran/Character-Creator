@@ -1,41 +1,44 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   buildScenarioFile,
+  deleteCharacter,
   deleteScenario,
-  deleteScenarioImage,
   findPlotPersons,
   generateScenarioDescription,
   generateScenarioField,
-  generateScenarioImage,
   generateScenarioPlot,
   getScenario,
-  getScenarioImage,
-  saveScenarioImage,
+  listScenarios,
+  updateCharacterContent,
+  updateCharacterScenario,
   updateScenario,
 } from "@/lib/client";
 import { downloadBlob, safeFileName } from "@/lib/download";
-import { fileToDataUrl } from "@/lib/image";
 import { scenarioFileName } from "@/lib/scenarioFile";
 import {
-  DEFAULT_IMAGE_STYLE,
-  IMAGE_STYLES,
   MAX_PLOT_VARIANTS,
   SCENARIO_LABELS,
   normalizeScenarioDetails,
+  type GeneratedCharacter,
   type PlotPerson,
   type PlotVariants,
   type ScenarioDetails,
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
-import { primaryImage, type StoredCharacter } from "@/lib/serialize";
-import { ImageLightbox } from "../../components/ImageLightbox";
+import {
+  primaryImage,
+  type StoredCharacter,
+  type StoredScenario,
+} from "@/lib/serialize";
+import { CharacterDetailModal } from "../../components/CharacterDetailModal";
 import { PlotPersonModal } from "../../components/PlotPersonModal";
 import { ScenarioFields } from "../../components/ScenarioFields";
+import { ScenarioImageModal } from "../../components/ScenarioImageModal";
 
 export default function ScenarioDetailPage({
   params,
@@ -59,6 +62,18 @@ export default function ScenarioDetailPage({
   const [varianten, setVarianten] = useState<string[]>([]);
   const [aktiv, setAktiv] = useState(0);
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
+  /**
+   * Der angeklickte Charakter – öffnet dasselbe Detail-Modal wie in der
+   * Galerie (`CharacterDetailModal`, dort herausgelöst), aber **hier in der
+   * Szenario-Seite**: Schließen führt zurück ins Szenario, nicht in die Galerie.
+   */
+  const [selectedChar, setSelectedChar] = useState<StoredCharacter | null>(null);
+  /**
+   * Alle Szenarien – nur für das Zuordnungs-Menü und die Szenario-Ableitung im
+   * Detail-Modal. Die Detailseite selbst braucht sie sonst nicht (sie kennt ihr
+   * eigenes Szenario aus `getScenario`).
+   */
+  const [allScenarios, setAllScenarios] = useState<StoredScenario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,26 +119,14 @@ export default function ScenarioDetailPage({
   // -------------------------------------------------------------------------
 
   /**
-   * Das **gespeicherte** Bild als Thumbnail (oder `null`). Das Original reist
-   * nicht mit – es wird für das Vollbild einzeln über `getScenarioImage`
-   * geholt, wie bei den Charakter-Bildern.
+   * Das **gespeicherte** Bild als Thumbnail (oder `null`). Die gesamte
+   * Bild-Bedienung (Erzeugen, Hochladen, Löschen, Exportieren, Vollbild) liegt
+   * in `ScenarioImageModal`; die Detailseite zeigt nur das Thumbnail und den
+   * Knopf, der die Ansicht öffnet. Das Modal meldet ein geändertes Bild über
+   * `onChange` zurück, damit das Thumbnail hier aktuell bleibt.
    */
   const [thumbnail, setThumbnail] = useState<string | null>(null);
-
-  /**
-   * Ein frisch erzeugtes oder hochgeladenes Bild, das **noch nicht gespeichert**
-   * ist. Solange ein Kandidat vorliegt, wird er statt des gespeicherten Bilds
-   * gezeigt – erst „Übernehmen" ersetzt das gespeicherte. So zerstört ein
-   * probeweises „Neu erzeugen" das vorhandene Bild nicht, bis eins gefällt.
-   */
-  const [kandidat, setKandidat] = useState<string | null>(null);
-  const [bildStil, setBildStil] = useState<string>(DEFAULT_IMAGE_STYLE);
-  const [bildZusatz, setBildZusatz] = useState("");
-  const [bildBusy, setBildBusy] = useState(false);
-  const [bildFehler, setBildFehler] = useState<string | null>(null);
-  /** Original fürs Vollbild – geladen bei Klick auf das gespeicherte Bild. */
-  const [vollbild, setVollbild] = useState<string | null>(null);
-  const dateiWahl = useRef<HTMLInputElement>(null);
+  const [bildModalOffen, setBildModalOffen] = useState(false);
 
   /**
    * Hier ist alles erzeugbar: Ort, Zeit und Regeln lassen sich ergänzen, die
@@ -251,78 +254,6 @@ export default function ScenarioDetailPage({
     }
   }
 
-  /**
-   * Ein Weltbild erzeugen. Es landet als **Kandidat** (ungespeichert) – das
-   * gespeicherte Bild bleibt, bis „Übernehmen" es ersetzt. Die Festlegungen
-   * gehen im aktuellen, womöglich ungespeicherten Stand mit; die Route
-   * persistiert nichts.
-   */
-  async function bildErzeugen() {
-    if (bildBusy) return;
-    setBildBusy(true);
-    setBildFehler(null);
-    try {
-      const { imageData } = await generateScenarioImage(details, bildStil, {
-        extraPrompt: bildZusatz.trim() || undefined,
-      });
-      setKandidat(imageData);
-    } catch (e) {
-      setBildFehler(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setBildBusy(false);
-    }
-  }
-
-  /** Ein eigenes Bild hochladen – ebenfalls erst Kandidat, dann „Übernehmen". */
-  async function bildHochladen(file: File) {
-    setBildFehler(null);
-    try {
-      setKandidat(await fileToDataUrl(file));
-    } catch (e) {
-      setBildFehler(e instanceof Error ? e.message : "Datei fehlerhaft.");
-    }
-  }
-
-  /** Den Kandidaten speichern – ersetzt das bisherige Bild. */
-  async function bildUebernehmen() {
-    if (!kandidat || bildBusy) return;
-    setBildBusy(true);
-    setBildFehler(null);
-    try {
-      const s = await saveScenarioImage(id, kandidat);
-      setThumbnail(s.thumbnail);
-      setKandidat(null);
-    } catch (e) {
-      setBildFehler(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
-    } finally {
-      setBildBusy(false);
-    }
-  }
-
-  async function bildLoeschen() {
-    if (bildBusy || !thumbnail) return;
-    if (!confirm("Das Szenario-Bild löschen?")) return;
-    setBildBusy(true);
-    setBildFehler(null);
-    try {
-      const s = await deleteScenarioImage(id);
-      setThumbnail(s.thumbnail);
-    } catch (e) {
-      setBildFehler(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
-    } finally {
-      setBildBusy(false);
-    }
-  }
-
-  /** Original fürs Vollbild nachladen (das Thumbnail ist nur die Vorschau). */
-  async function vollbildOeffnen() {
-    try {
-      setVollbild(await getScenarioImage(id));
-    } catch (e) {
-      setBildFehler(e instanceof Error ? e.message : "Bild laden fehlgeschlagen.");
-    }
-  }
-
   useEffect(() => {
     getScenario(id)
       .then(({ scenario, characters }) => {
@@ -343,6 +274,65 @@ export default function ScenarioDetailPage({
       .catch((e) => setError(e instanceof Error ? e.message : "Fehler."))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Alle Szenarien fürs Zuordnungs-Menü des Detail-Modals. Getrennt vom
+  // Haupt-Load, weil es unabhängig und nicht kritisch ist – schlägt es fehl,
+  // bleibt die Liste leer (das Menü zeigt dann nur „kein Szenario").
+  useEffect(() => {
+    listScenarios()
+      .then(setAllScenarios)
+      .catch(() => {});
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Angehängten Charakter bearbeiten (dasselbe Detail-Modal wie in der Galerie)
+  // ---------------------------------------------------------------------------
+
+  async function charLoeschen(cid: string) {
+    await deleteCharacter(cid);
+    setCharacters((cs) => cs.filter((c) => c.id !== cid));
+    setSelectedChar(null);
+  }
+
+  async function charInhaltSpeichern(
+    cid: string,
+    character: GeneratedCharacter,
+    storyHooks: string,
+    genre: string,
+  ) {
+    const updated = await updateCharacterContent(
+      cid,
+      character,
+      storyHooks,
+      genre,
+    );
+    setCharacters((cs) => cs.map((c) => (c.id === cid ? updated : c)));
+    setSelectedChar(updated);
+  }
+
+  // Bild-Operationen im Modal liefern den vollständigen aktualisierten Charakter
+  // zurück – hier in Liste und Auswahl übernehmen.
+  function charAktualisiert(updated: StoredCharacter) {
+    setCharacters((cs) => cs.map((c) => (c.id === updated.id ? updated : c)));
+    setSelectedChar(updated);
+  }
+
+  /**
+   * Zuordnung ändern. Wird der Charakter einem **anderen** Szenario (oder
+   * keinem) zugewiesen, gehört er nicht mehr hierher – dann fällt seine Kachel
+   * weg und das Modal schließt. Bleibt er bei diesem Szenario, wird er nur
+   * aktualisiert.
+   */
+  async function charZuordnen(cid: string, scenarioId: string | null) {
+    const updated = await updateCharacterScenario(cid, scenarioId);
+    if (updated.scenarioId === id) {
+      setCharacters((cs) => cs.map((c) => (c.id === cid ? updated : c)));
+      setSelectedChar(updated);
+    } else {
+      setCharacters((cs) => cs.filter((c) => c.id !== cid));
+      setSelectedChar(null);
+    }
+  }
 
   // Der aktuelle Stand als Vergleichswert für den „Ungespeichert"-Balken. Die
   // Handlungsvarianten gehören dazu: Umschalten und Anhängen sind Änderungen,
@@ -592,165 +582,44 @@ export default function ScenarioDetailPage({
             />
           </div>
 
-          {/* Rechts: das Weltbild samt Steuerung (Bild oben, Knöpfe darunter). */}
+          {/*
+            Rechts nur noch das Weltbild und ein Knopf, der die Bild-Ansicht
+            öffnet – die gesamte Bedienung liegt in `ScenarioImageModal`. Das
+            hält die Detailansicht ruhig: neben der Weltbeschreibung steht ein
+            Bild, kein Bedienfeld.
+          */}
           <div className="order-1 flex flex-col gap-3 md:order-2">
             <span className="text-sm font-medium">Weltbild</span>
 
-            {/* Kandidat (ungespeichert) hat Vorrang vor dem gespeicherten Bild. */}
-            <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.03]">
-              {kandidat ? (
+            <button
+              type="button"
+              onClick={() => setBildModalOffen(true)}
+              title={thumbnail ? "Weltbild verwalten" : "Weltbild hinzufügen"}
+              className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] transition hover:border-black/25 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/25"
+            >
+              {thumbnail ? (
                 <Image
-                  src={kandidat}
-                  alt="Vorschau des Szenario-Bilds"
+                  src={thumbnail}
+                  alt={`Weltbild von ${name}`}
                   fill
                   sizes="240px"
                   className="object-cover"
                   unoptimized
                 />
-              ) : thumbnail ? (
-                <button
-                  type="button"
-                  onClick={vollbildOeffnen}
-                  title="In voller Größe ansehen"
-                  className="absolute inset-0 h-full w-full cursor-zoom-in"
-                >
-                  <Image
-                    src={thumbnail}
-                    alt={`Weltbild von ${name}`}
-                    fill
-                    sizes="240px"
-                    className="object-cover"
-                    unoptimized
-                  />
-                </button>
               ) : (
                 <div className="flex h-full items-center justify-center text-4xl opacity-25">
                   🏞️
                 </div>
               )}
-            </div>
+            </button>
 
-            {kandidat && (
-              <p className="text-center text-xs text-amber-700 dark:text-amber-400">
-                Vorschau – noch nicht gespeichert
-              </p>
-            )}
-
-            {kandidat ? (
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={bildUebernehmen}
-                  disabled={bildBusy}
-                  className="w-full rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
-                >
-                  {bildBusy ? "Speichere …" : "Übernehmen"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setKandidat(null)}
-                  disabled={bildBusy}
-                  className="w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
-                >
-                  Verwerfen
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="bild-stil"
-                    className="text-xs font-medium text-foreground/70"
-                  >
-                    Stil
-                  </label>
-                  <select
-                    id="bild-stil"
-                    value={bildStil}
-                    onChange={(e) => setBildStil(e.target.value)}
-                    disabled={bildBusy}
-                    className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
-                  >
-                    {IMAGE_STYLES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="bild-zusatz"
-                    className="text-xs font-medium text-foreground/70"
-                  >
-                    Stichwörter (optional)
-                  </label>
-                  <input
-                    id="bild-zusatz"
-                    value={bildZusatz}
-                    onChange={(e) => setBildZusatz(e.target.value)}
-                    disabled={bildBusy}
-                    maxLength={1000}
-                    placeholder="z. B. Regen, Dämmerung"
-                    title="Zusätzliche Wünsche fürs Bild – Perspektive, Lichtstimmung, Wetter. Wird nicht gespeichert."
-                    className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <button
-                    type="button"
-                    onClick={bildErzeugen}
-                    disabled={bildBusy}
-                    className="w-full rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
-                  >
-                    {bildBusy
-                      ? "Erzeuge …"
-                      : thumbnail
-                        ? "✨ Neu erzeugen"
-                        : "✨ Bild erzeugen"}
-                  </button>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => dateiWahl.current?.click()}
-                      disabled={bildBusy}
-                      className="flex-1 rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
-                    >
-                      Hochladen
-                    </button>
-                    {thumbnail && (
-                      <button
-                        type="button"
-                        onClick={bildLoeschen}
-                        disabled={bildBusy}
-                        className="flex-1 rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 disabled:opacity-50 dark:text-red-400"
-                      >
-                        Löschen
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <input
-                  ref={dateiWahl}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) bildHochladen(f);
-                    e.target.value = "";
-                  }}
-                />
-              </>
-            )}
-
-            {bildFehler && (
-              <p className="text-xs text-red-600 dark:text-red-400">
-                {bildFehler}
-              </p>
-            )}
+            <button
+              type="button"
+              onClick={() => setBildModalOffen(true)}
+              className="w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              {thumbnail ? "🖼️ Weltbild verwalten" : "🏞️ Weltbild hinzufügen"}
+            </button>
           </div>
         </div>
       </section>
@@ -972,11 +841,12 @@ export default function ScenarioDetailPage({
             {characters.map((c) => {
               const preview = primaryImage(c)?.thumbnail;
               return (
-                <Link
+                <button
                   key={c.id}
-                  href="/gallery"
+                  type="button"
+                  onClick={() => setSelectedChar(c)}
                   title={c.character.kurzbeschreibung}
-                  className="flex flex-col overflow-hidden rounded-lg border border-black/10 bg-white transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
+                  className="flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border border-black/10 bg-white text-left transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
                 >
                   <div className="relative aspect-square w-full bg-black/[0.03] dark:bg-white/[0.03]">
                     {preview ? (
@@ -994,10 +864,10 @@ export default function ScenarioDetailPage({
                       </div>
                     )}
                   </div>
-                  <span className="truncate p-1.5 text-xs font-medium">
+                  <span className="block truncate p-1.5 text-xs font-medium">
                     {c.character.name}
                   </span>
-                </Link>
+                </button>
               );
             })}
           </div>
@@ -1065,11 +935,36 @@ export default function ScenarioDetailPage({
         />
       )}
 
-      {vollbild && (
-        <ImageLightbox
-          src={vollbild}
-          alt={`Weltbild von ${name}`}
-          onClose={() => setVollbild(null)}
+      {bildModalOffen && (
+        <ScenarioImageModal
+          scenarioId={id}
+          name={name}
+          details={details}
+          thumbnail={thumbnail}
+          onChange={setThumbnail}
+          onClose={() => setBildModalOffen(false)}
+        />
+      )}
+
+      {selectedChar && (
+        <CharacterDetailModal
+          key={selectedChar.id}
+          character={selectedChar}
+          scenarios={allScenarios}
+          onClose={() => setSelectedChar(null)}
+          onDelete={() => charLoeschen(selectedChar.id)}
+          onSaveContent={(character, storyHooks, genre) =>
+            charInhaltSpeichern(selectedChar.id, character, storyHooks, genre)
+          }
+          onCharacterUpdated={charAktualisiert}
+          onAssignScenario={(scenarioId) =>
+            charZuordnen(selectedChar.id, scenarioId)
+          }
+          onScenarioCreated={(scenario) =>
+            setAllScenarios((gs) =>
+              [...gs, scenario].sort((a, b) => a.name.localeCompare(b.name)),
+            )
+          }
         />
       )}
     </div>

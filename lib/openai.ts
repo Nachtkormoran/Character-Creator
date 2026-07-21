@@ -1,8 +1,14 @@
 import OpenAI from "openai";
+import { getSettings } from "./settings";
 
 /**
- * Zentraler OpenAI-Client. Wird ausschließlich serverseitig (in API-Routen)
- * verwendet, damit der API-Key niemals im Browser landet.
+ * Zentrale OpenAI-Clients. Werden ausschließlich serverseitig (in API-Routen)
+ * verwendet, damit die API-Keys niemals im Browser landen.
+ *
+ * **Text und Bild sind getrennt.** Der Text-Anbieter ist über die Einstellungen
+ * umschaltbar (OpenAI oder Google Gemini, s. `getTextClient`), das **Bild**
+ * läuft immer über OpenAI (`gpt-image-*`). Deshalb bleibt `getOpenAI()` der
+ * OpenAI-Client und wird von der Bild-Erzeugung direkt genutzt.
  */
 
 let client: OpenAI | null = null;
@@ -20,8 +26,84 @@ export function getOpenAI(): OpenAI {
   return client;
 }
 
-export const TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || "gpt-4o-2024-08-06";
+export const OPENAI_TEXT_MODEL =
+  process.env.OPENAI_TEXT_MODEL || "gpt-4o-2024-08-06";
 export const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+
+/**
+ * Google Gemini über seinen **OpenAI-kompatiblen** Endpunkt. Denselben
+ * OpenAI-SDK-Client wie oben, nur mit anderem `baseURL` und Key – so bleibt
+ * der gesamte Aufruf-Code (auch Structured Outputs) unverändert.
+ *
+ * Modell und Endpunkt sind per Env überschreibbar; der Key kommt aus
+ * `GEMINI_API_KEY` (kostenloses Kontingent über Google AI Studio).
+ */
+// `gemini-flash-lite-latest` folgt dem jeweils aktuellen Flash-**Lite**-Modell.
+// Bewusst Lite und nicht das Voll-Flash (`gemini-flash-latest`): Letzteres löst
+// sich auf `gemini-3.6-flash` auf, das im Free-Tier nur ~20 Anfragen/Tag erlaubt
+// – für ein paar Charaktere zu wenig. Die Lite-Modelle haben ein deutlich
+// größeres Tageskontingent. Und `gemini-2.0-flash` scheidet ganz aus: dessen
+// Free-Tier ist für neue Konten `limit: 0` (gemessen 21.07.2026).
+export const GEMINI_TEXT_MODEL =
+  process.env.GEMINI_TEXT_MODEL || "gemini-flash-lite-latest";
+export const GEMINI_BASE_URL =
+  process.env.GEMINI_BASE_URL ||
+  "https://generativelanguage.googleapis.com/v1beta/openai/";
+
+let geminiClient: OpenAI | null = null;
+
+function getGemini(): OpenAI {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY ist nicht gesetzt. Bitte in .env.local eintragen oder in " +
+        "den Einstellungen das Textmodell wieder auf OpenAI umstellen.",
+    );
+  }
+  if (!geminiClient) {
+    geminiClient = new OpenAI({ apiKey, baseURL: GEMINI_BASE_URL });
+  }
+  return geminiClient;
+}
+
+/**
+ * Zusätzliche Request-Parameter, die eine Text-Route unverändert in ihren
+ * `chat.completions.create`/`.parse`-Aufruf spreizt (`...extraParams`). Bei
+ * OpenAI leer, bei Gemini das Abschalten des „Nachdenkens" (s. u.).
+ */
+export type TextExtraParams = Record<string, unknown>;
+
+/**
+ * Liefert **Client, Modell und Extra-Parameter für die Text-Erzeugung** je nach
+ * eingestelltem Anbieter. Jede Text-Route ruft dies statt `getOpenAI()` + festem
+ * Modell, damit die Umschaltung in den Einstellungen ohne Neustart greift. Das
+ * Bild bleibt bewusst außen vor – es läuft immer über OpenAI.
+ *
+ * **`reasoning_effort: "minimal"` nur für Gemini:** Die aktuellen Gemini-Flash-
+ * Modelle „denken" per Default und verbrauchen dabei erst einmal Token, **bevor**
+ * sichtbarer Text entsteht. Knapp budgetierte Routen (z. B. der Namensknopf mit
+ * `max_tokens: 24`) bekamen dadurch eine **leere** Antwort (`finish_reason:
+ * "length"`, `completion_tokens: 0`). „minimal" schaltet das Nachdenken praktisch
+ * ab, so dass Gemini wie das bisherige `gpt-4o` direkt antwortet – das spart
+ * zugleich Token (wichtig fürs Minuten-Limit im Free-Tier). Der Parameter darf
+ * **nicht** an OpenAI gehen: `gpt-4o` lehnt ihn ab. Bei OpenAI bleibt das Objekt
+ * daher leer.
+ */
+export async function getTextClient(): Promise<{
+  client: OpenAI;
+  model: string;
+  extraParams: TextExtraParams;
+}> {
+  const { textProvider } = await getSettings();
+  if (textProvider === "gemini") {
+    return {
+      client: getGemini(),
+      model: GEMINI_TEXT_MODEL,
+      extraParams: { reasoning_effort: "minimal" },
+    };
+  }
+  return { client: getOpenAI(), model: OPENAI_TEXT_MODEL, extraParams: {} };
+}
 
 /**
  * **Kaputte Umlaute in einer Structured-Output-Antwort erkennen.**

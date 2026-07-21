@@ -54,7 +54,9 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export function generateText(input: CharacterInput) {
-  return postJson<{ character: GeneratedCharacter }>(
+  // `model` protokolliert, welches KI-Modell den Text erzeugt hat – der Aufrufer
+  // hängt es beim Speichern an `input` an (s. `characterInputSchema.model`).
+  return postJson<{ character: GeneratedCharacter; model: string }>(
     "/api/generate-text",
     input,
   );

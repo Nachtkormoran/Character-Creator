@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getOpenAI, TEXT_MODEL } from "@/lib/openai";
+import { getTextClient } from "@/lib/openai";
 import { buildRegenerateTextPrompt } from "@/lib/prompts";
 import { characterInputSchema, generatedCharacterSchema } from "@/lib/schema";
 
@@ -38,10 +38,11 @@ export async function POST(request: Request) {
     }
 
     const { input, character, zusatz } = parsed.data;
-    const openai = getOpenAI();
+    const { client: openai, model, extraParams } = await getTextClient();
 
     const completion = await openai.chat.completions.create({
-      model: TEXT_MODEL,
+      model,
+      ...extraParams,
       messages: [
         {
           role: "system",

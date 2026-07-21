@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { getOpenAI, hatKaputteZeichen, TEXT_MODEL } from "@/lib/openai";
+import { getTextClient, hatKaputteZeichen } from "@/lib/openai";
 import { prisma } from "@/lib/prisma";
 import { buildPlotPersonsPrompt } from "@/lib/prompts";
 import { plotPersonsSchema } from "@/lib/schema";
@@ -70,12 +70,13 @@ export async function POST(request: Request) {
       .map((c) => c.name?.trim() ?? "")
       .filter(Boolean);
 
-    const openai = getOpenAI();
+    const { client: openai, model, extraParams } = await getTextClient();
     const prompt = buildPlotPersonsPrompt(handlung, zugeordnet);
 
     const versuch = () =>
       openai.chat.completions.parse({
-        model: TEXT_MODEL,
+        model,
+        ...extraParams,
         messages: [
           {
             role: "system",

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { zodResponseFormat } from "openai/helpers/zod";
-import { getOpenAI, TEXT_MODEL } from "@/lib/openai";
+import { getTextClient } from "@/lib/openai";
 import { buildTextPrompt } from "@/lib/prompts";
 import { characterInputSchema, generatedCharacterSchema } from "@/lib/schema";
 
@@ -17,11 +17,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const openai = getOpenAI();
+    const { client: openai, model, extraParams } = await getTextClient();
     const prompt = buildTextPrompt(parsed.data);
 
     const completion = await openai.chat.completions.parse({
-      model: TEXT_MODEL,
+      model,
+      ...extraParams,
       messages: [
         {
           role: "system",
@@ -45,7 +46,9 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ character });
+    // `model` mitgeben, damit der Client beim Speichern protokollieren kann,
+    // womit die Figur erzeugt wurde (landet in `input.model`, s. `schema.ts`).
+    return NextResponse.json({ character, model });
   } catch (err) {
     console.error("generate-text error:", err);
     const message =

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getOpenAI, TEXT_MODEL } from "@/lib/openai";
+import { getTextClient } from "@/lib/openai";
 import { buildStoryHooksPrompt } from "@/lib/prompts";
 import {
   DEFAULT_STORY_HOOK_ANCHOR,
@@ -60,12 +60,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const openai = getOpenAI();
+    const { client: openai, model, extraParams } = await getTextClient();
 
     // Freitext statt Structured Outputs: das Ergebnis landet in einem
     // Textfeld und wird von Hand weitergeschrieben, nicht ausgewertet.
     const completion = await openai.chat.completions.create({
-      model: TEXT_MODEL,
+      model,
+      ...extraParams,
       messages: [
         {
           role: "system",

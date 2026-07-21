@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getOpenAI, TEXT_MODEL } from "@/lib/openai";
+import { getTextClient } from "@/lib/openai";
 import { buildScenarioFieldPrompt } from "@/lib/prompts";
 import {
   SCENARIO_MAXLENGTHS,
@@ -73,9 +73,10 @@ export async function POST(request: Request) {
     // wird – dann bleibt für Neues ohnehin wenig).
     const maxTokens = Math.min(700, Math.ceil(maxLen / 3) + 80);
 
-    const openai = getOpenAI();
+    const { client: openai, model, extraParams } = await getTextClient();
     const completion = await openai.chat.completions.create({
-      model: TEXT_MODEL,
+      model,
+      ...extraParams,
       messages: [
         {
           role: "system",

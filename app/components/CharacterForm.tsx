@@ -25,6 +25,8 @@ const EMPTY: CharacterInput = {
   personality: "",
   notes: "",
   imageStyle: DEFAULT_IMAGE_STYLE,
+  // Kein Formularfeld: wird erst beim Speichern aus der Modellantwort gesetzt.
+  model: "",
 };
 
 const inputClass =

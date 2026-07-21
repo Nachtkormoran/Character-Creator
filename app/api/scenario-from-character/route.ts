@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
-import { getOpenAI, hatKaputteZeichen, TEXT_MODEL } from "@/lib/openai";
+import { getTextClient, hatKaputteZeichen } from "@/lib/openai";
 import { buildScenarioFromCharacterPrompt } from "@/lib/prompts";
 import { generatedCharacterSchema, scenarioDraftSchema } from "@/lib/schema";
 import { scenarioSamples } from "@/lib/scenarioSamples";
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
       ? parsed.data.genre
       : DEFAULT_GENRE;
 
-    const openai = getOpenAI();
+    const { client: openai, model, extraParams } = await getTextClient();
     // Einmal gezogen, nicht je Versuch: Der zweite Anlauf nach kaputten
     // Umlauten soll denselben Prompt schicken – sonst wäre unklar, ob eine
     // abweichende Antwort am Fehler lag oder an anderen Beispielen.
@@ -91,7 +91,8 @@ export async function POST(request: Request) {
 
     const versuch = () =>
       openai.chat.completions.parse({
-        model: TEXT_MODEL,
+        model,
+        ...extraParams,
         messages: [
           {
             role: "system",

@@ -1,4 +1,4 @@
-import { getOpenAI, TEXT_MODEL } from "./openai";
+import { getTextClient } from "./openai";
 
 /**
  * Zieht aus dem ausführlichen Charaktertext nur die *bildrelevanten* visuellen
@@ -15,9 +15,10 @@ export async function extractVisualDetails(
   const text = beschreibung.trim();
   if (!text) return "";
 
-  const openai = getOpenAI();
+  const { client: openai, model, extraParams } = await getTextClient();
   const completion = await openai.chat.completions.create({
-    model: TEXT_MODEL,
+    model,
+    ...extraParams,
     messages: [
       {
         role: "system",

@@ -53,6 +53,30 @@ serverseitig über `getOpenAI()` genutzt und erreicht nie den Browser. Client-
 Komponenten sprechen die Routen ausschließlich über die typisierten Helfer in
 `lib/client.ts` an.
 
+**Umschaltbarer Text-Anbieter (OpenAI oder Google Gemini):** Der **Text** kann
+in den Einstellungen zwischen OpenAI (Standard, kostenpflichtig) und **Google
+Gemini** (kostenloses Kontingent über Google AI Studio) umgeschaltet werden; das
+**Bild** läuft **immer** über OpenAI (`gpt-image-*`). Deshalb sind die beiden
+Clients getrennt: `getOpenAI()` ist der OpenAI-Client (Bild + optional Text),
+`getTextClient()` in `lib/openai.ts` liefert **Client, Modell und
+Extra-Parameter** je nach eingestelltem Anbieter. Gemini läuft über seinen
+**OpenAI-kompatiblen** Endpunkt – derselbe OpenAI-SDK-Client, nur mit anderem
+`baseURL` (`GEMINI_BASE_URL`) und Key (`GEMINI_API_KEY`) –, sodass der gesamte
+Aufruf-Code inklusive Structured Outputs unverändert bleibt. Alle Text-Routen
+rufen `getTextClient()` statt `getOpenAI()` + festem `TEXT_MODEL` und spreizen
+das zurückgegebene `extraParams` in ihren `create`/`parse`-Aufruf; so greift die
+Umschaltung ohne Neustart. Die Einstellung `textProvider` folgt exakt dem Muster
+von `imageModel` (Key-Value in `Setting`, Allowlist `TEXT_PROVIDERS`, Vorrang
+gespeichert → Env `TEXT_PROVIDER` → Default `openai`, **keine Migration**).
+
+Zwei gemessene Fallstricke (21.07.2026) hängen an Gemini und stehen bei den
+**Nicht-offensichtlichen Fallstricken** unten ausführlich: (1) Gemini-Flash
+„denkt" per Default und liefert bei knappen `max_tokens` eine **leere** Antwort –
+Gegenmittel ist `reasoning_effort: "minimal"`, das **nur** Gemini bekommt (daher
+`extraParams`). (2) Die Modellwahl entscheidet über das Free-Tier-Kontingent:
+`gemini-flash-lite-latest` ist der Default, weil das Voll-Flash nur ~20
+Anfragen/Tag frei hat und `gemini-2.0-flash` gar `limit: 0`.
+
 **Ablauf:** Formular → `POST /api/generate-text` (OpenAI
 `chat.completions.parse` + `zodResponseFormat` → strukturiertes
 `GeneratedCharacter`) → Anzeige Text + Merkmals-Tabelle → `POST
@@ -245,16 +269,51 @@ Die Route `POST /api/scenario-image` **persistiert nichts** (wie alle
 Erzeugen-Routen) und liest die Festlegungen **aus dem Request** – in der
 Detailansicht können sie ungespeichert bearbeitet sein. Die UI führt Erzeugtes
 und Hochgeladenes zuerst als **Kandidat** (ungespeichert): Erst „Als
-Szenario-Bild speichern" ersetzt das vorhandene Bild über
+Weltbild speichern" ersetzt das vorhandene Bild über
 `PUT …/image`. So zerstört ein probeweises „Neu erzeugen" das gute alte Bild
 nicht, bis eins gefällt. Das Speichern des Bildes ist **unabhängig** vom
 „Änderungen speichern" der Festlegungen (eigene Route, sofort). Daneben ein
 Stichwörter-Feld (`extraPrompt`, Perspektive/Lichtstimmung, nicht gespeichert).
 Auf den Übersichtskarten unter `/scenarios` erscheint das Thumbnail links.
 
+**Die Bild-Bedienung liegt in einer eigenen Ansicht** (`ScenarioImageModal`) –
+das Gegenstück zur `CharacterImagesModal` und bewusst so herausgezogen wie beim
+Charakter: In der Detailansicht blieb sonst neben der Weltbeschreibung eine
+Spalte voller Schalter statt eines Bildes. Die Detailseite zeigt jetzt **nur**
+das Thumbnail (Klick öffnet die Ansicht) und einen Knopf „🖼️ Weltbild
+verwalten" bzw. „🏞️ Weltbild hinzufügen"; **alles andere** (Stil, Stichwörter,
+Erzeugen, Hochladen, Kandidat → Übernehmen/Verwerfen, Löschen, **Exportieren**,
+Vollbild) liegt im Modal. Das Modal hält seinen eigenen Zustand (Kandidat,
+Stil, Busy) und meldet ein geändertes gespeichertes Bild über `onChange` an die
+Seite, damit deren Thumbnail aktuell bleibt.
+
+Der **Bild-Export** sitzt hier (nicht an einer Kachel wie beim Charakter, es
+gibt nur eins): Er holt das **Original** über `GET …/image` und lädt es über
+`downloadImage` als `Name_Weltbild.png`. Ohne Positionszusatz – ein Szenario
+hat genau ein Bild.
+
+**Datenmodell bleibt einbildig** – die Ansicht wurde herausgezogen, `Scenario`
+trägt weiterhin **ein** `imageData` + `thumbnail` (kein `ScenarioImage`, keine
+`isPrimary`-Logik). Das Modal ist aber der Ort, an dem später eine Kachelgalerie
+entstünde, wenn das Szenario auf mehrere Bilder umgestellt wird (dann analog zu
+`CharacterImages`/`CharacterImagesModal`).
+
+**Ebenen/Esc:** Die Szenario-Detailseite ist eine **echte Seite**, kein Modal –
+`ScenarioImageModal` ist damit die **erste** Overlay-Ebene (`z-70`) und bekommt
+einen **gewöhnlichen** Esc-/Backdrop-Handler (`useBackdropClose`, eigener
+Escape-Listener wie `CharacterInputModal`), nicht die verschachtelte
+Capture-Phase-Logik der Galerie. Das Vollbild (`ImageLightbox`, `z-80`) öffnet
+darüber; solange es offen ist, hält der Modal-Handler sich über sein
+`vollbild`-Flag zurück, damit ein Esc nicht beide Ebenen schließt. `useOpenAtTop`
+braucht es hier **nicht** – ohne einen `backdrop-blur`-Vorfahren bezieht sich das
+`fixed` der Ansicht aufs Sichtfenster (die Falle aus der Galerie entsteht nur in
+der Modal-Verschachtelung dort).
+
 **Noch nicht dabei** (mögliche Folgeschritte): Das Weltbild ist **nicht** Teil
 der Szenario-Exportdatei (`scenarioFile.ts`) und **nicht** im Charakter-PDF.
-Beides ließe sich analog nachrüsten.
+Beides ließe sich analog nachrüsten. Und das Datenmodell ist wie oben gesagt
+noch einbildig – die getrennte Ansicht ist die Vorbereitung darauf, nicht die
+Umstellung selbst.
 
 **Text neu erzeugen & Ansatzpunkte:** Zwei Knöpfe in der Detailansicht der
 Galerie, beide **nur dort** – sie setzen einen fertigen Charakter voraus.
@@ -921,6 +980,24 @@ Text nie entstanden ist. Gerendert wird über `INPUT_LABELS`, nicht über die
 Schlüssel des Objekts – Altbestände haben nicht alle Felder, und die fehlen so
 sichtbar („— nichts angegeben —") statt lautlos.
 
+**Das erzeugende KI-Modell steht in den Vorgaben** (`input.model`, Label
+„Erzeugt mit", optional/leer bei Altbeständen). Es ist wie die übrigen Felder
+**reine Anzeige** und ein Protokoll des Erstellungszeitpunkts, aber – wie
+`imageStyle` – **kein Formularfeld**: Welches Modell lief, weiß erst die Route
+(`getTextClient`), nicht das Formular. Deshalb gibt `POST /api/generate-text`
+das `model` **mit zurück**, die Erstellen-Seite (`app/page.tsx`) hält es in
+einem eigenen State und hängt es beim Speichern an – `saveCharacter({ ...input,
+imageStyle, model }, …)`, genau dort, wo schon `imageStyle` eingereiht wird.
+`inputDisplayValue` setzt für die Anzeige den Anbieter aus dem Modellnamen davor
+(`gemini*` → „Google Gemini · …", `gpt*` → „OpenAI · …", sonst roh – ein eigenes
+`OPENAI_TEXT_MODEL` bleibt so lesbar). Gespeichert wird bewusst der **rohe
+Modellname**, nicht der Anbieter: der Name ist eindeutig, der Anbieter daraus
+ableitbar. `serialize.ts` füllt das Feld **nicht** auf (anders als das Genre) –
+ein fehlender Wert ist hier folgenlos und darf sichtbar fehlen. Der Backfill der
+Altbestände (24× `gpt-4o-2024-08-06`, 1× `gemini-flash-lite-latest`) lief einmalig
+per `UPDATE … json_set(input, '$.model', …)`; künftige Figuren tragen den Wert
+von selbst.
+
 **Das Genre gehört zu den Vorgaben** (`input.genre`, Default `gegenwart`) und
 ist damit die erste, die etwas **steuert** statt nur zu protokollieren: Die
 Auswahl im Formular belegt wie bisher das Setting vor und bestimmt die Würfel,
@@ -1044,7 +1121,15 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   im Bild-Prompt – `interessen` steht bewusst nicht drin (Hobbys sind kein
   Aussehen). Soll ein neues Merkmal ins Bild wirken, muss es hier ergänzt
   werden.
-- `openai.ts` – serverseitiger OpenAI-Client + Modell-IDs aus der Env.
+- `openai.ts` – serverseitige Text-Clients + Modell-IDs aus der Env.
+  `getOpenAI()` ist der OpenAI-Client (nutzt `IMAGE_MODEL` fürs Bild,
+  `OPENAI_TEXT_MODEL` für Text), `getGemini()` der Gemini-Client (OpenAI-SDK mit
+  `GEMINI_BASE_URL` + `GEMINI_API_KEY`, `GEMINI_TEXT_MODEL`). **Text-Routen rufen
+  aber weder direkt**, sondern `getTextClient()`: Es liest die Einstellung
+  `textProvider` und gibt `{ client, model, extraParams }` zurück – bei Gemini
+  mit `extraParams = { reasoning_effort: "minimal" }` (s. u.), bei OpenAI leer
+  (`gpt-4o` lehnt den Parameter ab). `hatKaputteZeichen` (kaputte Umlaut-Escapes
+  in Structured-Output-Antworten, rekursiv) liegt ebenfalls hier.
 - `imageProvider.ts` – `ImageProvider`-Interface abstrahiert das Bild-Backend
   (aktuell OpenAI); Austauschpunkt für z. B. Flux/Replicate. **Sind
   `referenceImages` gesetzt, läuft die Erzeugung über `images.edit` statt
@@ -1079,10 +1164,13 @@ Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über de
   gebaut – sonst verlören alte Sicherungen ihre Portraits. Vor dem Überschreiben entsteht eine `*.bak`-Kopie
   neben `dev.db` (in `.gitignore`).
 - `settings.ts` – serverseitiger Zugriff auf die `Setting`-Tabelle
-  (Key-Value: `imageModel`, `imageQuality`). **Vorrang: gespeicherter Wert →
-  Env → Default (`gpt-image-1` / `medium`).** Gespeicherte Werte stammen aus
+  (Key-Value: `imageModel`, `imageQuality`, `textProvider`). **Vorrang:
+  gespeicherter Wert → Env → Default.** Gespeicherte Werte stammen aus
   dem Browser und werden gegen die Allowlists `IMAGE_MODELS` / `IMAGE_QUALITIES`
-  geprüft. Beim **Modell** wird der Env-Wert (`OPENAI_IMAGE_MODEL`) als
+  / `TEXT_PROVIDERS` geprüft. `textProvider` (`openai` | `gemini`, Env
+  `TEXT_PROVIDER`, Default `openai`) steuert, welcher Anbieter die **Texte**
+  erzeugt – gelesen von `getTextClient()` in `openai.ts`; das Bild bleibt
+  unberührt. Beim **Modell** wird der Env-Wert (`OPENAI_IMAGE_MODEL`) als
   vertrauenswürdige Server-Konfiguration **ungeprüft** durchgereicht
   (Escape-Hatch für nicht gelistete Modelle); bei der **Qualität** nicht – die
   API kennt nur `low|medium|high`. Weil die Tabelle Key-Value ist, brauchen
@@ -1169,6 +1257,37 @@ PDF-Export via `@react-pdf/renderer` (nur Browser, wird in der Galerie
 **dynamisch** importiert); `AutoTextarea.tsx` ist eine randlose, mit dem Inhalt
 mitwachsende Textarea für die editierbaren Textfelder.
 
+**`CharacterDetailModal.tsx` – die Charakter-Detailansicht, aus der Galerie
+herausgelöst.** War früher eine lokale Funktion `DetailModal` in
+`app/gallery/page.tsx`; herausgezogen, damit **beide** Seiten sie öffnen können:
+die Galerie (Klick auf eine Karte) **und** die Szenario-Detailseite (Klick auf
+eine angehängte Charakter-Kachel). Der Grund für die Angleichung war eine
+Schwäche: Die Kachel führte vorher per `<Link href="/gallery">` nur in die
+allgemeine Galerie, nicht einmal zu diesem Charakter. Jetzt öffnet sie das Modal
+**an Ort und Stelle** – Schließen führt zurück ins Szenario, nicht in die
+Galerie.
+
+Die Komponente ist **hostagnostisch**: Sie bekommt Charakter, Szenarienliste und
+einen Satz Callbacks (`onClose`, `onDelete`, `onSaveContent`,
+`onCharacterUpdated`, `onAssignScenario`, `onScenarioCreated`) und weiß nicht,
+wer sie einbettet. Beide Hosts liefern dieselbe Callback-Fläche und pflegen ihre
+eigene Charakterliste. Zwei Eigenheiten der Szenario-Seite als Host:
+- Sie lädt **alle** Szenarien (`listScenarios`) nur fürs Zuordnungs-Menü und die
+  Ableitung – ihr eigenes Szenario kennt sie ohnehin aus `getScenario`.
+- **Zuordnung weg = Kachel weg:** Wird der Charakter im Modal einem *anderen*
+  Szenario (oder keinem) zugewiesen, gehört er nicht mehr auf diese Seite –
+  seine Kachel fällt weg und das Modal schließt (`charZuordnen`). In der Galerie
+  bleibt er dagegen in der Liste, nur mit anderer Zuordnung.
+
+Die **Modal-Verschachtelung** (Detail `z-50` → Bilder `z-70` → Vorlagen `z-75` →
+Vollbild `z-80`, Capture-Phase-Esc, `useBackdropClose`, `useOpenAtTop`) steckt
+vollständig in der Komponente und ihren Unter-Modals und funktioniert in beiden
+Hosts gleich – die Szenario-Seite ist eine echte Seite ohne `backdrop-blur`, das
+`fixed inset-0` des Detail-Modals bezieht sich also aufs Sichtfenster, und die
+Unter-Modals verhalten sich wie in der Galerie. Ein Detail-Modal **ohne**
+geöffnete Bilder-Ansicht hat bewusst **keinen** eigenen Esc-Handler (es schließt
+über Backdrop-Klick und ✕) – dieselbe Regel wie zuvor in der Galerie.
+
 **Datenmodell** (`prisma/schema.prisma`): `Character` (Felder `input` und
 `traits` als **JSON-Strings**, optionale `scenarioId`, optionale `storyHooks`),
 `CharacterImage`
@@ -1193,6 +1312,31 @@ App-Einstellungen). SQLite lokal.
   `zodResponseFormat` verwenden. **Kein** `z.number().int()` in Schemas, die an
   OpenAI gehen – `.int()` erzeugt `minimum`/`maximum`, was Structured Outputs
   ablehnt; stattdessen `z.number()`.
+- **Gemini „denkt" und leert damit knappe Token-Budgets:** Die aktuellen
+  Gemini-Flash-Modelle erzeugen per Default erst **versteckte Denk-Tokens**,
+  bevor sichtbarer Text kommt – und `max_tokens` deckelt **beide** Phasen
+  zusammen. Beim Namensknopf (`max_tokens: 24`) war das Budget schon beim
+  Nachdenken erschöpft: `finish_reason: "length"`, `completion_tokens: 0`, also
+  eine **leere** Antwort und „Das Modell lieferte keinen Namen." (Auch die
+  latenten Fälle `visualDetails` mit `120` und `scenario-field` wären
+  betroffen.) Gegenmittel: `getTextClient()` schickt für Gemini
+  `reasoning_effort: "minimal"` mit (schaltet das Nachdenken praktisch ab, lässt
+  Gemini wie `gpt-4o` antworten, spart Free-Tier-Token). **Nur Gemini** – bei
+  OpenAI ist `extraParams` leer, weil `gpt-4o` den Parameter mit 400 ablehnt;
+  Gemini akzeptiert `"minimal"`, aber **nicht** `"none"` (400). Wer eine Route
+  hat, die echtes Schlussfolgern braucht, kann `extraParams` dort gezielt höher
+  setzen.
+- **Gemini-Modellwahl = Free-Tier-Kontingent:** Der Default `GEMINI_TEXT_MODEL`
+  ist bewusst `gemini-flash-lite-latest`. Gemessen (21.07.2026, dieses Konto):
+  `gemini-2.0-flash` hat für neue Konten `limit: 0` (gar kein Free-Tier),
+  `gemini-flash-latest` löst auf `gemini-3.6-flash` auf mit nur **~20
+  Anfragen/Tag** (ein Charakter kostet mehrere Aufrufe – reicht kaum), die
+  **Lite**-Modelle haben ein deutlich größeres Tageskontingent. Läuft es auf ein
+  `429` mit `GenerateRequestsPerDayPerProjectPerModel-FreeTier`, ist das
+  **Tageslimit** erschöpft (Reset Mitternacht Pacific), **nicht** das
+  Minutenlimit – Googles `retryDelay` (wenige Sekunden) ist dabei irreführend.
+  Die `-latest`-Aliasse sind gewählt, weil Google alte Modelle abkündigt
+  (`gemini-2.5-flash`: „no longer available to new users", 404).
 - **Prisma 7 braucht einen Driver-Adapter:** `PrismaBetterSqlite3`
   (`@prisma/adapter-better-sqlite3`) ist in `lib/prisma.ts` verdrahtet; ein
   blankes `new PrismaClient()` funktioniert nicht.

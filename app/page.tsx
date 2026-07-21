@@ -45,6 +45,9 @@ function Home() {
 
   const [input, setInput] = useState<CharacterInput | null>(null);
   const [character, setCharacter] = useState<GeneratedCharacter | null>(null);
+  // KI-Modell, das den Text erzeugt hat – wird beim Speichern in `input.model`
+  // protokolliert (s. `characterInputSchema.model`).
+  const [model, setModel] = useState<string>("");
 
   const [textLoading, setTextLoading] = useState(false);
   const [textError, setTextError] = useState<string | null>(null);
@@ -143,14 +146,16 @@ function Home() {
     setTextLoading(true);
     setTextError(null);
     setCharacter(null);
+    setModel("");
     setImageData(null);
     setImageError(null);
     setSaved(false);
     setInput(formInput);
     setView("result"); // sofort zur Ergebnis-Ansicht wechseln
     try {
-      const { character } = await generateText(formInput);
+      const { character, model } = await generateText(formInput);
       setCharacter(character);
+      setModel(model);
     } catch (err) {
       setTextError(err instanceof Error ? err.message : "Fehler.");
     } finally {
@@ -174,6 +179,7 @@ function Home() {
   function resetToForm() {
     setView("form");
     setCharacter(null);
+    setModel("");
     setInput(null);
     setImageData(null);
     setImageError(null);
@@ -213,7 +219,7 @@ function Home() {
     setSaving(true);
     try {
       await saveCharacter(
-        { ...input, imageStyle },
+        { ...input, imageStyle, model },
         character,
         imageData,
         selectedScenarioId,
