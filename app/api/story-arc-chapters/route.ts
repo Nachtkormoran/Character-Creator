@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getTextClient, hatKaputteZeichen } from "@/lib/openai";
 import { buildStoryArcChaptersPrompt } from "@/lib/prompts";
 import { MAX_KAPITEL_PRO_STUFE, kapitelListeSchema } from "@/lib/schema";
+import { randomSparks } from "@/lib/storyArcSparks";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,9 @@ const bodySchema = z.object({
     beschreibung: z.string().trim().min(1).max(5000),
     figuren: z.array(z.string().trim().max(120)).max(30).optional().default([]),
   }),
+  // „kreativ": längere, ausgemalte Kapitel mit erlaubter Detailerfindung plus
+  // zufällige Impulse; die Temperatur steigt.
+  kreativ: z.boolean().optional().default(false),
 });
 
 export async function POST(request: Request) {
@@ -43,10 +47,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const { stufe } = parsed.data;
+    const { stufe, kreativ } = parsed.data;
 
     const { client: openai, model, extraParams } = await getTextClient();
-    const prompt = buildStoryArcChaptersPrompt(stufe);
+    const prompt = buildStoryArcChaptersPrompt(stufe, {
+      kreativ,
+      sparks: kreativ ? randomSparks(1, 2) : undefined,
+    });
 
     const versuch = () =>
       openai.chat.completions.parse({
@@ -61,7 +68,8 @@ export async function POST(request: Request) {
           { role: "user", content: prompt },
         ],
         response_format: zodResponseFormat(kapitelListeSchema, "kapitel"),
-        temperature: 0.5,
+        // Bei „kreativ" höher, damit die Ausarbeitung auch Farbe bekommt.
+        temperature: kreativ ? 0.9 : 0.5,
       });
 
     let ergebnis = (await versuch()).choices[0]?.message.parsed;

@@ -638,7 +638,12 @@ export function generateScenarioPlot(
 export function generateStoryArc(
   scenarioId: string,
   handlung: string,
-  options: { laenge?: ArcLength; format?: ArcFormat; zusatz?: string } = {},
+  options: {
+    laenge?: ArcLength;
+    format?: ArcFormat;
+    zusatz?: string;
+    kreativ?: boolean;
+  } = {},
 ) {
   return postJson<{ storyArc: StoryArc }>("/api/scenario-arc", {
     scenarioId,
@@ -652,13 +657,17 @@ export function generateStoryArc(
  * braucht weder `scenarioId` noch die Charaktere – die Station trägt alles in
  * sich. **Persistiert nichts**; gespeichert wird über `updateScenario`.
  */
-export function generateStoryArcChapters(stufe: {
-  titel: string;
-  beschreibung: string;
-  figuren: string[];
-}) {
+export function generateStoryArcChapters(
+  stufe: {
+    titel: string;
+    beschreibung: string;
+    figuren: string[];
+  },
+  options: { kreativ?: boolean } = {},
+) {
   return postJson<{ kapitel: Kapitel[] }>("/api/story-arc-chapters", {
     stufe,
+    ...options,
   });
 }
 

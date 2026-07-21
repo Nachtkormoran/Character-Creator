@@ -3,6 +3,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { getTextClient, hatKaputteZeichen } from "@/lib/openai";
 import { buildStoryArcPrompt, type PlotCharacter } from "@/lib/prompts";
+import { randomSparks } from "@/lib/storyArcSparks";
 import {
   ARC_FORMATS,
   ARC_LENGTHS,
@@ -53,6 +54,9 @@ const bodySchema = z.object({
     .optional()
     .default(DEFAULT_ARC_FORMAT),
   zusatz: z.string().trim().max(1000).optional().default(""),
+  // „kreativ": zufällige erzählerische Impulse fließen ein und die Temperatur
+  // steigt – der Arc darf freier ausfallen, bleibt aber am Entwurf.
+  kreativ: z.boolean().optional().default(false),
 });
 
 export async function POST(request: Request) {
@@ -66,7 +70,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenarioId, handlung, laenge, format, zusatz } = parsed.data;
+    const { scenarioId, handlung, laenge, format, zusatz, kreativ } =
+      parsed.data;
     const anzahl = arcStationen(laenge);
 
     const rows = await prisma.character.findMany({
@@ -102,12 +107,15 @@ export async function POST(request: Request) {
     }));
 
     const { client: openai, model, extraParams } = await getTextClient();
+    // Bei „kreativ" ein paar zufällige Impulse ziehen – jeder Lauf andere.
+    const sparks = kreativ ? randomSparks() : undefined;
     const prompt = buildStoryArcPrompt(
       handlung,
       characters,
       anzahl,
       format as "buch" | "spiel",
       zusatz,
+      sparks,
     );
 
     const versuch = () =>
@@ -123,8 +131,9 @@ export async function POST(request: Request) {
           { role: "user", content: prompt },
         ],
         response_format: zodResponseFormat(storyArcSchema, "story_arc"),
-        // Niedrig-mittig: gegliedert wird Vorhandenes, nicht frei erfunden.
-        temperature: 0.5,
+        // Normal niedrig-mittig (gegliedert wird Vorhandenes); bei „kreativ"
+        // höher, damit die Impulse auch Wirkung zeigen.
+        temperature: kreativ ? 0.9 : 0.5,
       });
 
     let ergebnis = (await versuch()).choices[0]?.message.parsed;

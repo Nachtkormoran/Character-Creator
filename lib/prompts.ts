@@ -496,6 +496,12 @@ export function buildStoryArcPrompt(
   format: "buch" | "spiel" = "buch",
   /** Zusätzliche Wünsche für diesen Lauf (Stichwörter) – optional. */
   zusatz?: string,
+  /**
+   * **Kreative Impulse** (bei gesetztem „kreativ"-Haken) – zufällige
+   * erzählerische Anregungen aus `storyArcSparks.ts`. Optional und dem Entwurf
+   * untergeordnet: Was nicht passt, lässt das Modell fallen.
+   */
+  sparks?: string[],
 ): string {
   /** Rückt einen mehrzeiligen Block ein, damit die Zuordnung zur Figur hält. */
   const einrücken = (text: string, tiefe = "     ") =>
@@ -541,6 +547,12 @@ export function buildStoryArcPrompt(
 
   const zusatzBlock = zusatz?.trim()
     ? `\nBesonders wichtig – zusätzliche Wünsche für diesen Arc:\n${zusatz.trim()}\n`
+    : "";
+
+  const sparksBlock = sparks?.length
+    ? `\nKreative Impulse – lass dich davon frei inspirieren, wo sie zur Geschichte passen. Sie sind Anregung, keine Pflicht, und dürfen dem Handlungsentwurf nie widersprechen; was nicht passt, lässt du fallen:\n${sparks
+        .map((s) => `- ${s}`)
+        .join("\n")}\n`
     : "";
 
   // Die Phasenfolge **explizit** vorgeben statt sie das Modell aus einer Zahl
@@ -589,7 +601,7 @@ Anforderungen:
 ${formatZeile}
 - Titel kurz und prägnant (2–5 Wörter). Beschreibung als Fließtext, ohne Nummerierung, ohne Aufzählungszeichen.
 - Alles auf Deutsch.
-${zusatzBlock}`;
+${sparksBlock}${zusatzBlock}`;
 }
 
 /**
@@ -602,15 +614,34 @@ ${zusatzBlock}`;
  * Station trägt Beschreibung und beteiligte Figuren schon in sich. Dieselbe
  * Abgrenzung wie Arc ↔ Handlungsentwurf, nur eine Ebene tiefer.
  */
-export function buildStoryArcChaptersPrompt(stufe: {
-  titel: string;
-  beschreibung: string;
-  figuren: string[];
-}): string {
+export function buildStoryArcChaptersPrompt(
+  stufe: {
+    titel: string;
+    beschreibung: string;
+    figuren: string[];
+  },
+  options: { kreativ?: boolean; sparks?: string[] } = {},
+): string {
+  const kreativ = !!options.kreativ;
   const figuren = stufe.figuren.filter((f) => f.trim());
   const figurenZeile =
-    figuren.length > 0
-      ? `\nBeteiligte Figuren: ${figuren.join(", ")}.`
+    figuren.length > 0 ? `\nBeteiligte Figuren: ${figuren.join(", ")}.` : "";
+
+  // Kreativ: länger und ausgemalt, mit erlaubter Detailerfindung; sonst knapp
+  // und rein zerlegend.
+  const satzVorgabe = kreativ
+    ? "drei bis fünf Sätzen, die die Handlung des Kapitels konkret ausmalen"
+    : "zwei bis drei Sätzen, die sagen, was in dem Kapitel passiert";
+
+  const ausarbeitung = kreativ
+    ? "- **Arbeite aus.** Bleib im Rahmen der Station (kein neues Großereignis, keine neuen Hauptfiguren, kein anderer Ausgang), aber fülle sie mit konkreten Details: ein Bild, ein Sinneseindruck, eine kleine Handlung, ein Satz Dialog, eine innere Regung. Die Kapitel dürfen erzählerisch atmen und Zwischentöne setzen."
+    : "- **Zerlege, erfinde nicht.** Bleib in dem, was die Station hergibt – konkretisiere, aber füge keine neuen Ereignisse oder Figuren hinzu.";
+
+  const sparksBlock =
+    kreativ && options.sparks?.length
+      ? `\nKreative Impulse – lass dich davon frei inspirieren, wo sie zur Station passen. Anregung, keine Pflicht; was nicht passt, lässt du fallen, und keiner darf der Station widersprechen:\n${options.sparks
+          .map((s) => `- ${s}`)
+          .join("\n")}\n`
       : "";
 
   return `Zerlege die folgende Station eines Story Arcs in zwei bis drei Kapitel.
@@ -623,12 +654,13 @@ Am Ende müssen zwei bis drei Kapitel dastehen. Sie schreiten die Station in ihr
 
 Jedes Kapitel besteht aus:
 - einer kurzen Überschrift (2–6 Wörter),
-- zwei bis drei Sätzen, die sagen, was in dem Kapitel passiert.
+- ${satzVorgabe}.
 
 Anforderungen:
-- **Zerlege, erfinde nicht.** Bleib in dem, was die Station hergibt – konkretisiere, aber füge keine neuen Ereignisse oder Figuren hinzu.
+${ausarbeitung}
 - Jedes Kapitel trägt die Handlung ein Stück weiter; keine zwei, die dasselbe sagen.
-- Alles auf Deutsch, ohne Nummerierung und ohne Aufzählungszeichen im Text.`;
+- Alles auf Deutsch, ohne Nummerierung und ohne Aufzählungszeichen im Text.
+${sparksBlock}`;
 }
 
 /**

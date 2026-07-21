@@ -87,7 +87,14 @@ export default function ScenarioDetailPage({
     laenge: ArcLength;
     format: ArcFormat;
     zusatz: string;
-  }>({ laenge: DEFAULT_ARC_LENGTH, format: DEFAULT_ARC_FORMAT, zusatz: "" });
+    /** Zufällige Impulse + höhere Temperatur, für Arc **und** Kapitel. */
+    kreativ: boolean;
+  }>({
+    laenge: DEFAULT_ARC_LENGTH,
+    format: DEFAULT_ARC_FORMAT,
+    zusatz: "",
+    kreativ: false,
+  });
   /** Welche Station gerade Kapitel erzeugt, und ein etwaiger Fehler dazu. */
   const [kapitelBusy, setKapitelBusy] = useState<number | null>(null);
   const [kapitelFehler, setKapitelFehler] = useState<{
@@ -479,6 +486,7 @@ export default function ScenarioDetailPage({
         laenge: arcParams.laenge,
         format: arcParams.format,
         zusatz: arcParams.zusatz,
+        kreativ: arcParams.kreativ,
       });
       setStoryArc(neu);
     } catch (e) {
@@ -501,11 +509,14 @@ export default function ScenarioDetailPage({
     setKapitelBusy(stufeIndex);
     setKapitelFehler(null);
     try {
-      const { kapitel } = await generateStoryArcChapters({
-        titel: stufe.titel,
-        beschreibung: stufe.beschreibung,
-        figuren: stufe.figuren,
-      });
+      const { kapitel } = await generateStoryArcChapters(
+        {
+          titel: stufe.titel,
+          beschreibung: stufe.beschreibung,
+          figuren: stufe.figuren,
+        },
+        { kreativ: arcParams.kreativ },
+      );
       setStoryArc((arc) => ({
         stufen: arc.stufen.map((s, k) =>
           k === stufeIndex ? { ...s, kapitel } : s,

@@ -81,12 +81,18 @@ export function StoryArcSection({
   onAbleiten: () => void;
   busy: boolean;
   error: string | null;
-  /** Länge/Format/Zusatz des nächsten Laufs – nicht gespeichert. */
-  params: { laenge: ArcLength; format: ArcFormat; zusatz: string };
+  /** Länge/Format/Zusatz/kreativ des nächsten Laufs – nicht gespeichert. */
+  params: {
+    laenge: ArcLength;
+    format: ArcFormat;
+    zusatz: string;
+    kreativ: boolean;
+  };
   onParamsChange: (p: {
     laenge: ArcLength;
     format: ArcFormat;
     zusatz: string;
+    kreativ: boolean;
   }) => void;
   /** Kapitel für die Station am Index ableiten. */
   onKapitelAbleiten: (stufeIndex: number) => void;
@@ -242,6 +248,28 @@ export function StoryArcSection({
           </button>
         </div>
       </div>
+
+      {/*
+        Kreativ-Haken – gilt für **beide** Erzeugungen (Arc und Kapitel): Es
+        fließen zufällige erzählerische Impulse ein, die Kapitel werden länger
+        und ausgemalt, und die Temperatur steigt. Deshalb steht er oben im
+        Abschnitt, nicht bei einem einzelnen Knopf.
+      */}
+      <label
+        className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+        title="Zufällige Impulse und mehr Freiheit: Der Arc fällt lebendiger aus, Kapitel werden länger und mit Details ausgearbeitet. Wirkt auf „Ableiten“ und auf die Kapitel-Erzeugung."
+      >
+        <input
+          type="checkbox"
+          checked={params.kreativ}
+          onChange={(e) =>
+            onParamsChange({ ...params, kreativ: e.target.checked })
+          }
+          disabled={disabled}
+          className="size-4 accent-foreground"
+        />
+        ✨ Kreativ – Impulse und ausgearbeitete Kapitel
+      </label>
 
       {/* Zusatzwunsch für die Arc-Erzeugung. */}
       <input
