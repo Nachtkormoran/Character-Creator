@@ -106,12 +106,123 @@ Abschnitt, eine Ebene.
   Sicherungen die Beziehungen. Dort wird tabellenweise kopiert, nicht die Datei
   getauscht.
 
+## Einsatz im Story Arc
+
+Die Beziehungen von oben sind genau das Material, das der Story Arc (s.
+[STORYARC.md](STORYARC.md)) braucht. Der Arc zerlegt einen Handlungsentwurf in
+dramaturgische Stationen; **Konflikt ist sein Motor, und Beziehungen sind
+vorgefertigter Konflikt.** Bis hierher betrachtet einzig `scenario-plot` mehrere
+Figuren zugleich, aber nur als lose Sammlung. Eine explizite Beziehungs-Ebene
+sagt dem Modell, *wie* sie zueinander stehen – und daraus schreibt sich ein
+Wendepunkt fast von selbst.
+
+### Welche Beziehungen der Arc liest
+
+Beziehungen sind – wie oben entworfen – **projektweit** (Galerie), nicht ans
+Szenario gehängt. Der Arc ist dagegen szenariogebunden. Beides passt ohne ein
+`scenarioId` an der Kante zusammen: Der Arc liest schlicht alle
+`Relationship`-Zeilen, deren **beide** Pole (`fromId`, `toId`) zur Besetzung des
+Szenarios gehören. Eine Beziehung ist eine Tatsache über zwei Menschen; der Arc
+filtert sie nur auf seine Besetzung. (Cross-Szenario-Kanten – ein Pol außerhalb
+der Besetzung – bleiben draußen, still, nicht als Fehler.)
+
+### Eine Valenz je Typ – abgeleitet, nicht gespeichert
+
+Damit der Arc weiß, welche Beziehung Konflikt trägt, braucht jeder Typ eine
+**Färbung**. Dieselbe Entscheidung wie beim `inverse`: Sie gehört in
+`RELATIONSHIP_TYPES`, nicht in eine Spalte – ein neuer Wert bleibt ein
+Listeneintrag, keine Migration.
+
+```ts
+export const RELATIONSHIP_TYPES = [
+  { value: "geschwister", label: "Geschwister",    inverse: "geschwister", valenz: "positiv" },
+  { value: "elternteil",  label: "Elternteil von", inverse: "kind",        valenz: "positiv" },
+  { value: "mentor",      label: "Mentor von",     inverse: "schueler",    valenz: "positiv" },
+  { value: "partner",     label: "Partner",        inverse: "partner",     valenz: "positiv" },
+  { value: "freund",      label: "Freund von",     inverse: "freund",      valenz: "positiv" },
+  { value: "verbuendet",  label: "verbündet mit",  inverse: "verbuendet",  valenz: "positiv" },
+  { value: "vorgesetzt",  label: "Vorgesetzte(r) von", inverse: "unterstellt", valenz: "ambivalent" },
+  { value: "rivale",      label: "Rivale",         inverse: "rivale",      valenz: "negativ" },
+  { value: "feind",       label: "Feind von",      inverse: "feind",       valenz: "negativ" },
+] as const;
+```
+
+`valenz: "positiv" | "negativ" | "ambivalent"`. Damit ist zugleich die **offene
+Frage unten beantwortet**: „Feind", „Vorgesetzter" und „Freund" kommen dazu, und
+gerade die konfliktträchtigen (Feind, Rivale) sind der wertvollste Input für den
+Arc. Feinjustieren lässt sich der Ton je Beziehung ohne neues Feld – das
+vorhandene `note` („Geschwister, aber seit dem Streit zerrüttet") liest das
+Modell mit und darf die Typ-Valenz im Einzelfall kippen.
+
+### Als Prompt-Material
+
+`scenario-plot` und (sobald es existiert) `scenario-arc` bekommen einen
+**Beziehungs-Block** – zusätzlich zu Kurzbeschreibung, Text, Merkmalen und
+`storyHooks` je Figur. Gebaut aus `label`/`inverse` (lesbar aufgelöst) plus
+`note`, gefiltert auf die Besetzung:
+
+```
+Beziehungen der Besetzung:
+- Maeve ist Mentorin von Elin (positiv): Elin verdankt ihr alles und beginnt zu zweifeln.
+- Anna und Lydia sind Geschwister (positiv), aber seit dem Streit zerrüttet.
+- Elin und Rasmus sind Rivalen (negativ): …
+```
+
+### Die prüfbare Konflikt-Regel
+
+Im Prompt als am Ergebnis prüfbare Bedingung, nicht als Bitte – dieselbe
+**„Belegstelle"-Disziplin** wie bei der `eng`-Bindung der `storyHooks`:
+
+> „Der zentrale Konflikt jeder Station muss sich auf **eine der genannten
+> Beziehungen** zurückführen lassen. Erfinde keine neuen Beziehungen; braucht
+> eine Station eine Zuspitzung, nimm die mit der stärksten Spannung (negativ
+> oder ambivalent)."
+
+Eine rein positive Besetzung ohne eine einzige Reibung ist ein Warnsignal – die
+UI kann darauf hinweisen, dass der Arc dann flach bleibt.
+
+### Stationen greifen Beziehungen auf
+
+Das `ArcStufe`-Schema aus [STORYARC.md](STORYARC.md) bekommt ein Feld
+`beziehungen: string[]` – welche Beziehungen eine Station **berührt oder
+verschiebt** (per Id oder Kennung „Elin↔Rasmus"). So wird sichtbar, *wann* sich
+eine Beziehung dreht, und die Rückbindung wird prüfbar (Namens-/Id-Abgleich wie
+bei `scenario-plot-persons`).
+
+### Der eigentliche Gewinn: der Graph bekommt eine Zeitachse
+
+Ein Story Arc ist dann nicht nur eine Folge von Ereignissen, sondern die
+**Transformation des Beziehungsgraphen über die Zeit** – aus Verbündeten werden
+Verräter, aus Rivalen Partner. Die Kreis-Übersicht von oben ließe sich entlang
+der Arc-Zeitleiste **umfärben** (Valenz je Station). Der Arc gibt den Beziehungen
+eine Zeitachse, die Beziehungen geben dem Arc seinen Konflikt. Das ist die
+lohnende Ausbaustufe, kein MVP.
+
+### Rückkopplung
+
+Wie `scenario-plot-persons` Personen aus dem Entwurf fischt, kann ein erzeugter
+Arc **Beziehungen benennen, die es als `Relationship` noch nicht gibt** („Maeve
+und Rasmus sind alte Feinde") → Vorschlag, sie anzulegen. So wächst der Graph
+mit der Geschichte, statt vorab vollständig sein zu müssen.
+
+### Reihenfolge
+
+Das ist ein **dritter Schritt** nach den zwei oben (Modell+Liste, dann
+Kreis-Graph) und setzt `scenario-arc` voraus: (a) `valenz` in
+`RELATIONSHIP_TYPES`, (b) Beziehungs-Block + Konflikt-Regel in
+`scenario-plot`/`scenario-arc`, (c) `ArcStufe.beziehungen`. Erst danach die
+Verlaufs-Ausbaustufe.
+
 ## Bewusst noch nicht eingeplant
 
-Beziehungen in den Text-Prompt geben („erzeuge jemanden, der Annas jüngerer
-Bruder ist"). Reizvoll, aber ein eigenes Thema.
+Beziehungen in den **Erstellungs**-Prompt geben („erzeuge jemanden, der Annas
+jüngerer Bruder ist"). Das betrifft `generate-text`, nicht den Arc, und bleibt
+ein eigenes Thema – der Arc-Einsatz oben ist davon unberührt.
 
 ## Offene Frage
 
 Reicht die Typenliste oben? Naheliegende Ergänzungen wären „Feind",
 „Vorgesetzter" und „Freund".
+
+→ **Beantwortet** im Abschnitt „Einsatz im Story Arc": Die drei kommen dazu, und
+mit ihnen eine `valenz` je Typ – ohne die bliebe der Arc konfliktblind.
