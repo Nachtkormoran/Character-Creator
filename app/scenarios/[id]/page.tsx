@@ -585,8 +585,18 @@ export default function ScenarioDetailPage({
     setExportFehler(null);
     try {
       const datei = await buildScenarioFile(
-        { name: name.trim(), details },
+        {
+          name: name.trim(),
+          details,
+          // Der **bearbeitete** Stand, wie bei den Festlegungen: alle Entwürfe
+          // samt aktivem Index und der Story Arc.
+          plotVariants: { items: aktuelleVarianten(), aktiv },
+          storyArc,
+        },
         mitCharakteren ? characters : [],
+        // Das Weltbild ist unabhängig vom bearbeiteten Stand (eigene Route,
+        // sofort gespeichert) – gibt es ein Thumbnail, gibt es ein Original.
+        { scenarioId: id, vorhanden: !!thumbnail },
       );
       const blob = new Blob([JSON.stringify(datei, null, 2)], {
         type: "application/json",
@@ -867,7 +877,7 @@ export default function ScenarioDetailPage({
               disabled={saving || generatingField !== null}
               className="size-4 accent-foreground"
             />
-            aktuellen Handlungsentwurf verwenden
+            aktuellen Handlungsentwurf bei neuem Entwurf verwenden
           </label>
         )}
         <ScenarioFields

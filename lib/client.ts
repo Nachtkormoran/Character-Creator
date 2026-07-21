@@ -348,20 +348,53 @@ export async function buildCharacterFile(
  */
 export async function buildScenarioFile(
   /**
-   * Bewusst **kein** ganzes `StoredScenario`: In die Datei gehen nur Name und
-   * Festlegungen, und `id`, `createdAt` und `count` gehören ausdrücklich nicht
-   * hinein (Begründung in `scenarioFile.ts`). Mit dem engeren Typ kann die
-   * aufrufende Seite den **bearbeiteten** Stand übergeben, ohne die übrigen
-   * Felder erfinden zu müssen.
+   * Bewusst **kein** ganzes `StoredScenario`: `id`, `createdAt` und `count`
+   * gehören ausdrücklich nicht in die Datei (Begründung in `scenarioFile.ts`).
+   * Mit dem engeren Typ kann die aufrufende Seite den **bearbeiteten** Stand
+   * übergeben (Festlegungen, Varianten, Arc), ohne die übrigen Felder erfinden
+   * zu müssen. `plotVariants` und `storyArc` sind optional – ein Szenario ohne
+   * Entwürfe oder Arc lässt sie weg.
    */
-  scenario: { name: string; details: ScenarioDetails },
+  scenario: {
+    name: string;
+    details: ScenarioDetails;
+    plotVariants?: PlotVariants;
+    storyArc?: StoryArc;
+  },
   characters: StoredCharacter[],
+  /**
+   * Das Weltbild reist über sein Original, nicht das Thumbnail – wie bei den
+   * Charakter-Bildern. Die aufrufende Seite kennt nur die `scenarioId` und ob
+   * ein Bild existiert; das Original holt diese Funktion einzeln nach
+   * (`getScenarioImage`), damit die Seite es nicht vorhalten muss.
+   */
+  bild?: { scenarioId: string; vorhanden: boolean },
 ): Promise<ScenarioFile> {
+  // Das Weltbild nur holen, wenn es eines gibt – sonst bleibt das Feld leer.
+  let imageData: string | undefined;
+  let thumbnail: string | undefined;
+  if (bild?.vorhanden) {
+    imageData = await getScenarioImage(bild.scenarioId);
+    thumbnail = (await safeThumbnail(imageData)) ?? undefined;
+  }
+
   return {
     kind: SCENARIO_FILE_KIND,
     version: SCENARIO_FILE_VERSION,
     exportedAt: new Date().toISOString(),
-    scenario: { name: scenario.name, details: scenario.details },
+    scenario: {
+      name: scenario.name,
+      details: scenario.details,
+      // Nur mitgeben, was da ist: leere Varianten/Arc bleiben weg und die
+      // Datei bleibt schlank (und mit älteren Ständen lesbar).
+      ...(scenario.plotVariants && scenario.plotVariants.items.length > 0
+        ? { plotVariants: scenario.plotVariants }
+        : {}),
+      ...(scenario.storyArc && scenario.storyArc.stufen.length > 0
+        ? { storyArc: scenario.storyArc }
+        : {}),
+      ...(imageData ? { imageData, thumbnail } : {}),
+    },
     // Nacheinander statt `Promise.all`: Jeder Charakter zieht seine
     // Bild-Originale einzeln, und mehrere Figuren gleichzeitig legten
     // Dutzende Megabyte parallel in den Speicher. Ein Export darf ein paar

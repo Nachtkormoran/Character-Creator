@@ -185,8 +185,9 @@ dunkel) wurde als Artifact erstellt.
 - **Arc pro Variante**: `plotVariants` von Strings auf Objekte mit optionalem
   `arc` heben. Der sauberere, aber größere Umbau – erst, wenn sich das
   Ein-Arc-Modell als zu eng erweist.
-- **Arc im Szenario-Export** (`scenarioFile.ts`) – analog nachrüstbar, wie das
-  Weltbild dort noch fehlt.
+- ~~**Arc im Szenario-Export** (`scenarioFile.ts`)~~ – **erledigt**: Der Story
+  Arc (samt Kapiteln), alle Handlungsentwürfe und das Weltbild sind jetzt Teil
+  der Szenario-Exportdatei (optional, ohne Versionssprung).
 - **Rückrichtung**: aus einer Arc-Station einen Charakter ableiten (die Station
   nennt ja `figuren`, darunter evtl. neue) – analog zu `scenario-plot-persons`.
 

@@ -169,6 +169,23 @@ und dieses hier liegt dazwischen – eine Welt und, wenn gewünscht, ihre
 Besetzung. Genau das, was man weitergibt, wenn jemand anders in derselben Welt
 weiterspielen soll.
 
+**In der Datei steckt das ganze Szenario, nicht nur Name und Festlegungen:**
+neben `details` auch **alle Handlungsentwürfe** (`plotVariants` samt aktivem
+Index – ohne sie überlebte nur der aktive über `details.handlung`), der
+**Story Arc** (`storyArc` samt Kapiteln) und das **Weltbild** (`imageData` +
+`thumbnail`, Original über `getScenarioImage` nachgeholt wie die
+Charakter-Bilder). Alle drei sind im Schema **optional und ohne
+Versionssprung** ergänzt – dieselbe Überlegung wie bei `storyHooks` in
+`characterFile.ts`: Alte Dateien lesen unverändert (die Felder fehlen
+folgenlos), und `serializeScenario` füllt beim Import auf (eine Variante aus
+`details.handlung`, leerer Arc, kein Bild). Der Export gibt den **bearbeiteten**
+Stand von Varianten und Arc mit (wie die Festlegungen); das Weltbild ist davon
+unabhängig (eigene Route, sofort gespeichert). *Round-Trip gegen den
+Dev-Server geprüft* (Testdaten entfernt): Datei mit Varianten/Arc+Kapiteln/Bild
+spielt sie alle wieder ein, aktive Variante bleibt konsistent, Bild-Original
+kommt über `GET …/image` zurück; eine Datei ohne die Felder fällt sauber auf die
+Vorgaben zurück.
+
 Die Charaktere stecken als `characterPayloadSchema` darin – **dieselbe Form wie
 in einer Einzeldatei, nur ohne deren Kopf**. Dafür wurde die Nutzlast aus
 `characterFileSchema` herausgezogen; `kind` und `version` gehören zur *Datei*
@@ -309,11 +326,12 @@ braucht es hier **nicht** – ohne einen `backdrop-blur`-Vorfahren bezieht sich 
 `fixed` der Ansicht aufs Sichtfenster (die Falle aus der Galerie entsteht nur in
 der Modal-Verschachtelung dort).
 
-**Noch nicht dabei** (mögliche Folgeschritte): Das Weltbild ist **nicht** Teil
-der Szenario-Exportdatei (`scenarioFile.ts`) und **nicht** im Charakter-PDF.
-Beides ließe sich analog nachrüsten. Und das Datenmodell ist wie oben gesagt
-noch einbildig – die getrennte Ansicht ist die Vorbereitung darauf, nicht die
-Umstellung selbst.
+Das Weltbild **ist** inzwischen Teil der Szenario-Exportdatei
+(`scenarioFile.ts`, s. u. „Szenarien exportieren") – als `imageData` +
+`thumbnail`, geholt über `getScenarioImage`. **Noch nicht dabei** (möglicher
+Folgeschritt): das Weltbild im **Charakter-PDF**. Und das Datenmodell ist wie
+oben gesagt noch einbildig – die getrennte Ansicht ist die Vorbereitung darauf,
+nicht die Umstellung selbst.
 
 **Text neu erzeugen & Ansatzpunkte:** Zwei Knöpfe in der Detailansicht der
 Galerie, beide **nur dort** – sie setzen einen fertigen Charakter voraus.

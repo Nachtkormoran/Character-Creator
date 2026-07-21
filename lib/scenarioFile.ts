@@ -18,7 +18,11 @@
 
 import { z } from "zod";
 import { characterPayloadSchema } from "./characterFile";
-import { scenarioDetailsSchema } from "./schema";
+import {
+  plotVariantsSchema,
+  scenarioDetailsSchema,
+  storyArcStoredSchema,
+} from "./schema";
 
 /** Erkennungsmerkmal im Dateikopf – schützt davor, irgendein JSON einzulesen. */
 export const SCENARIO_FILE_KIND = "charakter-creator/scenario";
@@ -41,6 +45,24 @@ export const scenarioFileSchema = z.object({
      * lose Prüfung nötig macht.
      */
     details: scenarioDetailsSchema,
+    /**
+     * Die übrigen Bestandteile eines Szenarios – **alle optional**, damit alte
+     * Dateien (die sie nicht kennen) unverändert lesen und **ohne
+     * Versionssprung**: dieselbe Überlegung wie bei `storyHooks` in
+     * `characterFile.ts`. Fehlen sie, füllt der Import bzw. `serializeScenario`
+     * sie auf (leere Liste, leerer Arc, kein Bild).
+     *
+     * - `plotVariants`: **alle** Handlungsentwürfe samt aktivem Index. Ohne sie
+     *   überlebte nur der aktive über `details.handlung` – die übrigen Entwürfe
+     *   gingen beim Export verloren.
+     * - `storyArc`: die dramaturgische Zerlegung samt Kapiteln.
+     * - `imageData`/`thumbnail`: das **Weltbild** (Original ~2 MB + Vorschau).
+     *   Anders als bei den Charakteren gibt es genau eins, direkt am Szenario.
+     */
+    plotVariants: plotVariantsSchema.optional(),
+    storyArc: storyArcStoredSchema.optional(),
+    imageData: z.string().optional(),
+    thumbnail: z.string().optional(),
   }),
   /**
    * Die zugeordneten Charaktere – **leer, wenn beim Export abgewählt**.

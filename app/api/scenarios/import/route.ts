@@ -62,7 +62,22 @@ export async function POST(request: Request) {
 
     const row = await prisma.$transaction(async (tx) => {
       const angelegt = await tx.scenario.create({
-        data: { name, details: JSON.stringify(scenario.details) },
+        data: {
+          name,
+          details: JSON.stringify(scenario.details),
+          // Die neuen Bestandteile, sofern die Datei sie trägt. Fehlen sie
+          // (alte Datei), bleibt die Spalte null und `serializeScenario` füllt
+          // beim Lesen auf (eine Variante aus `details.handlung`, leerer Arc).
+          plotVariants: scenario.plotVariants
+            ? JSON.stringify(scenario.plotVariants)
+            : null,
+          storyArc: scenario.storyArc
+            ? JSON.stringify(scenario.storyArc)
+            : null,
+          // Das Weltbild direkt als Spalten (ein Bild je Szenario).
+          imageData: scenario.imageData ?? null,
+          thumbnail: scenario.thumbnail ?? null,
+        },
       });
 
       // Nacheinander und nicht über `Promise.all`: Innerhalb einer Transaktion
