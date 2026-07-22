@@ -74,6 +74,11 @@ export async function POST(request: Request) {
           storyArc: scenario.storyArc
             ? JSON.stringify(scenario.storyArc)
             : null,
+          // Alle Story Arcs, sofern die Datei sie trägt. Fehlt das Feld,
+          // faltet `serializeScenario` den einen `storyArc` zur Variante.
+          storyArcVariants: scenario.storyArcVariants
+            ? JSON.stringify(scenario.storyArcVariants)
+            : null,
           // Das Weltbild direkt als Spalten (ein Bild je Szenario).
           imageData: scenario.imageData ?? null,
           thumbnail: scenario.thumbnail ?? null,

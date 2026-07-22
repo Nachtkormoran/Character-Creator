@@ -865,6 +865,34 @@ export type ArcStufe = z.infer<typeof arcStufeStoredSchema>;
 export type StoryArc = z.infer<typeof storyArcStoredSchema>;
 
 /**
+ * **Mehrere Story Arcs je Szenario.** Genau wie bei den Handlungsentwürfen
+ * (`plotVariants`): Ein Szenario kann mehrere Arcs halten, zwischen denen die
+ * Oberfläche umschaltet; genau **einer** ist aktiv (`aktiv` als Index in
+ * `items`). Der aktive Arc steht zugleich in der Spalte `Scenario.storyArc` –
+ * dort liest der Export ihn unverändert, ohne von den übrigen zu wissen.
+ *
+ * Eigene Spalte `Scenario.storyArcVariants` neben `storyArc`, dieselbe
+ * Überlegung wie `plotVariants` neben `details.handlung`: eine Liste, die die
+ * Oberfläche führt und die erst auf Knopfdruck wächst.
+ */
+export const MAX_STORY_ARCS = 20;
+
+export interface StoryArcVariants {
+  items: StoryArc[];
+  aktiv: number;
+}
+
+export const storyArcVariantsSchema = z
+  .object({
+    items: z.array(storyArcStoredSchema).max(MAX_STORY_ARCS),
+    aktiv: z.number().int().nonnegative(),
+  })
+  .refine(
+    (v) => (v.items.length === 0 ? v.aktiv === 0 : v.aktiv < v.items.length),
+    { message: "Der aktive Story Arc liegt außerhalb der Liste." },
+  );
+
+/**
  * Bringt einen gespeicherten (oder fehlenden) Arc in Form – für Altbestände und
  * Szenarien ohne abgeleiteten Arc `{ stufen: [] }`. Dieselbe Idee wie
  * `normalizePlotVariants`: kein Sonderfall „kein Arc" nötig, die leere Liste
@@ -908,6 +936,33 @@ export function normalizeStoryArc(raw: unknown): StoryArc {
       })
     : [];
   return { stufen };
+}
+
+/**
+ * Bringt einen gespeicherten (oder fehlenden) Arc-Variantensatz in Form und
+ * hält ihn mit dem aktiven Arc konsistent – analog zu `normalizePlotVariants`:
+ *
+ * - Fehlen gespeicherte Varianten (Altbestand, Import ohne das Feld), wird der
+ *   vorhandene aktive Arc – sofern er Stationen hat – zur ersten und einzigen
+ *   Variante. So hat jedes Szenario mit einem Arc genau eine Variante, ohne
+ *   dass irgendwo ein Sonderfall „keine Varianten" nötig wäre.
+ * - Jede gespeicherte Variante läuft durch `normalizeStoryArc` (Altbestände,
+ *   unbekannte Phasen, fehlende Kapitel).
+ * - Ein `aktiv` außerhalb des gültigen Bereichs fällt auf 0 zurück.
+ */
+export function normalizeStoryArcVariants(
+  raw: unknown,
+  aktiverArc: StoryArc,
+): StoryArcVariants {
+  const src = (raw ?? {}) as { items?: unknown; aktiv?: unknown };
+  let items = Array.isArray(src.items)
+    ? src.items.map((x) => normalizeStoryArc(x))
+    : [];
+  if (items.length === 0)
+    items = aktiverArc.stufen.length > 0 ? [aktiverArc] : [];
+  let aktiv = typeof src.aktiv === "number" ? src.aktiv : 0;
+  if (!Number.isInteger(aktiv) || aktiv < 0 || aktiv >= items.length) aktiv = 0;
+  return { items, aktiv };
 }
 
 /**

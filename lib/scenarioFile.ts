@@ -22,6 +22,7 @@ import {
   plotVariantsSchema,
   scenarioDetailsSchema,
   storyArcStoredSchema,
+  storyArcVariantsSchema,
 } from "./schema";
 
 /** Erkennungsmerkmal im Dateikopf – schützt davor, irgendein JSON einzulesen. */
@@ -55,12 +56,17 @@ export const scenarioFileSchema = z.object({
      * - `plotVariants`: **alle** Handlungsentwürfe samt aktivem Index. Ohne sie
      *   überlebte nur der aktive über `details.handlung` – die übrigen Entwürfe
      *   gingen beim Export verloren.
-     * - `storyArc`: die dramaturgische Zerlegung samt Kapiteln.
+     * - `storyArc`: der **aktive** Story Arc samt Kapiteln.
+     * - `storyArcVariants`: **alle** Story Arcs samt aktivem Index – dieselbe
+     *   Überlegung wie `plotVariants`. Ohne sie überlebte nur der aktive über
+     *   `storyArc`. Fehlt das Feld (alte Dateien), faltet der Import den einen
+     *   `storyArc` zur einzigen Variante.
      * - `imageData`/`thumbnail`: das **Weltbild** (Original ~2 MB + Vorschau).
      *   Anders als bei den Charakteren gibt es genau eins, direkt am Szenario.
      */
     plotVariants: plotVariantsSchema.optional(),
     storyArc: storyArcStoredSchema.optional(),
+    storyArcVariants: storyArcVariantsSchema.optional(),
     imageData: z.string().optional(),
     thumbnail: z.string().optional(),
   }),

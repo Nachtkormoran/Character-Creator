@@ -28,6 +28,7 @@ import {
   DEFAULT_KAPITEL_COUNT,
   DEFAULT_STORY_TONE,
   MAX_PLOT_VARIANTS,
+  MAX_STORY_ARCS,
   SCENARIO_LABELS,
   STORY_TONES,
   normalizeScenarioDetails,
@@ -40,6 +41,7 @@ import {
   type PlotVariants,
   type ScenarioDetails,
   type StoryArc,
+  type StoryArcVariants,
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
 import {
@@ -81,6 +83,14 @@ export default function ScenarioDetailPage({
    * der ruhende Zustand (noch keiner abgeleitet).
    */
   const [storyArc, setStoryArc] = useState<StoryArc>({ stufen: [] });
+  /**
+   * Alle Story Arcs und der aktive Index – genau wie `varianten`/`aktiv` bei den
+   * Handlungsentwürfen. Der aktive Arc ist zugleich `storyArc` (dort editiert
+   * ihn die Zeitleiste live); `arcVarianten` hält die übrigen. Zusammengeführt
+   * wird erst in `aktuelleArcs()`.
+   */
+  const [arcVarianten, setArcVarianten] = useState<StoryArc[]>([]);
+  const [arcAktiv, setArcAktiv] = useState(0);
   const [arcBusy, setArcBusy] = useState(false);
   const [arcFehler, setArcFehler] = useState<string | null>(null);
   /**
@@ -261,6 +271,86 @@ export default function ScenarioDetailPage({
   }
 
   /**
+   * Alle Entwürfe auf einmal löschen. Anders als `varianteLoeschen` bleibt hier
+   * **keiner** stehen: das Feld wird geleert, die Leiste verschwindet. Rückfrage
+   * mit Zahl, weil hier mehrere teuer erzeugte Texte auf einmal gehen. Wie das
+   * einzelne Löschen nur im Bearbeitungs-Zustand – „Verwerfen" holt die
+   * gespeicherten Entwürfe zurück, „Änderungen speichern" macht die Leerung
+   * dauerhaft.
+   */
+  function alleVariantenLoeschen() {
+    if (generatingField || saving) return;
+    const anzahl = aktuelleVarianten().length;
+    if (anzahl === 0) return;
+    if (!confirm(`Alle ${anzahl} Entwürfe löschen?`)) return;
+    setVarianten([]);
+    setAktiv(0);
+    setDetails((d) => ({ ...d, handlung: "" }));
+  }
+
+  // --- Story-Arc-Varianten (analog zu den Handlungsentwürfen) --------------
+
+  /**
+   * Die volle Arc-Liste mit der aktiven Zelle auf dem **live bearbeiteten** Arc
+   * (`storyArc`): dieser ist die Wahrheit über die aktive Variante, `arcVarianten`
+   * hält die übrigen. Zusammengeführt erst hier – so kostet keine Bearbeitung
+   * eine Spiegelung in die Liste. Ohne gespeicherte Liste wird ein von Hand
+   * aufgebauter Arc zu Arc 1.
+   */
+  function aktuelleArcs(): StoryArc[] {
+    if (arcVarianten.length === 0)
+      return storyArc.stufen.length > 0 ? [storyArc] : [];
+    return arcVarianten.map((v, i) => (i === arcAktiv ? storyArc : v));
+  }
+
+  /** Auf einen anderen Arc umschalten – der bisherige wird zuvor gesichert. */
+  function arcWaehlen(i: number) {
+    if (arcBusy || saving) return;
+    const items = aktuelleArcs();
+    if (i < 0 || i >= items.length || i === arcAktiv) return;
+    setArcVarianten(items);
+    setArcAktiv(i);
+    setStoryArc(items[i]);
+  }
+
+  /**
+   * Einen Arc löschen. Wie beim Handlungsentwurf mit Rückfrage – ein Arc ist
+   * eine große, teuer erzeugte Struktur. Der letzte verbliebene lässt sich nicht
+   * über die Leiste löschen; dafür ist „Alle löschen" da.
+   */
+  function arcLoeschen(i: number) {
+    if (arcBusy || saving) return;
+    const items = aktuelleArcs();
+    if (items.length <= 1) return;
+    if (!confirm(`Story Arc ${i + 1} löschen?`)) return;
+    const rest = items.filter((_, k) => k !== i);
+    const na =
+      i === arcAktiv
+        ? Math.min(i, rest.length - 1)
+        : i < arcAktiv
+          ? arcAktiv - 1
+          : arcAktiv;
+    setArcVarianten(rest);
+    setArcAktiv(na);
+    setStoryArc(rest[na]);
+  }
+
+  /**
+   * Alle Arcs auf einmal löschen – zurück zum ruhenden Zustand `{ stufen: [] }`.
+   * Rückfrage mit Zahl. Nur im Bearbeitungs-Zustand; „Verwerfen" holt die
+   * gespeicherten Arcs zurück.
+   */
+  function alleArcsLoeschen() {
+    if (arcBusy || saving) return;
+    const anzahl = aktuelleArcs().length;
+    if (anzahl === 0) return;
+    if (!confirm(`Alle ${anzahl} Story Arcs löschen?`)) return;
+    setArcVarianten([]);
+    setArcAktiv(0);
+    setStoryArc({ stufen: [] });
+  }
+
+  /**
    * Ein Textfeld per KI erzeugen. Das Ergebnis landet als **ungespeicherte
    * Änderung** im Formular – wie überall sonst muss „Verwerfen" den alten Text
    * zurückbringen können. Die Rückfrage schützt von Hand Geschriebenes.
@@ -347,6 +437,8 @@ export default function ScenarioDetailPage({
         setVarianten(scenario.plotVariants.items);
         setAktiv(scenario.plotVariants.aktiv);
         setStoryArc(scenario.storyArc);
+        setArcVarianten(scenario.storyArcVariants.items);
+        setArcAktiv(scenario.storyArcVariants.aktiv);
         setCharacters(characters);
         setThumbnail(scenario.thumbnail);
         setSaved(
@@ -354,7 +446,7 @@ export default function ScenarioDetailPage({
             name: scenario.name,
             details: scenario.details,
             plot: scenario.plotVariants,
-            arc: scenario.storyArc,
+            arc: scenario.storyArcVariants,
           }),
         );
       })
@@ -430,7 +522,7 @@ export default function ScenarioDetailPage({
       name,
       details,
       plot: { items: aktuelleVarianten(), aktiv },
-      arc: storyArc,
+      arc: { items: aktuelleArcs(), aktiv: arcAktiv },
     }) !== saved;
   const nameValid = name.trim().length > 0;
   // Für die Reiter-Leiste: die Entwürfe im aktuellen (womöglich ungespeicherten)
@@ -503,12 +595,20 @@ export default function ScenarioDetailPage({
    * im aktuellen, womöglich ungespeicherten Stand mit (`details.handlung`); die
    * Figuren lädt die Route selbst über die gespeicherte Zuordnung.
    *
-   * Keine Rückfrage vor dem Überschreiben eines vorhandenen Arcs: „Verwerfen"
-   * ist der Rückweg, und ein Ableiten ist selten ein Versehen (der Knopf sagt,
-   * was er tut).
+   * Wie beim Handlungsentwurf **hängt** jedes Ableiten einen weiteren Arc an,
+   * statt den vorigen zu ersetzen – der häufigste Fall ist, dass ein Arc den
+   * Aufbau besser trifft und ein anderer das Ende, und man will beide
+   * nebeneinander halten. Die Reiter-Leiste schaltet um. Keine Rückfrage: der
+   * Knopf ersetzt nichts mehr, „Verwerfen" bleibt der Rückweg.
    */
   async function storyArcAbleiten() {
     if (arcBusy || !details.handlung.trim()) return;
+    if (aktuelleArcs().length >= MAX_STORY_ARCS) {
+      setArcFehler(
+        `Mehr als ${MAX_STORY_ARCS} Story Arcs werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
+      );
+      return;
+    }
     setArcBusy(true);
     setArcFehler(null);
     try {
@@ -520,6 +620,9 @@ export default function ScenarioDetailPage({
         weiterspinnen: arcParams.weiterspinnen,
         ton: arcParams.ton,
       });
+      const items = [...aktuelleArcs(), neu];
+      setArcVarianten(items);
+      setArcAktiv(items.length - 1);
       setStoryArc(neu);
     } catch (e) {
       setArcFehler(e instanceof Error ? e.message : "Fehler.");
@@ -577,19 +680,21 @@ export default function ScenarioDetailPage({
         name: name.trim(),
         details,
         plotVariants: { items: aktuelleVarianten(), aktiv },
-        storyArc,
+        storyArcVariants: { items: aktuelleArcs(), aktiv: arcAktiv },
       });
       setName(aktualisiert.name);
       setDetails(aktualisiert.details);
       setVarianten(aktualisiert.plotVariants.items);
       setAktiv(aktualisiert.plotVariants.aktiv);
       setStoryArc(aktualisiert.storyArc);
+      setArcVarianten(aktualisiert.storyArcVariants.items);
+      setArcAktiv(aktualisiert.storyArcVariants.aktiv);
       setSaved(
         JSON.stringify({
           name: aktualisiert.name,
           details: aktualisiert.details,
           plot: aktualisiert.plotVariants,
-          arc: aktualisiert.storyArc,
+          arc: aktualisiert.storyArcVariants,
         }),
       );
     } catch (e) {
@@ -625,9 +730,10 @@ export default function ScenarioDetailPage({
           name: name.trim(),
           details,
           // Der **bearbeitete** Stand, wie bei den Festlegungen: alle Entwürfe
-          // samt aktivem Index und der Story Arc.
+          // und alle Story Arcs samt aktivem Index.
           plotVariants: { items: aktuelleVarianten(), aktiv },
           storyArc,
+          storyArcVariants: { items: aktuelleArcs(), aktiv: arcAktiv },
         },
         mitCharakteren ? characters : [],
         // Das Weltbild ist unabhängig vom bearbeiteten Stand (eigene Route,
@@ -711,13 +817,15 @@ export default function ScenarioDetailPage({
                 name: string;
                 details: ScenarioDetails;
                 plot: PlotVariants;
-                arc: StoryArc;
+                arc: StoryArcVariants;
               };
               setName(s.name);
               setDetails(s.details);
               setVarianten(s.plot.items);
               setAktiv(s.plot.aktiv);
-              setStoryArc(s.arc);
+              setArcVarianten(s.arc.items);
+              setArcAktiv(s.arc.aktiv);
+              setStoryArc(s.arc.items[s.arc.aktiv] ?? { stufen: [] });
             }}
             disabled={saving}
             className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
@@ -893,6 +1001,22 @@ export default function ScenarioDetailPage({
                 ersetzen
               </span>
             )}
+            {/*
+              Alle auf einmal löschen – erst ab zwei Entwürfen sinnvoll (bei
+              einem tut es das Feld selbst). Rechts abgesetzt, damit es nicht
+              mit den einzelnen ✕ verwechselt wird.
+            */}
+            {variantenAnzeige.length >= 2 && (
+              <button
+                type="button"
+                onClick={alleVariantenLoeschen}
+                disabled={saving || generatingField !== null}
+                title="Alle Handlungsentwürfe löschen"
+                className="ml-auto rounded-full border border-red-600/30 px-2.5 py-1 text-xs font-medium text-red-600 transition hover:bg-red-600/10 disabled:opacity-40 dark:border-red-400/30 dark:text-red-400 dark:hover:bg-red-400/10"
+              >
+                Alle löschen
+              </button>
+            )}
           </div>
         )}
         <div className="mb-3 flex flex-col gap-2">
@@ -1058,6 +1182,11 @@ export default function ScenarioDetailPage({
         disabled={saving}
         handlung={details.handlung}
         quelleLabel={`Entwurf ${aktiv + 1}`}
+        arcs={aktuelleArcs()}
+        arcAktiv={arcAktiv}
+        onArcWaehlen={arcWaehlen}
+        onArcLoeschen={arcLoeschen}
+        onAlleArcsLoeschen={alleArcsLoeschen}
       />
 
       <section>

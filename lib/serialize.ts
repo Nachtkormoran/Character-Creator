@@ -8,6 +8,7 @@ import {
   normalizePlotVariants,
   normalizeScenarioDetails,
   normalizeStoryArc,
+  normalizeStoryArcVariants,
   normalizeTraits,
 } from "./schema";
 import type {
@@ -16,6 +17,7 @@ import type {
   PlotVariants,
   ScenarioDetails,
   StoryArc,
+  StoryArcVariants,
 } from "./schema";
 
 /** Client-Repräsentation eines einzelnen Bildes. */
@@ -132,12 +134,20 @@ export interface StoredScenario {
    */
   plotVariants: PlotVariants;
   /**
-   * Der Story Arc – die dramaturgische Zerlegung des aktiven Handlungsentwurfs.
-   * `stufen: []`, solange keiner abgeleitet wurde (Altbestand, oder verworfen);
-   * bewusst kein `null`, damit Anzeige und Bearbeitung keinen Sonderfall
-   * brauchen – dieselbe Idee wie bei `plotVariants`.
+   * Der **aktive** Story Arc – die dramaturgische Zerlegung des aktiven
+   * Handlungsentwurfs. `stufen: []`, solange keiner abgeleitet wurde
+   * (Altbestand, oder verworfen); bewusst kein `null`, damit Anzeige und
+   * Bearbeitung keinen Sonderfall brauchen – dieselbe Idee wie bei
+   * `plotVariants`. Zugleich `storyArcVariants.items[aktiv]`.
    */
   storyArc: StoryArc;
+  /**
+   * Alle Story Arcs und welcher aktiv ist – wie `plotVariants` bei den
+   * Handlungsentwürfen. Der aktive ist zugleich `storyArc` (oben);
+   * `serializeScenario` hält beide konsistent. `items: []`, solange keiner
+   * abgeleitet wurde.
+   */
+  storyArcVariants: StoryArcVariants;
   /**
    * Vorschau des Weltbilds (WebP, ~40 KB) oder `null`. Das Original
    * (`imageData`, ~2 MB) reist **nie** in einer Antwort mit – es wird bei
@@ -169,9 +179,17 @@ export function serializeScenario(row: ScenarioRow): StoredScenario {
   // Die aktive Variante ist die maßgebliche Handlung – so bekommt der Client die
   // beiden nie widersprüchlich (etwa nach einem Import, der nur `details` setzt).
   details.handlung = plotVariants.items[plotVariants.aktiv] ?? details.handlung;
-  const storyArc = normalizeStoryArc(
+  const gespeicherterArc = normalizeStoryArc(
     row.storyArc ? JSON.parse(row.storyArc) : null,
   );
+  const storyArcVariants = normalizeStoryArcVariants(
+    row.storyArcVariants ? JSON.parse(row.storyArcVariants) : null,
+    gespeicherterArc,
+  );
+  // Der aktive Arc ist der maßgebliche – so bekommt der Client die beiden nie
+  // widersprüchlich (etwa nach einem Import, der nur `storyArc` setzt).
+  const storyArc =
+    storyArcVariants.items[storyArcVariants.aktiv] ?? gespeicherterArc;
   return {
     id: row.id,
     createdAt: row.createdAt.toISOString(),
@@ -179,6 +197,7 @@ export function serializeScenario(row: ScenarioRow): StoredScenario {
     details,
     plotVariants,
     storyArc,
+    storyArcVariants,
     thumbnail: row.thumbnail ?? null,
     count: row._count?.characters ?? 0,
   };

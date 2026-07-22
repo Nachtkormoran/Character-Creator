@@ -61,6 +61,13 @@ model Scenario {
   // Optional – Altbestände und Szenarien ohne abgeleiteten Arc haben keinen.
   storyArc   String?
 
+  // Mehrere Story Arcs je Szenario als JSON `{ items, aktiv }` – der **aktive**
+  // Arc steht zusätzlich in `storyArc` (dort liest ihn der Export). Eigene
+  // Spalte neben `storyArc`, genau wie `plotVariants` neben `details.handlung`:
+  // eine Liste, die die Oberfläche führt und die erst auf Knopfdruck wächst.
+  // Optional – Altbestände haben nur den einen `storyArc`.
+  storyArcVariants String?
+
   // **Ein** Weltbild je Szenario (Establishing-Shot des Ortes, ohne Figuren) –
   // anders als beim Charakter, der beliebig viele Bilder mit Primärmarkierung
   // hat. Ein Szenario ist eine Stimmung, kein Steckbrief; ein repräsentatives

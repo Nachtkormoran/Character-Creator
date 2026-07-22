@@ -79,6 +79,11 @@ export function StoryArcSection({
   disabled,
   handlung,
   quelleLabel,
+  arcs,
+  arcAktiv,
+  onArcWaehlen,
+  onArcLoeschen,
+  onAlleArcsLoeschen,
 }: {
   storyArc: StoryArc;
   onChange: (arc: StoryArc) => void;
@@ -116,6 +121,19 @@ export function StoryArcSection({
   handlung: string;
   /** Etikett des Entwurfs, aus dem abgeleitet wird (z. B. „Entwurf 2"). */
   quelleLabel: string;
+  /**
+   * Alle Story Arcs im aktuellen (womöglich ungespeicherten) Stand – die aktive
+   * Zelle ist `storyArc`. Für die Reiter-Leiste; sie erscheint ab zwei Arcs.
+   */
+  arcs: StoryArc[];
+  /** Index des aktiven Arcs in `arcs`. */
+  arcAktiv: number;
+  /** Auf einen anderen Arc umschalten. */
+  onArcWaehlen: (i: number) => void;
+  /** Einen Arc löschen (nur ab zwei möglich). */
+  onArcLoeschen: (i: number) => void;
+  /** Alle Arcs auf einmal löschen. */
+  onAlleArcsLoeschen: () => void;
 }) {
   const stufen = storyArc.stufen;
   const hatArc = stufen.length > 0;
@@ -274,6 +292,89 @@ export function StoryArcSection({
           </button>
         </div>
       </div>
+
+      {/*
+        Reiter-Leiste über der Zeitleiste: zwischen mehreren Story Arcs
+        umschalten – genau wie bei den Handlungsentwürfen. Erscheint ab einem
+        Arc; „📖 Neu ableiten" oben hängt jeweils einen weiteren an, statt den
+        vorigen zu ersetzen. Der aktive Arc steht darunter in der Zeitleiste und
+        geht in den Export.
+      */}
+      {arcs.length >= 1 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs font-medium text-foreground/50">
+            Story Arcs:
+          </span>
+          {arcs.map((arc, i) => {
+            // Der letzte verbliebene Arc trägt kein ✕ – er lässt sich nicht über
+            // die Leiste löschen; dafür ist „Alle löschen" da.
+            const loeschbar = arcs.length >= 2;
+            return (
+              <span
+                key={i}
+                className={`inline-flex items-center gap-1 rounded-full border text-xs transition ${
+                  i === arcAktiv
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-black/15 hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => onArcWaehlen(i)}
+                  disabled={disabled || busy}
+                  title={`${arc.stufen.length} ${
+                    arc.stufen.length === 1 ? "Station" : "Stationen"
+                  }`}
+                  className={`py-1 pl-2.5 font-medium disabled:opacity-50 ${
+                    loeschbar ? "pr-1" : "pr-2.5"
+                  }`}
+                >
+                  Arc {i + 1}
+                </button>
+                {loeschbar && (
+                  <button
+                    type="button"
+                    onClick={() => onArcLoeschen(i)}
+                    disabled={disabled || busy}
+                    title={`Story Arc ${i + 1} löschen`}
+                    aria-label={`Story Arc ${i + 1} löschen`}
+                    className={`rounded-full py-1 pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
+                      i === arcAktiv
+                        ? "hover:text-red-300"
+                        : "hover:text-red-600 dark:hover:text-red-400"
+                    }`}
+                  >
+                    ✕
+                  </button>
+                )}
+              </span>
+            );
+          })}
+          {/*
+            Bei genau einem Arc ist die Leiste keine Umschaltung, sondern ein
+            Hinweis: „Neu ableiten" legt einen weiteren an, statt diesen zu
+            ersetzen.
+          */}
+          {arcs.length === 1 && (
+            <span className="text-xs text-foreground/50">
+              · „📖 Neu ableiten“ legt einen weiteren an, statt diesen zu
+              ersetzen
+            </span>
+          )}
+          {/* Alle auf einmal löschen – erst ab zwei sinnvoll. */}
+          {arcs.length >= 2 && (
+            <button
+              type="button"
+              onClick={onAlleArcsLoeschen}
+              disabled={disabled || busy}
+              title="Alle Story Arcs löschen"
+              className="ml-auto rounded-full border border-red-600/30 px-2.5 py-1 text-xs font-medium text-red-600 transition hover:bg-red-600/10 disabled:opacity-40 dark:border-red-400/30 dark:text-red-400 dark:hover:bg-red-400/10"
+            >
+              Alle löschen
+            </button>
+          )}
+        </div>
+      )}
 
       {/*
         Handlung weiterspinnen – bestimmt den **Grundcharakter** des Arcs und

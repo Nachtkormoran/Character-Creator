@@ -25,6 +25,7 @@ import type {
   ScenarioDraft,
   Settings,
   StoryArc,
+  StoryArcVariants,
   StoryHookAnchor,
 } from "./schema";
 import type { StoredCharacter, StoredScenario } from "./serialize";
@@ -361,6 +362,7 @@ export async function buildScenarioFile(
     details: ScenarioDetails;
     plotVariants?: PlotVariants;
     storyArc?: StoryArc;
+    storyArcVariants?: StoryArcVariants;
   },
   characters: StoredCharacter[],
   /**
@@ -393,6 +395,12 @@ export async function buildScenarioFile(
         : {}),
       ...(scenario.storyArc && scenario.storyArc.stufen.length > 0
         ? { storyArc: scenario.storyArc }
+        : {}),
+      // Alle Story Arcs mitgeben, sobald mehr als der eine aktive existiert –
+      // sonst genügt `storyArc` oben (der Import faltet ihn zur einen Variante).
+      ...(scenario.storyArcVariants &&
+      scenario.storyArcVariants.items.length > 0
+        ? { storyArcVariants: scenario.storyArcVariants }
         : {}),
       ...(imageData ? { imageData, thumbnail } : {}),
     },
@@ -731,6 +739,7 @@ export async function updateScenario(
     details?: ScenarioDetails;
     plotVariants?: PlotVariants;
     storyArc?: StoryArc;
+    storyArcVariants?: StoryArcVariants;
   },
 ): Promise<StoredScenario> {
   const res = await fetch(`/api/scenarios/${id}`, {

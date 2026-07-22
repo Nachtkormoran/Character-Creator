@@ -5,6 +5,7 @@ import {
   plotVariantsSchema,
   scenarioDetailsSchema,
   storyArcStoredSchema,
+  storyArcVariantsSchema,
 } from "@/lib/schema";
 import { serializeCharacter, serializeScenario } from "@/lib/serialize";
 
@@ -26,9 +27,15 @@ const patchSchema = z
     // aktive Variante steht zusätzlich in `details.handlung`; der Client hält
     // beide gleich, `serializeScenario` zieht sie beim Lesen wieder zusammen.
     plotVariants: plotVariantsSchema,
-    // Der Story Arc – eigene Spalte, wie `plotVariants`. Wird die Struktur leer
+    // Der (aktive) Story Arc – eigene Spalte. Wird die Struktur leer
     // (`stufen: []`) geschickt, ist das ein bewusstes „Arc verworfen".
+    // Normalerweise schickt der Client stattdessen `storyArcVariants` (unten),
+    // aus dem der aktive Arc abgeleitet und in dieselbe Spalte gespiegelt wird.
     storyArc: storyArcStoredSchema,
+    // Alle Story Arcs samt aktivem Index (eigene Spalte, wie `plotVariants`).
+    // Ist es gesetzt, gewinnt es: die Spalte `storyArc` wird auf die aktive
+    // Variante gespiegelt, damit Export und Consumer unverändert bleiben.
+    storyArcVariants: storyArcVariantsSchema,
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, {
@@ -90,12 +97,24 @@ export async function PATCH(request: Request, { params }: Context) {
       details?: string;
       plotVariants?: string;
       storyArc?: string;
+      storyArcVariants?: string;
     } = {};
     if (p.name !== undefined) data.name = p.name;
     if (p.details !== undefined) data.details = JSON.stringify(p.details);
     if (p.plotVariants !== undefined)
       data.plotVariants = JSON.stringify(p.plotVariants);
-    if (p.storyArc !== undefined) data.storyArc = JSON.stringify(p.storyArc);
+    // `storyArcVariants` hat Vorrang und spiegelt zugleich den aktiven Arc in
+    // die Spalte `storyArc` – so bleiben beide konsistent, ohne dass der Client
+    // zwei Felder gleichhalten muss.
+    if (p.storyArcVariants !== undefined) {
+      data.storyArcVariants = JSON.stringify(p.storyArcVariants);
+      const aktiv = p.storyArcVariants.items[p.storyArcVariants.aktiv] ?? {
+        stufen: [],
+      };
+      data.storyArc = JSON.stringify(aktiv);
+    } else if (p.storyArc !== undefined) {
+      data.storyArc = JSON.stringify(p.storyArc);
+    }
 
     const row = await prisma.scenario.update({
       where: { id },
