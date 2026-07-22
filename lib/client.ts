@@ -670,10 +670,27 @@ export function generateScenarioPlot(
   weiterspinnen = false,
   /** Ton und Sprache (`STORY_TONES`-Wert). Leer/`neutral` = wie bisher. */
   ton = "",
+  /**
+   * Wie viele **neue benannte Personen** der Entwurf zusätzlich einführen soll
+   * (0 = keine). Auf `MAX_NEUE_PLOT_PERSONEN` gedeckelt.
+   */
+  neuePersonen = 0,
+  /** Optionale Namens-/Rollen-Vorgaben zu den neuen Personen (Freitext). */
+  neuePersonenWunsch = "",
 ) {
   return postJson<{ handlung: string; characters: number }>(
     "/api/scenario-plot",
-    { scenarioId, name, details, zusatz, basis, weiterspinnen, ton },
+    {
+      scenarioId,
+      name,
+      details,
+      zusatz,
+      basis,
+      weiterspinnen,
+      ton,
+      neuePersonen,
+      neuePersonenWunsch,
+    },
   );
 }
 

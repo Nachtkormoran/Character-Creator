@@ -27,6 +27,7 @@ import {
   DEFAULT_ARC_LENGTH,
   DEFAULT_KAPITEL_COUNT,
   DEFAULT_STORY_TONE,
+  MAX_NEUE_PLOT_PERSONEN,
   MAX_PLOT_VARIANTS,
   MAX_STORY_ARCS,
   SCENARIO_LABELS,
@@ -200,6 +201,16 @@ export default function ScenarioDetailPage({
    * man Entwurf und Arc unabhängig einstellen kann). Nicht gespeichert.
    */
   const [handlungTon, setHandlungTon] = useState<StoryTone>(DEFAULT_STORY_TONE);
+
+  /**
+   * Wie viele **neue benannte Personen** der nächste Entwurf zusätzlich einführt
+   * (0 = keine, wie bisher). Dazu optionale Namens-/Rollen-Vorgaben. Beides gilt
+   * für „Neu erzeugen" – frisch wie auf Basis eines vorhandenen Entwurfs – und
+   * wird **nicht gespeichert** (beschreibt einen Lauf, wie Ton und Weiterspinnen).
+   */
+  const [handlungNeuePersonen, setHandlungNeuePersonen] = useState(0);
+  const [handlungNeuePersonenWunsch, setHandlungNeuePersonenWunsch] =
+    useState("");
 
   // -------------------------------------------------------------------------
   // Weltbild des Szenarios
@@ -430,6 +441,8 @@ export default function ScenarioDetailPage({
           basis,
           handlungWeiterspinnen,
           handlungTon,
+          handlungNeuePersonen,
+          handlungNeuePersonenWunsch,
         );
         const items = [...aktuelleVarianten(), handlung];
         setVarianten(items);
@@ -1117,6 +1130,50 @@ export default function ScenarioDetailPage({
               aktuellen Handlungsentwurf bei neuem Entwurf verwenden
             </label>
           )}
+
+          {/*
+            Neue benannte Personen auf Wunsch – lockert die harte Regel „keine
+            neuen Hauptfiguren". 0 = aus (wie bisher). Bei ≥1 erscheint ein
+            optionales Feld für gewünschte Namen/Rollen; leer erfindet die KI
+            sie. Gilt für „Neu erzeugen", frisch wie auf Basis. Nicht gespeichert.
+            Danach lassen sich die Neuen über „Personen im Entwurf suchen"
+            als Charaktere anlegen.
+          */}
+          <div className="flex flex-wrap items-center gap-2 text-sm text-foreground/70">
+            <label className="flex items-center gap-2">
+              <span>👥 Neue Personen:</span>
+              <select
+                value={handlungNeuePersonen}
+                onChange={(e) =>
+                  setHandlungNeuePersonen(Number(e.target.value))
+                }
+                disabled={saving || generatingField !== null}
+                title="Wie viele neue, benannte Personen der Entwurf zusätzlich einführt. Wirkt auf „Neu erzeugen“ – frisch wie auf Basis eines vorhandenen Entwurfs."
+                className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              >
+                <option value={0}>aus</option>
+                {Array.from({ length: MAX_NEUE_PLOT_PERSONEN }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>
+                    {i + 1}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {handlungNeuePersonen >= 1 && (
+              <input
+                value={handlungNeuePersonenWunsch}
+                onChange={(e) =>
+                  setHandlungNeuePersonenWunsch(e.target.value)
+                }
+                disabled={saving || generatingField !== null}
+                maxLength={500}
+                placeholder="optional: Namen/Rollen – z. B. „Mira (Schwester); ein korrupter Beamter“"
+                title="Gewünschte Namen oder Rollen der neuen Personen. Leer gelassen erfindet die KI sie stimmig aus Welt und Konflikt. Wird nicht gespeichert."
+                aria-label="Gewünschte Namen oder Rollen der neuen Personen"
+                className="min-w-0 flex-1 rounded-md border border-black/15 bg-white px-3 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              />
+            )}
+          </div>
         </div>
         <ScenarioFields
           details={details}

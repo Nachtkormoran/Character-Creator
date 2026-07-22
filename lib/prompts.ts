@@ -1,4 +1,9 @@
-import { DEFAULT_STORY_HOOK_ANCHOR, TRAIT_LABELS, toneHint } from "./schema";
+import {
+  DEFAULT_STORY_HOOK_ANCHOR,
+  MAX_NEUE_PLOT_PERSONEN,
+  TRAIT_LABELS,
+  toneHint,
+} from "./schema";
 import { DEFAULT_GENRE, genreLabel } from "./templates";
 import type { ScenarioSamples } from "./scenarioSamples";
 import type {
@@ -389,8 +394,27 @@ export function buildScenarioPlotPrompt(
    * vorhandenen.
    */
   weiterspinnen?: boolean,
+  /**
+   * **Neue benannte Personen auf Wunsch.** 0 (Default) lässt die harte Regel
+   * „keine neuen Hauptfiguren" unangetastet. Bei ≥1 wird sie gezielt gelockert:
+   * Der Entwurf führt **genau so viele** neue, benannte Personen ein – die
+   * vorhandenen Figuren bleiben tragend, die neuen treten hinzu. Gilt
+   * unabhängig von `basis` und `weiterspinnen`. Auf `MAX_NEUE_PLOT_PERSONEN`
+   * gedeckelt, damit frische Namen die Handlung nicht zersprengen.
+   */
+  neuePersonen?: number,
+  /**
+   * Optionale Vorgaben zu den neuen Personen (Namen/Rollen), z. B. „Mira
+   * (Schwester); ein korrupter Beamter". Leer = das Modell erfindet sie stimmig
+   * aus Welt und Konflikt. Wirkt nur zusammen mit `neuePersonen ≥ 1`.
+   */
+  neuePersonenWunsch?: string,
 ): string {
   const nutzeBasis = !!basis?.trim();
+  const anzahlNeue = Math.max(
+    0,
+    Math.min(MAX_NEUE_PLOT_PERSONEN, Math.floor(neuePersonen ?? 0)),
+  );
   const welt =
     line("Szenario", name) +
     line("Genre", details.genre) +
@@ -478,17 +502,37 @@ export function buildScenarioPlotPrompt(
     ? "- Skizziere eine **vollständige Geschichte**: von der Ausgangslage über Zuspitzung und Wendepunkt bis zu einem Ende, das aus den Figuren und ihrem Konflikt folgt. Schreibe auch, **wie es ausgeht**."
     : "- Kein fertiger Plot mit Auflösung: eine Ausgangslage mit offenem Ausgang. Schreibe nicht, wie es endet.";
 
+  // Die Figuren-Regel hat zwei Fassungen. Ohne neue Personen (Default) die harte
+  // Sperre wie bisher; auf Wunsch die gezielte Lockerung – genau so viele neue
+  // benannte Personen, mit optionalen Namens-/Rollen-Vorgaben.
+  const wunsch = neuePersonenWunsch?.trim();
+  const figurenRegel =
+    anzahlNeue >= 1
+      ? `- **Führe genau ${anzahlNeue} neue, benannte ${
+          anzahlNeue === 1 ? "Person" : "Personen"
+        } ein**${
+          wunsch ? ` (orientiere dich an: ${wunsch})` : ""
+        }: ${anzahlNeue === 1 ? "eine Figur" : "Figuren"} mit vollständigem Namen und einer echten Rolle im Geschehen. Die oben genannten Figuren bleiben die tragenden Hauptfiguren; die neuen treten als Verbündete, Widersacher, Angehörige o. Ä. hinzu und dürfen mit ihnen in Konflikt geraten.${
+          wunsch ? " Fülle Ungesagtes zu den Vorgaben stimmig auf." : ""
+        }`
+      : "- **Erfinde keine neuen Hauptfiguren.** Arbeite mit den Genannten. Nebenfiguren dürfen vorkommen, aber die Handlung muss von diesen Personen getragen werden.";
+
+  const figurenEinleitung =
+    anzahlNeue >= 1
+      ? "Diese Figuren gibt es – sie tragen die Handlung (weitere neue Personen führst du wie unten angegeben zusätzlich ein):"
+      : "Diese Figuren gibt es, und nur diese:";
+
   return `${auftrag}
 
 Die Welt steht fest:
 ${welt}${weltText}
-Diese Figuren gibt es, und nur diese:
+${figurenEinleitung}
 
 ${figuren}
 ${basisBlock}
 Anforderungen:${basisAnforderung}
 ${laengeZeile}
-- **Erfinde keine neuen Hauptfiguren.** Arbeite mit den Genannten. Nebenfiguren dürfen vorkommen, aber die Handlung muss von diesen Personen getragen werden.
+${figurenRegel}
 - Benenne, **wer was von wem will** und woran es sich entzündet. Ein Konflikt braucht mindestens zwei Personen mit unvereinbaren Absichten.
 - Lies die Beschreibungen genau: Dort steht die Vorgeschichte, und dort liegen die Reibungsflächen zwischen den Figuren. Auch scheinbare Nebensachen aus den Merkmalen – Herkunft, eine Narbe, ein Hobby – taugen als Anknüpfungspunkt.
 - Sind offene Ansatzpunkte genannt, greife sie auf und verbinde sie: Das Interessante entsteht dort, wo das Anliegen der einen die Wunde der anderen trifft.

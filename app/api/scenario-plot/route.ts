@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTextClient } from "@/lib/openai";
 import { buildScenarioPlotPrompt, type PlotCharacter } from "@/lib/prompts";
-import { normalizeTraits, scenarioDetailsSchema } from "@/lib/schema";
+import {
+  MAX_NEUE_PLOT_PERSONEN,
+  normalizeTraits,
+  scenarioDetailsSchema,
+} from "@/lib/schema";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -37,6 +41,17 @@ const bodySchema = z.object({
   // Ton und Sprache – nicht gespeichert. Ohne Allowlist als String: ein
   // unbekannter Wert liefert bloß keinen Ton-Block (`toneHint` gibt "").
   ton: z.string().trim().max(40).optional().default(""),
+  // Wie viele **neue benannte Personen** der Entwurf zusätzlich einführen soll
+  // (0 = keine, harte Regel bleibt). Auf MAX_NEUE_PLOT_PERSONEN gedeckelt.
+  neuePersonen: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_NEUE_PLOT_PERSONEN)
+    .optional()
+    .default(0),
+  // Optionale Namens-/Rollen-Vorgaben zu den neuen Personen (Freitext).
+  neuePersonenWunsch: z.string().trim().max(500).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -50,8 +65,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenarioId, name, details, zusatz, basis, weiterspinnen, ton } =
-      parsed.data;
+    const {
+      scenarioId,
+      name,
+      details,
+      zusatz,
+      basis,
+      weiterspinnen,
+      ton,
+      neuePersonen,
+      neuePersonenWunsch,
+    } = parsed.data;
 
     const rows = await prisma.character.findMany({
       where: { scenarioId },
@@ -113,13 +137,16 @@ export async function POST(request: Request) {
             basis,
             ton,
             weiterspinnen,
+            neuePersonen,
+            neuePersonenWunsch,
           ),
         },
       ],
       temperature: 0.9,
       // Verlangt sind ca. 900–1400 Zeichen; der Prompt ist mit sechs Figuren
       // und ihren Ansatzpunkten ohnehin lang, hier zählt der Ausgabe-Puffer.
-      max_tokens: 1100,
+      // Neue Personen brauchen etwas mehr Platz (Einführung + Rolle je Figur).
+      max_tokens: 1100 + neuePersonen * 120,
     });
 
     const handlung = (completion.choices[0]?.message.content ?? "").trim();

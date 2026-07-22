@@ -594,6 +594,14 @@ export function normalizeScenarioDetails(raw: unknown): ScenarioDetails {
  */
 export const MAX_PLOT_VARIANTS = 20;
 
+/**
+ * Wie viele **neue benannte Personen** ein Handlungsentwurf auf Wunsch zusätzlich
+ * einführen darf (Lauf-Parameter, nicht gespeichert). 0 = keine – dann gilt die
+ * harte Regel „keine neuen Hauptfiguren" wie bisher. Die Obergrenze hält den
+ * Entwurf beisammen: zu viele frische Namen zersprengen die Handlung.
+ */
+export const MAX_NEUE_PLOT_PERSONEN = 5;
+
 export interface PlotVariants {
   items: string[];
   aktiv: number;
