@@ -288,6 +288,27 @@ export default function ScenarioDetailPage({
     setDetails((d) => ({ ...d, handlung: "" }));
   }
 
+  /**
+   * Einen **leeren** Entwurf anhängen und auf ihn umschalten – der Gegenpol zu
+   * „✨ Neu erzeugen": kein KI-Aufruf, sondern ein leeres Feld zum
+   * Selbstschreiben (wie „➕ Station hinzufügen" beim Story Arc). Nur im
+   * Bearbeitungs-Zustand; „Verwerfen" nimmt ihn wieder zurück.
+   */
+  function leerenEntwurfHinzufuegen() {
+    if (generatingField || saving) return;
+    const items = aktuelleVarianten();
+    if (items.length >= MAX_PLOT_VARIANTS) {
+      setSaveError(
+        `Mehr als ${MAX_PLOT_VARIANTS} Entwürfe werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
+      );
+      return;
+    }
+    const neu = [...items, ""];
+    setVarianten(neu);
+    setAktiv(neu.length - 1);
+    setDetails((d) => ({ ...d, handlung: "" }));
+  }
+
   // --- Story-Arc-Varianten (analog zu den Handlungsentwürfen) --------------
 
   /**
@@ -989,6 +1010,20 @@ export default function ScenarioDetailPage({
                 </span>
               );
             })}
+            {/*
+              Leeren Entwurf anhängen – der Gegenpol zu „✨ Neu erzeugen": kein
+              KI-Aufruf, ein leeres Feld zum Selbstschreiben. Sitzt bei den
+              Reitern, weil er einen weiteren Reiter anlegt.
+            */}
+            <button
+              type="button"
+              onClick={leerenEntwurfHinzufuegen}
+              disabled={saving || generatingField !== null}
+              title="Einen leeren Handlungsentwurf zum Selbstschreiben anlegen"
+              className="rounded-full border border-black/15 px-2.5 py-1 text-xs font-medium text-foreground/70 transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              ➕ Leerer Entwurf
+            </button>
             {/*
               Bei genau einem Entwurf ist die Leiste keine Umschaltung, sondern
               ein Hinweis: Sie macht sichtbar, dass „Neu erzeugen" einen weiteren

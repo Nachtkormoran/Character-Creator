@@ -44,6 +44,31 @@ function ersterSatz(text: string): string {
   return (treffer ? treffer[0] : t).trim();
 }
 
+/**
+ * Die ersten `anzahl` **Sätze** eines Feldes (Default 2).
+ *
+ * Die Weltbeschreibung ist Fließtext von bis zu ~1200 Zeichen und beschreibt
+ * die **Stimmung der ganzen Welt**, nicht diese eine Figur. Vollständig in
+ * `notes` gelegt, füllte sie das Feld „Weitere Wünsche" mit einem Block, dessen
+ * Textmenge weit mehr Gewicht suggeriert, als er für das Erstellen **dieses**
+ * Charakters hat – zumal Genre und Setting den Rahmen ohnehin kompakt tragen.
+ * Ein bis zwei Sätze genügen als Anriss; der Rest ist Atmosphäre, die die Figur
+ * nicht schärfer macht.
+ */
+function ersteSaetze(text: string, anzahl = 2): string {
+  const t = text.trim();
+  if (!t) return "";
+  // Folgen aus Nicht-Satzzeichen plus abschließendem .!? – greift auch über
+  // Zeilenumbrüche hinweg. Ohne jedes Satzende bleibt der ganze Text (kurz).
+  const treffer = t.match(/[^.!?]+[.!?]+/g);
+  if (!treffer) return t;
+  return treffer
+    .slice(0, anzahl)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export interface ScenarioPrefill {
   /**
    * Vorbelegte Formularfelder – **einschließlich des Genres**. Das war einmal
@@ -63,8 +88,12 @@ export interface ScenarioPrefill {
  *   landet dadurch im selben Genre und nicht in der Gegenwart.
  * - **`setting`** ← Genre, Ort und Zeit, kompakt in einer Zeile. Das Feld ist
  *   ein einzeiliges Eingabefeld mit 200 Zeichen – hier passt nur das Gerüst.
- * - **`notes`** ← Regeln und Weltbeschreibung. Ein Textfeld mit 2000 Zeichen,
- *   und der einzige Ort im Formular, an dem längerer Weltkontext unterkommt.
+ * - **`notes`** ← Regeln und **die ersten ein bis zwei Sätze** der
+ *   Weltbeschreibung. Das Textfeld „Weitere Wünsche" ist der einzige Ort für
+ *   längeren Weltkontext, aber die volle Beschreibung (bis ~1200 Zeichen)
+ *   überlagerte die eigentliche Figur mit einem Block, dessen Textmenge mehr
+ *   Gewicht suggeriert, als er hat – siehe `ersteSaetze`. Genre und Setting
+ *   tragen den Rahmen bereits.
  *
  * Bewusst **nicht** belegt werden `background`, `personality` und `appearance`:
  * Das sind Eigenschaften der Person, nicht der Welt. Ein Szenario, das die
@@ -85,7 +114,9 @@ export function scenarioToInput(
   const kontext = [
     details.regeln.trim() &&
       `Im Szenario „${name}" gilt: ${details.regeln.trim()}`,
-    details.beschreibung.trim(),
+    // Nur ein Anriss der Weltbeschreibung – die volle Prosa überlädt „Weitere
+    // Wünsche" mit Gewicht, das sie fürs Erstellen dieser Figur nicht hat.
+    ersteSaetze(details.beschreibung, 2),
   ]
     .filter(Boolean)
     .join("\n\n");
