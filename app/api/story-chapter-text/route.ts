@@ -6,6 +6,7 @@ import {
   MAX_KAPITEL_PRO_STUFE,
   normalizeTraits,
   scenarioDetailsSchema,
+  toneHint,
 } from "@/lib/schema";
 import { prisma } from "@/lib/prisma";
 
@@ -123,6 +124,15 @@ export async function POST(request: Request) {
         merkmale: normalizeTraits(JSON.parse(r.traits)),
       }));
 
+    // Der Ton prägt auch die Erzähler-Rolle – aber nur, wenn einer gesetzt ist.
+    // Bei `neutral`/leer bleibt die Rolle unverändert (`toneHint` gibt "").
+    const hint = toneHint(ton);
+    const systemBasis =
+      "Du bist Erzähler. Du schreibst ausgeschriebene Szenen mit sinnlichen Details und lebendigem Dialog – und antwortest ausschließlich mit dem Szenentext selbst.";
+    const systemInhalt = hint
+      ? `${systemBasis} Dein Ton durchzieht die ganze Szene, auch die Beschreibungen: ${hint}`
+      : systemBasis;
+
     const { client: openai, model, extraParams } = await getTextClient();
     const completion = await openai.chat.completions.create({
       model,
@@ -130,8 +140,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content:
-            "Du bist Erzähler. Du schreibst ausgeschriebene Szenen mit sinnlichen Details und lebendigem Dialog – und antwortest ausschließlich mit dem Szenentext selbst.",
+          content: systemInhalt,
         },
         {
           role: "user",

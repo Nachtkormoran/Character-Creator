@@ -895,12 +895,34 @@ export function buildChapterTextPrompt(
     ? "Fünf bis acht Absätze (insgesamt ca. 3000–5000 Zeichen)."
     : "Drei bis fünf Absätze (insgesamt ca. 1800–3200 Zeichen).";
 
+  // Ton – nur bei nicht-neutralem Ton. `neutral`/leer liefert `""`, dann bleibt
+  // der Prompt exakt wie zuvor (auch das „ohne Kitsch" unten). Bei gesetztem Ton
+  // dagegen **verstärkt**: der Ton steht als Wichtigstes oben (nicht bloß als
+  // eine Zeile unter vielen), verlangt ausdrücklich, den **ganzen** Text zu
+  // prägen (nicht nur den Dialog), und wird am Ende noch einmal eingeschärft. Im
+  // langen Prosatext geht ein einzelner Ton-Satz sonst im vielen neutralen
+  // Beschreibungsgewebe unter.
+  const hint = toneHint(options.ton ?? "");
+  const hatTon = hint !== "";
+  const tonKopf = hatTon
+    ? `\n**Der Ton ist das Wichtigste an diesem Text:** ${hint}\nDieser Ton prägt den **gesamten** Text – nicht nur die wörtliche Rede, sondern auch, wie du die Personen, ihre Tätigkeiten und die Atmosphäre schilderst. Fall nie ins neutral Berichtende zurück.\n`
+    : "";
+  const tonFuss = hatTon
+    ? "\n- Halte den oben genannten Ton **durchgehend bis zum letzten Satz** durch, auch in den Beschreibungen."
+    : "";
+  // „Ohne Kitsch" kämpft gegen gefühlsbetonte Töne (leidenschaftlich,
+  // romantisch) – deshalb nur im neutralen Ton. Bei gesetztem Ton trägt ihn der
+  // Ton selbst.
+  const stilZeile = hatTon
+    ? "- Auf Deutsch, lebendig und plastisch."
+    : "- Auf Deutsch, lebendig und plastisch, aber ohne Kitsch.";
+
   const grenzAnforderung = mehrere
     ? "- **Schreibe ausschließlich das markierte Kapitel aus – nicht die ganze Station.** Die anderen Kapitel oben sind nicht dein Gegenstand; ihr Inhalt gehört in ihre eigenen Texte. Beginne dort, wo dieses Kapitel öffnet, und höre auf, wo das nächste beginnt."
     : "- **Schreibe nur dieses eine Kapitel aus** – bleib bei seinem Inhalt, geh nicht darüber hinaus.";
 
   return `Schreibe den ausformulierten Prosatext für **ein einzelnes Kapitel** einer Geschichte – eine ausgeschriebene Szene, nicht eine Zusammenfassung.
-
+${tonKopf}
 Die Welt:
 ${weltZeilen}${weltText}
 Die Station „${stufe.titel.trim() || "(ohne Titel)"}" – nur zur Einordnung, **nicht** ausschreiben:
@@ -916,9 +938,8 @@ ${grenzAnforderung}
 - **Fange die Atmosphäre des Ortes ein**: Licht, Geräusche, Gerüche, Temperatur, Stimmung – passend zu Ort und Zeit oben.
 - **Baue Dialog in wörtlicher Rede ein** (mit Anführungszeichen), der die Figuren charakterisiert und die Handlung trägt. Nicht nur berichten, was gesagt wird – lass sie sprechen.
 - Gehorche den Regeln der Welt. Erfinde nichts, was ihnen widerspricht; führe keine neuen tragenden Personen ein.
-- Auf Deutsch, lebendig und plastisch, aber ohne Kitsch.
-- Reiner Fließtext, keine Überschrift, kein Markdown, keine Aufzählung.
-${tonHinweis(options.ton)}
+${stilZeile}
+- Reiner Fließtext, keine Überschrift, kein Markdown, keine Aufzählung.${tonFuss}
 Antworte mit nichts als dem Kapiteltext selbst.`;
 }
 
