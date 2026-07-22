@@ -739,6 +739,29 @@ export function generateStoryArcChapters(
   });
 }
 
+/**
+ * Erzeugt den **ausformulierten Prosatext eines Kapitels** (Personen +
+ * Tätigkeiten, Atmosphäre, Dialog in wörtlicher Rede). Wie `scenario-plot` lädt
+ * die Route die Figuren selbst über die `scenarioId`; Festlegungen und Kapitel
+ * kommen im aktuellen Stand aus dem Request. **Persistiert nichts** –
+ * gespeichert wird über `updateScenario`.
+ */
+export function generateChapterText(
+  scenarioId: string,
+  details: ScenarioDetails,
+  stufe: { titel: string; beschreibung: string; figuren: string[] },
+  kapitel: { titel: string; inhalt: string },
+  options: { ton?: string; kreativ?: boolean } = {},
+) {
+  return postJson<{ text: string }>("/api/story-chapter-text", {
+    scenarioId,
+    details,
+    stufe,
+    kapitel,
+    ...options,
+  });
+}
+
 /** Einzelnes Szenario samt seiner Charaktere (ohne Bild-Originale). */
 export async function getScenario(
   id: string,

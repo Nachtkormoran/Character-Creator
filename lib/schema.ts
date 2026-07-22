@@ -852,6 +852,15 @@ export const kapitelListeSchema = z.object({
 export const kapitelStoredSchema = z.object({
   titel: z.string().trim().max(200),
   inhalt: z.string().trim().max(2000),
+  /**
+   * Der **ausformulierte Prosatext** des Kapitels (Personen + Tätigkeiten,
+   * Atmosphäre des Ortes, Dialog in wörtlicher Rede) – auf Knopfdruck erzeugt,
+   * eine Ebene unter `inhalt` (der bleibt die Zusammenfassung). Optional mit
+   * `default("")`: Kapitel ohne erzeugten Text und alte Exportdateien bleiben
+   * gültig, ganz wie `kapitel` selbst nachträglich dazukam. Großzügig bemessen –
+   * eine Szene mit Dialog wird lang.
+   */
+  text: z.string().trim().max(20000).default(""),
 });
 
 export const arcStufeStoredSchema = z.object({
@@ -925,6 +934,7 @@ export function normalizeStoryArc(raw: unknown): StoryArc {
                 {
                   titel: typeof ko.titel === "string" ? ko.titel : "",
                   inhalt: typeof ko.inhalt === "string" ? ko.inhalt : "",
+                  text: typeof ko.text === "string" ? ko.text : "",
                 },
               ];
             })

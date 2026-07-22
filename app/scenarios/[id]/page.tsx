@@ -13,6 +13,7 @@ import {
   generateScenarioField,
   generateScenarioPlot,
   generateStoryArc,
+  generateChapterText,
   generateStoryArcChapters,
   getScenario,
   listScenarios,
@@ -124,6 +125,20 @@ export default function ScenarioDetailPage({
   const [kapitelBusy, setKapitelBusy] = useState<number | null>(null);
   const [kapitelFehler, setKapitelFehler] = useState<{
     index: number;
+    text: string;
+  } | null>(null);
+  /**
+   * Welches Kapitel gerade seinen **Prosatext** erzeugt (Station + Kapitel), und
+   * ein etwaiger Fehler dazu. Getrennt vom Kapitel-Ableiten oben, weil beides
+   * unabhängig läuft.
+   */
+  const [kapitelTextBusy, setKapitelTextBusy] = useState<{
+    stufe: number;
+    kapitel: number;
+  } | null>(null);
+  const [kapitelTextFehler, setKapitelTextFehler] = useState<{
+    stufe: number;
+    kapitel: number;
     text: string;
   } | null>(null);
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
@@ -690,9 +705,14 @@ export default function ScenarioDetailPage({
           ton: arcParams.ton,
         },
       );
+      // Die Route liefert nur Titel und Inhalt; der Prosatext (`text`) entsteht
+      // erst später auf Knopfdruck – hier leer auffüllen, damit das Kapitel dem
+      // Typ genügt und die Ausklapp-Ansicht kein `undefined` bekommt.
       setStoryArc((arc) => ({
         stufen: arc.stufen.map((s, k) =>
-          k === stufeIndex ? { ...s, kapitel } : s,
+          k === stufeIndex
+            ? { ...s, kapitel: kapitel.map((c) => ({ ...c, text: c.text ?? "" })) }
+            : s,
         ),
       }));
     } catch (e) {
@@ -702,6 +722,55 @@ export default function ScenarioDetailPage({
       });
     } finally {
       setKapitelBusy(null);
+    }
+  }
+
+  /**
+   * Den **Prosatext** eines Kapitels erzeugen (Personen + Tätigkeiten,
+   * Atmosphäre, Dialog). Station und Kapitel gehen im aktuell bearbeiteten Stand
+   * mit; die Figuren lädt die Route selbst über die Zuordnung. Das Ergebnis
+   * ersetzt `kapitel.text` als ungespeicherte Änderung – „Verwerfen" bringt den
+   * alten zurück. Funktionales Update gegen verlorene Parallel-Bearbeitungen.
+   */
+  async function kapitelTextGenerieren(stufeIndex: number, kapitelIndex: number) {
+    if (kapitelTextBusy) return;
+    const stufe = storyArc.stufen[stufeIndex];
+    const kapitel = stufe?.kapitel[kapitelIndex];
+    if (!kapitel || (!kapitel.inhalt.trim() && !kapitel.titel.trim())) return;
+    setKapitelTextBusy({ stufe: stufeIndex, kapitel: kapitelIndex });
+    setKapitelTextFehler(null);
+    try {
+      const { text } = await generateChapterText(
+        id,
+        details,
+        {
+          titel: stufe.titel,
+          beschreibung: stufe.beschreibung,
+          figuren: stufe.figuren,
+        },
+        { titel: kapitel.titel, inhalt: kapitel.inhalt },
+        { ton: arcParams.ton, kreativ: arcParams.kreativ },
+      );
+      setStoryArc((arc) => ({
+        stufen: arc.stufen.map((s, si) =>
+          si === stufeIndex
+            ? {
+                ...s,
+                kapitel: s.kapitel.map((c, ki) =>
+                  ki === kapitelIndex ? { ...c, text } : c,
+                ),
+              }
+            : s,
+        ),
+      }));
+    } catch (e) {
+      setKapitelTextFehler({
+        stufe: stufeIndex,
+        kapitel: kapitelIndex,
+        text: e instanceof Error ? e.message : "Fehler.",
+      });
+    } finally {
+      setKapitelTextBusy(null);
     }
   }
 
@@ -1271,6 +1340,9 @@ export default function ScenarioDetailPage({
         onKapitelAbleiten={kapitelAbleiten}
         kapitelBusy={kapitelBusy}
         kapitelError={kapitelFehler}
+        onKapitelText={kapitelTextGenerieren}
+        kapitelTextBusy={kapitelTextBusy}
+        kapitelTextError={kapitelTextFehler}
         disabled={saving}
         handlung={details.handlung}
         quelleLabel={`Entwurf ${aktiv + 1}`}

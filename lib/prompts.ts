@@ -785,6 +785,115 @@ ${tonHinweis(options.ton)}${sparksBlock}`;
 }
 
 /**
+ * Eine Figur, wie sie der **Kapitel-Prosatext** braucht: genug, um sie stimmig
+ * und wiedererkennbar zu schildern. Weniger als der Handlungsentwurf verlangt
+ * (der die ganze Vorgeschichte will) – hier zählt, wie die Person **wirkt** und
+ * aussieht, nicht ihr kompletter Lebenslauf.
+ */
+export interface ChapterCharacter {
+  name: string;
+  kurzbeschreibung: string;
+  /** Die vollständige Merkmalstabelle – Aussehen und Eckdaten. */
+  merkmale: CharacterTraits;
+}
+
+/**
+ * Baut den Prompt für den **ausformulierten Prosatext eines Kapitels**.
+ *
+ * Eine Ebene unter `buildStoryArcChaptersPrompt`: Der zerlegt eine Station in
+ * Kapitel (Überschrift + zwei bis drei Sätze, *was* passiert); dieser hier macht
+ * aus **einem** solchen Kapitel eine ausgeschriebene Szene. Der `inhalt` des
+ * Kapitels ist das Gerüst – der Text soll ihn erfüllen, nicht überschreiten.
+ *
+ * Die drei ausdrücklich verlangten Zutaten stehen als prüfbare Anforderungen im
+ * Prompt (die Lehre aus dem Szenario-Feld: ein prüfbarer Endzustand hält besser
+ * als eine Verfahrensanweisung): **genaue Personen und ihre Tätigkeiten**, die
+ * **Atmosphäre des Ortes**, **Dialog in wörtlicher Rede**.
+ *
+ * Die bekannten Figuren gehen mit ihren Merkmalen ein, damit der Text sie
+ * konsistent schildert. Andere Personen, die nur im Kapitel vorkommen (etwa aus
+ * dem Handlungsentwurf hinzuerfundene), zeichnet der Text aus dem, was `inhalt`
+ * und Station über sie sagen.
+ */
+export function buildChapterTextPrompt(
+  welt: {
+    genre?: string;
+    ort?: string;
+    zeit?: string;
+    regeln?: string;
+    beschreibung?: string;
+  },
+  stufe: { titel: string; beschreibung: string },
+  kapitel: { titel: string; inhalt: string },
+  figuren: ChapterCharacter[],
+  options: { ton?: string; kreativ?: boolean } = {},
+): string {
+  const weltZeilen =
+    line("Genre", welt.genre) +
+    line("Ort", welt.ort) +
+    line("Zeit", welt.zeit) +
+    line("Regeln", welt.regeln);
+  const weltText = welt.beschreibung?.trim()
+    ? `\nZur Welt:\n${welt.beschreibung.trim()}\n`
+    : "";
+
+  const figurenBlock = figuren.length
+    ? figuren
+        .map((c) => {
+          const m = c.merkmale;
+          const merkmale = (
+            Object.keys(TRAIT_LABELS) as Array<keyof CharacterTraits>
+          )
+            .map((key) => {
+              const wert = String(m[key] ?? "").trim();
+              return wert && wert !== "0"
+                ? `${TRAIT_LABELS[key]}: ${wert}`
+                : null;
+            })
+            .filter(Boolean)
+            .join(" · ");
+          return [
+            `- ${c.name}`,
+            c.kurzbeschreibung && `  ${c.kurzbeschreibung}`,
+            merkmale && `  Merkmale: ${merkmale}`,
+          ]
+            .filter(Boolean)
+            .join("\n");
+        })
+        .join("\n")
+    : "";
+
+  const figurenTeil = figurenBlock
+    ? `\nBekannte Figuren (schildere sie stimmig zu diesen Angaben):\n${figurenBlock}\n`
+    : "";
+
+  const laenge = options.kreativ
+    ? "Fünf bis acht Absätze (insgesamt ca. 3000–5000 Zeichen)."
+    : "Drei bis fünf Absätze (insgesamt ca. 1800–3200 Zeichen).";
+
+  return `Schreibe den ausformulierten Prosatext für **ein Kapitel** einer Geschichte – eine ausgeschriebene Szene, nicht eine Zusammenfassung.
+
+Die Welt:
+${weltZeilen}${weltText}
+Der Abschnitt (Station): ${stufe.titel.trim() || "(ohne Titel)"}
+${stufe.beschreibung.trim() ? `${stufe.beschreibung.trim()}\n` : ""}
+Das Kapitel: ${kapitel.titel.trim() || "(ohne Titel)"}
+Was darin geschieht (dein Gerüst – erfülle es, geh nicht darüber hinaus):
+${kapitel.inhalt.trim() || "(keine Angabe – halte dich an Station und Welt)"}
+${figurenTeil}
+Anforderungen:
+- ${laenge}
+- **Beschreibe die Personen genau** – ihr Aussehen und Auftreten – und schildere ihre **Tätigkeiten** Schritt für Schritt, konkret und sichtbar.
+- **Fange die Atmosphäre des Ortes ein**: Licht, Geräusche, Gerüche, Temperatur, Stimmung – passend zu Ort und Zeit oben.
+- **Baue Dialog in wörtlicher Rede ein** (mit Anführungszeichen), der die Figuren charakterisiert und die Handlung trägt. Nicht nur berichten, was gesagt wird – lass sie sprechen.
+- Bleib beim Inhalt des Kapitels und gehorche den Regeln der Welt. Erfinde nichts, was ihnen widerspricht; führe keine neuen tragenden Personen ein.
+- Auf Deutsch, lebendig und plastisch, aber ohne Kitsch.
+- Reiner Fließtext, keine Überschrift, kein Markdown, keine Aufzählung.
+${tonHinweis(options.ton)}
+Antworte mit nichts als dem Kapiteltext selbst.`;
+}
+
+/**
  * Baut den Prompt für ein **aus einem Charakter abgeleitetes Szenario**.
  *
  * Die Gegenrichtung zu `scenarioToInput`: dort prägt eine fertige Welt eine

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   ARC_FORMATS,
   ARC_LENGTHS,
@@ -76,6 +77,9 @@ export function StoryArcSection({
   onKapitelAbleiten,
   kapitelBusy,
   kapitelError,
+  onKapitelText,
+  kapitelTextBusy,
+  kapitelTextError,
   disabled,
   handlung,
   quelleLabel,
@@ -115,6 +119,12 @@ export function StoryArcSection({
   kapitelBusy: number | null;
   /** Fehler der Kapitel-Erzeugung, samt betroffener Station. */
   kapitelError: { index: number; text: string } | null;
+  /** Den **Prosatext** eines Kapitels erzeugen (Station-, Kapitel-Index). */
+  onKapitelText: (stufeIndex: number, kapitelIndex: number) => void;
+  /** Welches Kapitel gerade seinen Prosatext erzeugt. */
+  kapitelTextBusy: { stufe: number; kapitel: number } | null;
+  /** Fehler der Prosatext-Erzeugung, samt betroffenem Kapitel. */
+  kapitelTextError: { stufe: number; kapitel: number; text: string } | null;
   /** Gesperrt, während gespeichert wird. */
   disabled: boolean;
   /** Der aktive Handlungsentwurf – ohne ihn lässt sich nichts ableiten. */
@@ -139,6 +149,24 @@ export function StoryArcSection({
   const hatArc = stufen.length > 0;
   const kannAbleiten = handlung.trim().length > 0 && !busy && !disabled;
   const kannHinzufuegen = stufen.length < MAX_ARC_STUFEN;
+
+  // Welche Kapitel-Prosatexte ausgeklappt sind, nach „Station.Kapitel"-Schlüssel.
+  // Rein darstellend – der Text selbst lebt im Arc, nicht hier.
+  const [offeneTexte, setOffeneTexte] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const textKey = (i: number, ki: number) => `${i}.${ki}`;
+  const textOffen = (i: number, ki: number) => offeneTexte.has(textKey(i, ki));
+  const textUmschalten = (i: number, ki: number) =>
+    setOffeneTexte((s) => {
+      const n = new Set(s);
+      const k = textKey(i, ki);
+      if (n.has(k)) n.delete(k);
+      else n.add(k);
+      return n;
+    });
+  const textOeffnen = (i: number, ki: number) =>
+    setOffeneTexte((s) => new Set(s).add(textKey(i, ki)));
 
   // --- Stufen-Mutationen (alle über onChange) -----------------------------
   function stufeAendern(i: number, patch: Partial<StoryArc["stufen"][number]>) {
@@ -206,7 +234,7 @@ export function StoryArcSection({
   }
   function kapitelHinzufuegen(i: number) {
     if (stufen[i].kapitel.length >= MAX_KAPITEL_PRO_STUFE) return;
-    kapitelSetzen(i, [...stufen[i].kapitel, { titel: "", inhalt: "" }]);
+    kapitelSetzen(i, [...stufen[i].kapitel, { titel: "", inhalt: "", text: "" }]);
   }
 
   return (
@@ -714,6 +742,78 @@ export function StoryArcSection({
                               placeholder="Zwei bis drei Sätze, was in dem Kapitel passiert …"
                               className="text-sm text-foreground/75"
                             />
+
+                            {/*
+                              Ausformulierter Prosatext des Kapitels – eine Ebene
+                              unter dem Inhalt (der bleibt die Zusammenfassung).
+                              Ausklappbar, damit die langen Texte die Zeitleiste
+                              nicht überfluten; auf Knopfdruck erzeugt.
+                            */}
+                            <div className="mt-2 border-t border-black/5 pt-2 dark:border-white/5">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => textUmschalten(i, ki)}
+                                  aria-expanded={textOffen(i, ki)}
+                                  title={
+                                    textOffen(i, ki)
+                                      ? "Story einklappen"
+                                      : "Story ausklappen"
+                                  }
+                                  className="flex items-center gap-1 rounded px-1 py-0.5 text-xs font-medium text-foreground/60 transition hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                                >
+                                  <span className="text-[0.6rem]">
+                                    {textOffen(i, ki) ? "▾" : "▸"}
+                                  </span>
+                                  📖 Story
+                                  {k.text.trim() ? ` (${k.text.length})` : ""}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    textOeffnen(i, ki);
+                                    onKapitelText(i, ki);
+                                  }}
+                                  disabled={
+                                    disabled ||
+                                    kapitelTextBusy !== null ||
+                                    (!k.inhalt.trim() && !k.titel.trim())
+                                  }
+                                  title={
+                                    k.inhalt.trim() || k.titel.trim()
+                                      ? "Erzeugt den ausformulierten Prosatext dieses Kapitels (Personen, Atmosphäre, Dialog)"
+                                      : "Erst Titel oder Inhalt des Kapitels füllen"
+                                  }
+                                  className={CHIP_BTN}
+                                >
+                                  {kapitelTextBusy?.stufe === i &&
+                                  kapitelTextBusy?.kapitel === ki
+                                    ? "Erzeuge …"
+                                    : k.text.trim()
+                                      ? "✨ Neu erzeugen"
+                                      : "✨ Story generieren"}
+                                </button>
+                              </div>
+
+                              {kapitelTextError?.stufe === i &&
+                                kapitelTextError?.kapitel === ki && (
+                                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                                    {kapitelTextError.text}
+                                  </p>
+                                )}
+
+                              {textOffen(i, ki) && (
+                                <AutoTextarea
+                                  value={k.text}
+                                  onChange={(v) =>
+                                    kapitelAendern(i, ki, { text: v })
+                                  }
+                                  ariaLabel={`Prosatext von Kapitel ${i + 1}.${ki + 1}`}
+                                  placeholder="Ausformulierter Kapiteltext – Personen, Atmosphäre, Dialog in wörtlicher Rede. „Story generieren“ erzeugt ihn."
+                                  className="mt-1 text-sm text-foreground/80"
+                                />
+                              )}
+                            </div>
                           </li>
                         ))}
                       </ol>
