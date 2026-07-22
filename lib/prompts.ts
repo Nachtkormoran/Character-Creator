@@ -824,10 +824,34 @@ export function buildChapterTextPrompt(
     beschreibung?: string;
   },
   stufe: { titel: string; beschreibung: string },
-  kapitel: { titel: string; inhalt: string },
+  /**
+   * **Alle** Kapitel der Station in Reihenfolge – nicht nur das gewählte. Der
+   * Prompt braucht die Nachbarn, um die Grenze zu kennen: Ohne sie behandelt das
+   * Modell die Stationsbeschreibung als das Auszuschreibende und schreibt die
+   * ganze Station statt nur des einen Kapitels.
+   */
+  kapitelListe: { titel: string; inhalt: string }[],
+  /** Welches Kapitel aus `kapitelListe` ausgeschrieben wird. */
+  kapitelIndex: number,
   figuren: ChapterCharacter[],
   options: { ton?: string; kreativ?: boolean } = {},
 ): string {
+  const ziel = kapitelListe[kapitelIndex] ?? { titel: "", inhalt: "" };
+  const mehrere = kapitelListe.length > 1;
+
+  // Die Kapitel der Station mit Markierung des gewählten – so sieht das Modell
+  // die Grenzen und schreibt nur diesen einen Ausschnitt.
+  const kapitelUebersicht = mehrere
+    ? `\nDie Station ist in diese Kapitel geteilt (in Reihenfolge). Du schreibst **nur das mit ▶ markierte** aus:\n${kapitelListe
+        .map((k, idx) => {
+          const marke = idx === kapitelIndex ? "▶" : " ";
+          const titel = k.titel.trim() || `Kapitel ${idx + 1}`;
+          const inhalt = k.inhalt.trim() ? ` – ${k.inhalt.trim()}` : "";
+          return `${marke} ${idx + 1}. ${titel}${inhalt}`;
+        })
+        .join("\n")}\n`
+    : "";
+
   const weltZeilen =
     line("Genre", welt.genre) +
     line("Ort", welt.ort) +
@@ -871,22 +895,27 @@ export function buildChapterTextPrompt(
     ? "Fünf bis acht Absätze (insgesamt ca. 3000–5000 Zeichen)."
     : "Drei bis fünf Absätze (insgesamt ca. 1800–3200 Zeichen).";
 
-  return `Schreibe den ausformulierten Prosatext für **ein Kapitel** einer Geschichte – eine ausgeschriebene Szene, nicht eine Zusammenfassung.
+  const grenzAnforderung = mehrere
+    ? "- **Schreibe ausschließlich das markierte Kapitel aus – nicht die ganze Station.** Die anderen Kapitel oben sind nicht dein Gegenstand; ihr Inhalt gehört in ihre eigenen Texte. Beginne dort, wo dieses Kapitel öffnet, und höre auf, wo das nächste beginnt."
+    : "- **Schreibe nur dieses eine Kapitel aus** – bleib bei seinem Inhalt, geh nicht darüber hinaus.";
+
+  return `Schreibe den ausformulierten Prosatext für **ein einzelnes Kapitel** einer Geschichte – eine ausgeschriebene Szene, nicht eine Zusammenfassung.
 
 Die Welt:
 ${weltZeilen}${weltText}
-Der Abschnitt (Station): ${stufe.titel.trim() || "(ohne Titel)"}
-${stufe.beschreibung.trim() ? `${stufe.beschreibung.trim()}\n` : ""}
-Das Kapitel: ${kapitel.titel.trim() || "(ohne Titel)"}
-Was darin geschieht (dein Gerüst – erfülle es, geh nicht darüber hinaus):
-${kapitel.inhalt.trim() || "(keine Angabe – halte dich an Station und Welt)"}
+Die Station „${stufe.titel.trim() || "(ohne Titel)"}" – nur zur Einordnung, **nicht** ausschreiben:
+${stufe.beschreibung.trim() ? `${stufe.beschreibung.trim()}\n` : "(keine Beschreibung)\n"}${kapitelUebersicht}
+Auszuschreibendes Kapitel: ${ziel.titel.trim() || "(ohne Titel)"}
+Was darin geschieht (dein Gerüst – erfülle genau dies, nicht mehr):
+${ziel.inhalt.trim() || "(keine Angabe – halte dich an die Station und die Welt, aber bleib bei diesem einen Kapitel)"}
 ${figurenTeil}
 Anforderungen:
+${grenzAnforderung}
 - ${laenge}
 - **Beschreibe die Personen genau** – ihr Aussehen und Auftreten – und schildere ihre **Tätigkeiten** Schritt für Schritt, konkret und sichtbar.
 - **Fange die Atmosphäre des Ortes ein**: Licht, Geräusche, Gerüche, Temperatur, Stimmung – passend zu Ort und Zeit oben.
 - **Baue Dialog in wörtlicher Rede ein** (mit Anführungszeichen), der die Figuren charakterisiert und die Handlung trägt. Nicht nur berichten, was gesagt wird – lass sie sprechen.
-- Bleib beim Inhalt des Kapitels und gehorche den Regeln der Welt. Erfinde nichts, was ihnen widerspricht; führe keine neuen tragenden Personen ein.
+- Gehorche den Regeln der Welt. Erfinde nichts, was ihnen widerspricht; führe keine neuen tragenden Personen ein.
 - Auf Deutsch, lebendig und plastisch, aber ohne Kitsch.
 - Reiner Fließtext, keine Überschrift, kein Markdown, keine Aufzählung.
 ${tonHinweis(options.ton)}

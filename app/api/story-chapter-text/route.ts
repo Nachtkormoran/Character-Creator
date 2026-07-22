@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTextClient } from "@/lib/openai";
 import { buildChapterTextPrompt, type ChapterCharacter } from "@/lib/prompts";
-import { normalizeTraits, scenarioDetailsSchema } from "@/lib/schema";
+import {
+  MAX_KAPITEL_PRO_STUFE,
+  normalizeTraits,
+  scenarioDetailsSchema,
+} from "@/lib/schema";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -32,10 +36,19 @@ const bodySchema = z.object({
     beschreibung: z.string().trim().max(5000).optional().default(""),
     figuren: z.array(z.string().trim().max(120)).max(30).optional().default([]),
   }),
-  kapitel: z.object({
-    titel: z.string().trim().max(200).optional().default(""),
-    inhalt: z.string().trim().max(2000).optional().default(""),
-  }),
+  // **Alle** Kapitel der Station plus der Index des auszuschreibenden. Die
+  // ganze Liste geht mit, damit der Prompt die Grenzen kennt und nur das eine
+  // Kapitel ausschreibt statt der ganzen Station.
+  kapitelListe: z
+    .array(
+      z.object({
+        titel: z.string().trim().max(200).optional().default(""),
+        inhalt: z.string().trim().max(2000).optional().default(""),
+      }),
+    )
+    .min(1)
+    .max(MAX_KAPITEL_PRO_STUFE),
+  kapitelIndex: z.number().int().min(0),
   // Ton und Sprache – ohne Allowlist als String (unbekannt = kein Ton-Block).
   ton: z.string().trim().max(40).optional().default(""),
   // Kreativ: längerer, stärker ausgemalter Text; höhere Temperatur.
@@ -62,10 +75,20 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenarioId, details, stufe, kapitel, ton, kreativ } = parsed.data;
+    const { scenarioId, details, stufe, kapitelListe, kapitelIndex, ton, kreativ } =
+      parsed.data;
+
+    // Der Index muss in die Liste zeigen.
+    if (kapitelIndex >= kapitelListe.length) {
+      return NextResponse.json(
+        { error: "Das gewählte Kapitel liegt außerhalb der Liste." },
+        { status: 400 },
+      );
+    }
 
     // Ein Kapitel ohne jeden Inhalt gäbe dem Modell kein Gerüst.
-    if (!kapitel.inhalt.trim() && !kapitel.titel.trim()) {
+    const ziel = kapitelListe[kapitelIndex];
+    if (!ziel.inhalt.trim() && !ziel.titel.trim()) {
       return NextResponse.json(
         {
           error:
@@ -112,10 +135,14 @@ export async function POST(request: Request) {
         },
         {
           role: "user",
-          content: buildChapterTextPrompt(details, stufe, kapitel, figuren, {
-            ton,
-            kreativ,
-          }),
+          content: buildChapterTextPrompt(
+            details,
+            stufe,
+            kapitelListe,
+            kapitelIndex,
+            figuren,
+            { ton, kreativ },
+          ),
         },
       ],
       temperature: kreativ ? 0.95 : 0.85,

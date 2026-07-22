@@ -750,14 +750,19 @@ export function generateChapterText(
   scenarioId: string,
   details: ScenarioDetails,
   stufe: { titel: string; beschreibung: string; figuren: string[] },
-  kapitel: { titel: string; inhalt: string },
+  /** **Alle** Kapitel der Station (in Reihenfolge) – der Prompt braucht die
+   * Grenzen, damit nur das gewählte ausgeschrieben wird. */
+  kapitelListe: { titel: string; inhalt: string }[],
+  /** Index des auszuschreibenden Kapitels in `kapitelListe`. */
+  kapitelIndex: number,
   options: { ton?: string; kreativ?: boolean } = {},
 ) {
   return postJson<{ text: string }>("/api/story-chapter-text", {
     scenarioId,
     details,
     stufe,
-    kapitel,
+    kapitelListe,
+    kapitelIndex,
     ...options,
   });
 }

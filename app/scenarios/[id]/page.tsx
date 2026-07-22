@@ -748,7 +748,10 @@ export default function ScenarioDetailPage({
           beschreibung: stufe.beschreibung,
           figuren: stufe.figuren,
         },
-        { titel: kapitel.titel, inhalt: kapitel.inhalt },
+        // Die **ganze** Kapitelliste der Station plus der Index – so schreibt die
+        // Route nur dieses eine Kapitel aus, nicht die ganze Station.
+        stufe.kapitel.map((c) => ({ titel: c.titel, inhalt: c.inhalt })),
+        kapitelIndex,
         { ton: arcParams.ton, kreativ: arcParams.kreativ },
       );
       setStoryArc((arc) => ({
