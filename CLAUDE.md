@@ -101,10 +101,14 @@ als eines, das immer dasselbe ist.
 
 **API-Routen:**
 - `POST /api/generate-text`, `POST /api/generate-image`,
-  `POST /api/generate-name`, `POST /api/regenerate-text`,
-  `POST /api/scenario-description`, `POST /api/scenario-plot`,
-  `POST /api/scenario-image`, `POST /api/story-hooks` – OpenAI (persistieren
-  nichts).
+  `POST /api/generate-name`, `POST /api/generate-input-field`,
+  `POST /api/regenerate-text`,
+  `POST /api/scenario-description`, `POST /api/scenario-field`,
+  `POST /api/scenario-plot`, `POST /api/scenario-plot-persons`,
+  `POST /api/scenario-from-character`, `POST /api/scenario-arc`,
+  `POST /api/story-arc-chapters`, `POST /api/story-chapter-text`,
+  `POST /api/scenario-image`, `POST /api/story-hooks` – KI-Text/-Bild
+  (persistieren **nichts**; s. u. „Story Arc" für die drei Arc-/Kapitel-Routen).
 - `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional
   `scenarioId`, `imageData` und `thumbnail`; ein mitgegebenes Bild wird das erste
   und primäre). **Keine Route liefert `imageData` in einer Liste** (`omit`),
@@ -118,6 +122,11 @@ als eines, das immer dasselbe ist.
   nicht in einer eigenen – s. u. **Bilder nicht** – die haben eigene Routen.
 - `POST /api/characters/[id]/images` – Bild hinzufügen (wird standardmäßig zum
   Primärbild).
+- `POST /api/characters/[id]/clone` – Charakter **klonen** (Kopie samt Bildern
+  in **einer** Transaktion, mit Ziel-`scenarioId` aus dem Body). Gebaut für
+  „Vorhandenen Charakter zu Szenario hinzufügen" (s. u.): gehört die gewählte
+  Figur schon zu einem anderen Szenario, wäre ein Umhängen dort ein Wegnehmen –
+  stattdessen eine eigenständige Kopie. Das Original bleibt unangetastet.
 - `GET|PATCH|DELETE /api/characters/[id]/images/[imageId]` – **GET ist der
   einzige Weg an ein Original** (Vollbild, Bild-Export, PDF holen es hier);
   PATCH `{ isPrimary: true }` wählt das Primärbild; DELETE löscht das Bild.
@@ -126,9 +135,10 @@ als eines, das immer dasselbe ist.
 - `GET|POST /api/scenarios` – Liste / Anlegen (`details` optional, s. u.).
 - `GET|PATCH|DELETE /api/scenarios/[id]` – **GET liefert das Szenario samt
   seiner Charaktere** (ohne Bild-Originale, nur Thumbnails – wie die
-  Charakter-Liste); PATCH ist ein Teil-Update von `name`, `details` und
-  `plotVariants` (die Handlungsentwürfe, s. u.). **Das Szenario-Bild nicht** –
-  es hat eine eigene Route (s. u.).
+  Charakter-Liste); PATCH ist ein Teil-Update von `name`, `details`,
+  `plotVariants` (die Handlungsentwürfe, s. u.) und `storyArcVariants` (die
+  Story Arcs, s. u. „Story Arc"). **Das Szenario-Bild nicht** – es hat eine
+  eigene Route (s. u.).
 - `GET|PUT|DELETE /api/scenarios/[id]/image` – das **eine** Weltbild eines
   Szenarios. GET ist der einzige Weg ans Original (Vollbild, Export), PUT
   setzt/ersetzt es (`imageData` + `thumbnail`), DELETE entfernt es; PUT/DELETE
@@ -459,7 +469,11 @@ Teil-PATCH das Feld nicht an.
 **Szenarien:** Ein Szenario fasst Charaktere für eine Geschichte zusammen und
 hält fest, was für sie alle gilt. Eigener Bereich unter `/scenarios`
 (Übersicht mit Anlege-Formular) und `/scenarios/[id]` (Detailansicht:
-Festlegungen bearbeiten, zugeordnete Charaktere als Kacheln, Löschen).
+Festlegungen bearbeiten, zugeordnete Charaktere als Kacheln, Löschen). Die
+Übersicht hat **Suche und Sortierung** wie die Galerie (lokaler `normalize` +
+`searchableText` über Name und alle Festlegungen, diakritika-tolerant und
+UND-verknüpft; Sortierung Name/Datum) – bewusst als Kopie des Galerie-Musters,
+die beiden Seiten teilen sonst nichts.
 
 **Die Festlegungen liegen als JSON-String in `Scenario.details`**, nicht als
 einzelne Spalten – dasselbe Muster wie `Character.traits` und
@@ -737,6 +751,71 @@ bleibt darstellend: sie kennt kein `fetch` und ruft nur `onGenerate(key)`.
 Während ein Feld erzeugt wird, sind **alle** Knöpfe gesperrt – die Erzeugung
 liest die übrigen Felder mit, und zwei gleichzeitige Läufe säßen auf
 verschiedenen Ständen.
+
+**Story Arc:** die **dramaturgische Zerlegung des aktiven Handlungsentwurfs** in
+eine geordnete Folge von Stationen (Fünfakter). Das Verhältnis Arc ↔ Entwurf ist
+dasselbe wie Entwurf ↔ Beschreibung: eine Fassung derselben Sache auf anderer
+Ebene, die der Quelle nie widersprechen darf. Eigene Karte unter dem
+Handlungsentwurf, Komponente `StoryArcSection` (präsentierend wie
+`ScenarioFields` – kein `fetch`, meldet über `onChange`/`onAbleiten`/
+`onKapitelAbleiten`/`onKapitelText`).
+
+- `POST /api/scenario-arc` – **Structured Output** (`storyArcSchema`). Wie
+  `scenario-plot`: Figuren lädt die Route selbst über `scenarioId` (für die
+  `figuren`-Rückbindung jeder Stufe, grob nachgeprüft über ganze Namensteile),
+  der Handlungsentwurf kommt aus dem Request. Die **fünf Phasen** (exposition …
+  aufloesung) werden **explizit** über die geforderte Stationenzahl verteilt und
+  als fertige Liste vorgegeben – „prüfbarer Endzustand statt Verfahren". Ohne
+  Figuren → 400. `hatKaputteZeichen`-Wächter + ein Wiederholversuch.
+- `POST /api/story-arc-chapters` – Kapitel **einer Station** (Spanne aus
+  `KAPITEL_COUNTS`), Structured Output. Bewusst **ohne DB-Zugriff**: die Station
+  trägt Beschreibung und Figuren schon in sich und kommt aus dem Request.
+- `POST /api/story-chapter-text` – der **ausformulierte Prosatext eines
+  Kapitels** (Personen + Tätigkeiten, Atmosphäre, Dialog). **Freitext.** Figuren
+  über `scenarioId`, Station + Kapitel aus dem Request. Bekommt die **ganze**
+  Kapitelliste plus den Index und schreibt **nur das markierte** Kapitel aus
+  (sonst die ganze Station); ein **Folgekapitel** (Index > 0) steigt direkt in
+  die Handlung ein statt mit erneuter Stimmungs-Einstimmung.
+
+**Mehrere Story Arcs (Varianten)** – exakt das Muster der Handlungsentwürfe:
+`Scenario.storyArcVariants` (JSON `{ items, aktiv }`), die aktive Variante ist
+zugleich die Spalte `storyArc` (dort lesen Export und Anzeige sie unverändert),
+`serializeScenario` erzwingt die Gleichheit. Client hält den aktiven Arc live
+(`storyArc`), die übrigen in `arcVarianten`; zusammengeführt erst in
+`aktuelleArcs()`. `normalizePlotVariants`-Analog für Altbestände, Obergrenze
+`MAX_STORY_ARCS` (20). Jedes „Neu ableiten" **hängt an**, ersetzt nicht; Reiter-
+Leiste zum Umschalten. Kapitel liegen **in** der Station (`kapitel[]` mit
+`titel`/`inhalt`/`text`), gehen also über denselben `storyArcVariants`-PATCH mit.
+
+Die **Arc-Parameter** (Länge, Format buch/spiel, Ton, Erzählform, kreativ,
+weiterspinnen, Kapitelzahl) liegen als `arcParams` **in der Seite** und sind
+**nicht gespeichert** (Lauf-Parameter). Ton, Erzählform und „kreativ" gelten für
+Arc **und** Kapitel **und** Prosa gemeinsam.
+
+**Erzählform** (`STORY_FORMS` + `formHint` in `schema.ts`, Zwilling von
+`STORY_TONES`/`toneHint`): die **dritte Achse** neben Genre (der Welt) und Ton
+(dem Wie) – *welche Art* Geschichte: `allround` (Default, kein Hinweis = wie
+bisher), `liebe`, `abenteuer`, `krimi`, `drama`, `thriller`. Sie prägt
+**Konflikt und Aufbau**, nicht die Welt, und ist bewusst **kein Genre**: ein
+Krimi spielt in jeder Welt (ein „Fantasy-Krimi" ist möglich). Ein
+Lauf-Parameter, **nicht gespeichert**, ohne Allowlist als String durchgereicht
+(unbekannt = leerer Block). `formHinweis(form)` wird in **alle vier**
+Erzeugungs-Prompts eingespeist (`buildScenarioPlotPrompt`, `buildStoryArcPrompt`,
+`buildStoryArcChaptersPrompt`, `buildChapterTextPrompt`). Handlungsentwurf
+(`handlungForm`) und Arc (`arcParams.form`) haben **getrennte** Erzählformen –
+man kann einen Krimi-Entwurf als Thriller-Arc zerlegen. Menü „Erzählform" neben
+„Ton" beim Entwurf und in der Story-Arc-Leiste.
+
+**Vorhandenen Charakter zu einem Szenario hinzufügen:** Knopf „+ Vorhandenen
+hinzufügen" in der Szenario-Detailseite → `AddCharacterToScenarioModal`. Zeigt
+**nur Charaktere, die dem Szenario noch nicht angehören** (`scenarioId !== id`).
+Eine **unzugeordnete** Figur wird schlicht zugeordnet (`updateCharacterScenario`);
+gehört sie schon zu einem **anderen** Szenario, erscheint eine **Warnung** und
+auf Wunsch eine **Kopie** über `POST …/clone` (Original bleibt dort). Das
+Datenmodell ist bewusst **1-zu-n** – die Kopie ist die Antwort auf „dieselbe
+Figur auch drüben", ohne auf n-zu-m umzustellen (mit Folgen für Export/Import).
+Daneben in der Ergebnis-Ansicht des Erstellens ein Knopf „← Zum Szenario", falls
+man aus einem Szenario kam und die Figur doch nicht anlegen will.
 
 **Szenario aus einem Charakter ableiten:** Die Gegenrichtung, Knopf „✨ Szenario
 ableiten" in der Fußzeile der Charakter-Detailansicht →
@@ -1070,6 +1149,34 @@ der Name schon vergeben, geändert wird nachträglich). In der Erstellen-Ansicht
 Galerie werden sie über PATCH persistiert. Merkmals-Änderungen laufen über den
 `withTrait`-Helfer in `schema.ts` (konvertiert `alter` in eine Zahl).
 
+**KI-Knopf an vier Formularfeldern:** Neben **Aussehen, Persönlichkeit,
+Beruf/Rolle und Hintergrund** steht im Erstellen-Formular – zusätzlich zum
+Würfel – ein **✨-Knopf** (`POST /api/generate-input-field`,
+`buildInputFieldPrompt`, Client `generateInputField`). Er ist das **schlaue
+Gegenstück zum Würfel**: Der zieht kontextblind aus Listen
+(`inspiration.ts`/`backgrounds.ts`/`professions.ts`), dieser liest die **übrigen
+ausgefüllten Felder** (Genre, Geschlecht, Alter, Herkunft, Setting …) und erzeugt
+etwas Stimmiges – dieselbe Idee wie beim Namens-✨ und beim „Ergänzen" der
+Szenariofelder, nur ohne Nachbarfeld-Filter (`SCENARIO_READS` gibt es hier
+nicht). Der Umfang und die **Form** je Feld sind bewusst auf den jeweiligen
+Würfel gemünzt: Aussehen und Hintergrund mit **Semikolon** (die Einträge
+enthalten Kommas), Persönlichkeit mit Komma, Beruf ein **einzelnes Wort** – so
+fügt sich das Ergebnis genauso ins Feld wie ein Wurf.
+
+Das **Zielfeld selbst geht nicht mit** in den Prompt: Der Knopf **ersetzt**
+seinen Inhalt (wie der Würfel), und wiederholtes Klicken soll Varianten liefern
+statt den Text anwachsen zu lassen. Das Genre steht immer im Kontext
+(Default „Gegenwart"), ist also ein Anker, selbst wenn sonst nichts ausgefüllt
+ist. Wie `generate-name` **Freitext** statt Structured Outputs (ein Feldinhalt,
+kein JSON) und über `getTextClient()` – läuft also mit dem eingestellten
+Textanbieter (OpenAI **oder** Gemini). Die Route deckelt `max_tokens` je Feld,
+säubert die Antwort (umschließende Anführungszeichen/Aufzählungszeichen weg, der
+Beruf einzeilig ohne Schlusspunkt) und kürzt auf die Schema-Grenze
+(`characterInputSchema`: appearance 1500, personality 1000, occupation 200,
+background 2000). Während ein Feld erzeugt wird, sind **alle** ✨-Knöpfe gesperrt
+– die Erzeugung liest die anderen Felder mit. Persistiert wird nichts; das
+Ergebnis geht in den Formular-State.
+
 **Zentrale Module in `lib/`:**
 - `schema.ts` – Zod-Schemas & Typen (`CharacterInput` mit `INPUT_LABELS`,
   `CharacterTraits` mit `TRAIT_LABELS`, `GeneratedCharacter`, `IMAGE_STYLES`).
@@ -1314,10 +1421,11 @@ geöffnete Bilder-Ansicht hat bewusst **keinen** eigenen Esc-Handler (es schlie�
 `Scenario` (`details` als JSON-String, dazu **ein** Weltbild direkt als
 `imageData` + `thumbnail` am Szenario – anders als der Charakter, der eine eigene
 Bildtabelle hat; `plotVariants` als JSON-String für die Handlungsentwürfe
-`{ items, aktiv }`, eigene Spalte neben `details` wie `storyHooks` neben `traits`
-– s. o. „Mehrere Entwürfe je Szenario"; `onDelete: SetNull` – beim Löschen des
-Szenarios bleiben Charaktere erhalten) und `Setting` (Key-Value für
-App-Einstellungen). SQLite lokal.
+`{ items, aktiv }` und `storyArcVariants` als JSON-String für die Story Arcs
+`{ items, aktiv }`, beide eigene Spalten neben `details` wie `storyHooks` neben
+`traits` – s. o. „Mehrere Entwürfe je Szenario" und „Story Arc"; `onDelete:
+SetNull` – beim Löschen des Szenarios bleiben Charaktere erhalten) und `Setting`
+(Key-Value für App-Einstellungen). SQLite lokal.
 
 ## Nicht-offensichtliche Fallstricke
 
