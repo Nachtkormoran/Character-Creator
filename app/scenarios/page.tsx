@@ -30,8 +30,13 @@ function summary(details: ScenarioDetails): string {
   return (Object.keys(SCENARIO_LABELS) as Array<keyof ScenarioDetails>)
     .map((key) => {
       // Die langen Texte bleiben draußen: sie würden die Zeile allein füllen.
-      // Hier stehen die Eckdaten.
-      if (key === "beschreibung" || key === "handlung") return null;
+      // Hier stehen die Eckdaten (auch die Figuren-Notizen sind mehrzeilig).
+      if (
+        key === "beschreibung" ||
+        key === "figuren" ||
+        key === "handlung"
+      )
+        return null;
       const value = details[key]?.trim();
       if (!value) return null;
       if (key === "genre") return genreLabel(value);

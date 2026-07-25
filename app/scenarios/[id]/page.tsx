@@ -721,6 +721,7 @@ export default function ScenarioDetailPage({
         weiterspinnen: arcParams.weiterspinnen,
         ton: arcParams.ton,
         form: arcParams.form,
+        figuren: details.figuren,
       });
       const items = [...aktuelleArcs(), neu];
       setArcVarianten(items);
@@ -1076,6 +1077,32 @@ export default function ScenarioDetailPage({
           onChange={setDetails}
           disabled={saving}
           fields={["genre", "ort", "zeit", "regeln"]}
+          generatable={ERZEUGBAR}
+          onGenerate={handleGenerate}
+          generatingField={generatingField}
+          zusatz={zusatz}
+          onZusatzChange={(key, value) =>
+            setZusatz((z) => ({ ...z, [key]: value }))
+          }
+        />
+      </section>
+
+      {/*
+        Die Besetzung – Notizen zu wichtigen Figuren. Eigene Karte zwischen der
+        Welt (Festlegungen) und dem Handlungsentwurf, weil sie beides verbindet:
+        aus ihr (und den zugeordneten Charakteren) entsteht die Handlung. Kein
+        Erzeugen-Knopf (nicht in ERZEUGBAR) – gefüllt wird von Hand oder vom
+        „Zufälligen Szenario".
+      */}
+      <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+        <h2 className="mb-4 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+          Figuren
+        </h2>
+        <ScenarioFields
+          details={details}
+          onChange={setDetails}
+          disabled={saving}
+          fields={["figuren"]}
           generatable={ERZEUGBAR}
           onGenerate={handleGenerate}
           generatingField={generatingField}

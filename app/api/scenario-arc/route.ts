@@ -65,6 +65,10 @@ const bodySchema = z.object({
   // Erzählform (Krimi, Liebe, …) – als String ohne Allowlist (unbekannt =
   // kein Erzählform-Block).
   form: z.string().trim().max(40).optional().default(""),
+  // Wichtige Figuren (Notizen, `details.figuren`) – noch keine Charaktere.
+  // Gefüllt: sie treten als zusätzliche Besetzung hinzu und dürfen die
+  // Stationen-Namen tragen. Leer = wie bisher. Gedeckelt wie das Feld selbst.
+  figuren: z.string().trim().max(3000).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -88,6 +92,7 @@ export async function POST(request: Request) {
       weiterspinnen,
       ton,
       form,
+      figuren,
     } = parsed.data;
     const anzahl = arcStationen(laenge);
 
@@ -105,12 +110,13 @@ export async function POST(request: Request) {
     });
 
     // Ohne Besetzung kein Arc – die tragenden Figuren jeder Station kämen aus
-    // dem Nichts. (Der Entwurf selbst entsteht schon nicht ohne Figuren.)
-    if (rows.length === 0) {
+    // dem Nichts. „Besetzung" ist ein zugeordneter Charakter **oder** eine Notiz
+    // im Figuren-Feld (dann trägt sie die Stationen). Fehlt beides → 400.
+    if (rows.length === 0 && !figuren.trim()) {
       return NextResponse.json(
         {
           error:
-            "Diesem Szenario ist noch kein Charakter zugeordnet. Der Story Arc bindet seine Stationen an die Figuren – ordne in der Charakter-Übersicht welche zu.",
+            "Diesem Szenario ist noch kein Charakter zugeordnet und das Figuren-Feld ist leer. Der Story Arc bindet seine Stationen an die Figuren – ordne welche zu oder trag wichtige Personen ins Figuren-Feld ein.",
         },
         { status: 400 },
       );
@@ -138,6 +144,7 @@ export async function POST(request: Request) {
       weiterspinnen,
       ton,
       form,
+      figuren,
     );
 
     // Die System-Rolle folgt dem Auftrag: gliedern oder weiterentwickeln.
@@ -203,6 +210,10 @@ export async function POST(request: Request) {
       figuren: s.figuren.filter((f) => {
         const eigene = teile(f);
         if (eigene.size === 0) return false;
+        // Sind Figuren-Notizen im Spiel, tragen legitim auch Namen die Stationen,
+        // die zu keinem angelegten Charakter gehören – dann nicht wegfiltern.
+        // Ohne Notizen bleibt die strenge Bindung an die Besetzung wie bisher.
+        if (figuren.trim()) return true;
         return bekannt.some((b) => [...eigene].some((w) => b.has(w)));
       }),
       // Kapitel entstehen getrennt, auf Knopfdruck je Stufe – hier leer.

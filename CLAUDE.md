@@ -495,6 +495,41 @@ Formular oder Detailansicht. Extra-Arbeit entstand nur durch die Eigenheiten
 **dieses** Feldes: der Erzeugen-Knopf und der Ausschluss aus der
 Zusammenfassungszeile der Übersicht (ein 1200-Zeichen-Text füllte sie allein).
 
+**Das Feld `figuren` – die Besetzung.** Die **dritte Säule** eines Szenarios
+neben der *Welt* (Ort/Zeit/Regeln/Beschreibung) und der *Handlung*
+(Handlungsentwurf/Arc): Freitext-Notizen zu wichtigen Personen, um die es gehen
+soll – **noch keine ausgearbeiteten Charaktere**, sondern ein Saatbeet. Ein
+weiteres `details`-Feld (kein eigenes Column), gefüllt entweder von Hand oder
+vom **„Zufälligen Szenario"** (`random-scenario` erzeugt es jetzt mit –
+`randomScenarioSchema.figuren`, Format „Name: ein bis zwei Sätze mit einem
+Riss"). In der Detailansicht steht es in einer **eigenen Karte „Figuren"**
+zwischen Festlegungen und Handlungsentwurf; im Anlege-Formular zieht es
+automatisch mit (rendert ohne `fields`-Einschränkung alle Felder). **Kein
+Erzeugen-Knopf je Feld** (nicht in `ERZEUGBAR`), aus der
+Übersichts-Zusammenfassung ausgeschlossen (mehrzeilig, wie `beschreibung`).
+
+Der Zweck ist die **Erzeugung von Handlungsentwurf und Story Arc**: Ist das Feld
+gefüllt, treten seine Notizen als zusätzliche Besetzung in den Prompt
+(`buildScenarioPlotPrompt` / `buildStoryArcPrompt`), neben den zugeordneten
+Charakteren. Es räumt zugleich eine Hürde weg: `scenario-plot` und `scenario-arc`
+antworteten mit **400**, wenn dem Szenario kein Charakter zugeordnet war; jetzt
+genügt **ein Charakter *oder* ein nicht-leeres Figuren-Feld**. So entsteht ein
+Entwurf **direkt aus einem zufällig erzeugten Szenario**, bevor Charaktere
+angelegt sind (der übliche Weg zu echten Charakteren bleibt „Personen im Entwurf
+suchen"). Beim Arc wird zusätzlich der Namensfilter der Stationen ausgesetzt,
+solange Notizen vorliegen – die notierten Figuren gehören nicht zur
+Charakter-Besetzung und würden sonst herausgefiltert.
+
+**Härteste Regel dabei: Bei leerem `figuren`-Feld ist der Prompt
+zeichengenau der von vorher** – für Plot **und** Arc. Alle figuren-abhängigen
+Blöcke sind `""`, wenn das Feld leer ist. *Verifiziert* mit einem
+Byte-Vergleich der Prompt-Ausgabe (diverse Kombinationen aus Basis,
+Weiterspinnen, neuen Personen, Ton, Form) vor und nach der Änderung: identisch.
+Gegen den Dev-Server geprüft (Testdaten entfernt): `random-scenario` liefert
+Figuren; Plot/Arc mit leerem Feld + ohne Charaktere → 400 wie bisher, mit
+gefülltem Feld + ohne Charaktere → 200; die notierten Namen überstehen den
+Arc-Filter.
+
 An **Ort, Zeit und Regeln** hängt je ein **Würfel** (`scenarioPlaces.ts`,
 `scenarioTimes.ts`, `scenarioRules.ts` – je neun Listen zu 100, eine pro
 Genre, zusammen 2700 Einträge). Rein lokal wie alle Würfel im Projekt. Welche

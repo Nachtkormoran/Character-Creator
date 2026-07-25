@@ -408,6 +408,14 @@ export function buildScenarioPlotPrompt(
     zeit?: string;
     regeln?: string;
     beschreibung?: string;
+    /**
+     * **Wichtige Figuren** (Notizen aus dem Szenario, `details.figuren`) – noch
+     * keine ausgearbeiteten Charaktere. Ist das Feld gefüllt, tritt es als
+     * zusätzliche Besetzung in den Prompt (oder trägt sie ganz, wenn keine
+     * Charaktere zugeordnet sind). **Leer = der Prompt ist zeichengenau der von
+     * vorher.**
+     */
+    figuren?: string;
   },
   characters: PlotCharacter[],
   zusatz?: string,
@@ -586,13 +594,27 @@ export function buildScenarioPlotPrompt(
       )}. Im Zentrum stehen ihre Entscheidungen und ihr Konflikt; die übrigen Figuren sind **Nebenfiguren**, die sie stützen, herausfordern oder mit ihnen ringen, ohne selbst die Hauptrolle zu spielen.`
     : "";
 
+  // Die Besetzung im Prompt. Bei **leerem** `figuren`-Feld und vorhandenen
+  // Charakteren ist `besetzung` zeichengenau `${figurenEinleitung}\n\n${figuren}`
+  // wie zuvor – der ganze Prompt bleibt unverändert. Ist das Feld gefüllt,
+  // treten seine Notizen hinzu (oder tragen die Besetzung ganz, wenn keine
+  // Charaktere zugeordnet sind – dann lässt die Route den Aufruf überhaupt zu).
+  const figurenNotizen = (details.figuren ?? "").trim();
+  const notizenBlock = figurenNotizen
+    ? `Wichtige Figuren – Notizen (noch keine ausgearbeiteten Charaktere, aber sie sollen im Entwurf vorkommen):\n${figurenNotizen}`
+    : "";
+  const besetzung =
+    characters.length > 0
+      ? notizenBlock
+        ? `${figurenEinleitung}\n\n${figuren}\n\n${notizenBlock}`
+        : `${figurenEinleitung}\n\n${figuren}`
+      : notizenBlock;
+
   return `${auftrag}
 
 Die Welt steht fest:
 ${welt}${weltText}
-${figurenEinleitung}
-
-${figuren}
+${besetzung}
 ${basisBlock}
 Anforderungen:${basisAnforderung}
 ${laengeZeile}
@@ -669,6 +691,13 @@ export function buildStoryArcPrompt(
    * Zuspitzung und Auflösung die Phasen tragen), nicht die Welt.
    */
   form?: string,
+  /**
+   * **Wichtige Figuren** (`details.figuren`) – Notizen zu Personen, die keine
+   * ausgearbeiteten Charaktere sind. Ist das gefüllt, treten sie als zusätzliche
+   * Besetzung hinzu und dürfen die Stationen-Namen tragen. **Leer = der Prompt
+   * ist zeichengenau der von vorher.**
+   */
+  figurenNotizen?: string,
 ): string {
   /** Rückt einen mehrzeiligen Block ein, damit die Zuordnung zur Figur hält. */
   const einrücken = (text: string, tiefe = "     ") =>
@@ -772,14 +801,34 @@ export function buildStoryArcPrompt(
     ? "- **Spinne die Handlung weiter.** Die Ausgangslage liefert Anfang, Figuren und Konflikt; daraus entwickelst du eine ganze Geschichte. Erfinde die Zuspitzung, den Wendepunkt und ein Ende, das aus Figuren und Konflikt zwingend folgt. Die späteren Phasen (Höhepunkt, Fall, Auflösung) sind hier **keine Zusammenfassung des Vorhandenen, sondern neue Handlung, die du erfindest** – bleib dabei Welt, Figuren und dem Kern des Konflikts treu und widersprich der Ausgangslage nie."
     : "- **Zerlege, erfinde nicht.** Der Entwurf ist die Obergrenze der Wahrheit: Baue keine Ereignisse ein, die nicht in ihm angelegt sind. Lässt er etwas offen, konkretisiere es aus den Figuren – aber erfinde keine neue Wendung und kein neues Ende.";
 
+  // Besetzung im Prompt. Bei **leerem** Notiz-Feld und vorhandenen Charakteren
+  // zeichengenau „Diese Figuren gibt es, und nur diese:\n\n${figuren}" wie zuvor.
+  // Gefüllt: die Notizen treten hinzu (oder tragen die Besetzung ganz, wenn keine
+  // Charaktere zugeordnet sind – dann lässt die Route den Aufruf überhaupt zu).
+  const notizen = (figurenNotizen ?? "").trim();
+  const notizenBlock = notizen
+    ? `Wichtige Figuren – Notizen (noch keine ausgearbeiteten Charaktere, aber sie kommen im Handlungsentwurf vor):\n${notizen}`
+    : "";
+  const besetzung =
+    characters.length > 0
+      ? notizenBlock
+        ? `Diese Figuren gibt es:\n\n${figuren}\n\n${notizenBlock}`
+        : `Diese Figuren gibt es, und nur diese:\n\n${figuren}`
+      : notizenBlock;
+
+  // Die Namensbindung jeder Station. Ohne Notizen die harte Sperre auf die
+  // Besetzung wie bisher; mit Notizen dürfen auch die notierten Figuren die
+  // Stationen tragen (ihre Namen stehen nicht in `namen`).
+  const namenZeile = notizen
+    ? "- Jede Station nennt in ihren Figuren die Namen der beteiligten Personen – aus der oben genannten Besetzung (die zugeordneten Charaktere und die notierten wichtigen Figuren). Erfinde darüber hinaus keine neuen Hauptfiguren."
+    : `- Jede Station nennt in ihren Figuren die Namen, die sie tragen – **ausschließlich** aus dieser Besetzung: ${namen}. Erfinde keine neuen Namen.`;
+
   return `${einleitung}
 
 Der Handlungsentwurf:
 ${handlung.trim()}
 
-Diese Figuren gibt es, und nur diese:
-
-${figuren}
+${besetzung}
 
 Die fünf Dramaturgie-Phasen bedeuten:
 - exposition – die Ausgangslage: wer, wo, welche Spannung liegt in der Luft.
@@ -794,7 +843,7 @@ ${folgeListe}
 Anforderungen:
 ${kernAnforderung}${protagonistZeile}
 - Jede Station **verändert die Lage** gegenüber der vorigen. Keine zwei Stationen, die dasselbe noch einmal sagen.
-- Jede Station nennt in ihren Figuren die Namen, die sie tragen – **ausschließlich** aus dieser Besetzung: ${namen}. Erfinde keine neuen Namen.
+${namenZeile}
 ${formatZeile}
 - Titel kurz und prägnant (2–5 Wörter). Beschreibung als Fließtext, ohne Nummerierung, ohne Aufzählungszeichen.
 - Alles auf Deutsch.
@@ -1431,6 +1480,7 @@ export function buildRandomScenarioPrompt(
     zeit?: string;
     regeln?: string;
     beschreibung?: string;
+    figuren?: string;
   },
   freitext: string,
   genreWuerfeln = false,
@@ -1441,6 +1491,7 @@ export function buildRandomScenarioPrompt(
     ["Zeit", details.zeit ?? ""],
     ["Regeln", details.regeln ?? ""],
     ["Beschreibung", details.beschreibung ?? ""],
+    ["Figuren", details.figuren ?? ""],
   ];
 
   const fest = felder.filter(([, wert]) => wert.trim());
@@ -1483,6 +1534,7 @@ Anforderungen:
 - **Zeit**: ein Zeitraum – ein Rahmen (Epoche, Jahreszeit) und eine Spanne, über die sich etwas verschiebt. Kein bloßes Datum.
 - **Regeln**: vollständige Sätze über den Technik-/Weltenstand, mit Leerzeichen verbunden. Keine Zahlen, keine Eigennamen – zwei Regeln müssen nebeneinander stehen können.
 - **Beschreibung**: zwei bis drei Absätze, konkret und sinnlich (Atmosphäre, Alltag), ohne den übrigen Feldern zu widersprechen.
+- **Figuren**: zwei bis vier wichtige Personen, um die es gehen könnte – je Zeile ein Name und ein bis zwei Sätze zu Rolle, Wesen und einem Riss (ein Wunsch, ein Geheimnis, ein Konflikt). Noch keine ausgearbeiteten Charaktere, sondern Anhaltspunkte, aus denen später ein Handlungsentwurf entsteht. Sie müssen in diese Welt passen.
 - Alles auf Deutsch.`;
 }
 

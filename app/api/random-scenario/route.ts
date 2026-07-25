@@ -95,7 +95,9 @@ export async function POST(request: Request) {
 
     // Ein gesetztes Feld gewinnt gegen die Modellantwort; ein leeres wird
     // gefüllt. Danach auf die Feldgrenze gedeckelt (`SCENARIO_MAXLENGTHS`).
-    const nimmDetail = (key: "ort" | "zeit" | "regeln" | "beschreibung") => {
+    const nimmDetail = (
+      key: "ort" | "zeit" | "regeln" | "beschreibung" | "figuren",
+    ) => {
       const orig = details[key].trim();
       const wert = orig || ergebnis![key].trim();
       return wert.slice(0, SCENARIO_MAXLENGTHS[key]);
@@ -112,6 +114,8 @@ export async function POST(request: Request) {
         zeit: nimmDetail("zeit"),
         regeln: nimmDetail("regeln"),
         beschreibung: nimmDetail("beschreibung"),
+        // Die Besetzung – gefüllt wie die Welt-Felder (Vorhandenes gewinnt).
+        figuren: nimmDetail("figuren"),
         // Nicht erzeugt – ein vorhandener bleibt, sonst leer.
         handlung: details.handlung,
       },

@@ -473,6 +473,7 @@ export const SCENARIO_MAXLENGTHS = {
   zeit: 1000,
   regeln: 4000,
   beschreibung: 4000,
+  figuren: 3000,
   handlung: 4000,
 } as const;
 
@@ -490,6 +491,12 @@ export const scenarioDetailsSchema = z.object({
     .string()
     .trim()
     .max(SCENARIO_MAXLENGTHS.beschreibung)
+    .optional()
+    .default(""),
+  figuren: z
+    .string()
+    .trim()
+    .max(SCENARIO_MAXLENGTHS.figuren)
     .optional()
     .default(""),
   handlung: z
@@ -532,6 +539,11 @@ export const randomScenarioSchema = z.object({
   beschreibung: z
     .string()
     .describe("Zwei bis drei Absätze über die Welt: Atmosphäre, Alltag, Stimmung"),
+  figuren: z
+    .string()
+    .describe(
+      "Zwei bis vier wichtige Personen, um die es gehen könnte – je Zeile Name und ein bis zwei Sätze zu Rolle, Wesen und einem Riss (Wunsch, Geheimnis, Konflikt). Noch keine ausgearbeiteten Charaktere, sondern Anhaltspunkte für einen späteren Handlungsentwurf.",
+    ),
 });
 
 export type RandomScenario = z.infer<typeof randomScenarioSchema>;
@@ -561,6 +573,11 @@ export const SCENARIO_LABELS: Record<keyof ScenarioDetails, string> = {
   // zuletzt, weil er zusätzlich die Charaktere braucht – er ist das einzige
   // Feld im Projekt, das mehrere Figuren zugleich betrachtet.
   beschreibung: "Beschreibung",
+  // Die **Besetzung** – die dritte Säule neben Welt (Ort/Zeit/Regeln/
+  // Beschreibung) und Handlung. Notizen zu wichtigen Personen, noch keine
+  // ausgearbeiteten Charaktere. Steht **vor** dem Handlungsentwurf, weil dieser
+  // sie mitverwendet.
+  figuren: "Figuren",
   handlung: "Handlungsentwurf",
 };
 
@@ -577,6 +594,8 @@ export const SCENARIO_HINTS: Record<keyof ScenarioDetails, string> = {
     "Was in diesem Szenario gilt und für alle Figuren darin wahr ist – Technikstand, Magie, gesellschaftliche Ordnung, Tabus.",
   beschreibung:
     "Fließtext über die Welt des Szenarios. Lässt sich aus den Festlegungen weiter unten erzeugen und danach frei bearbeiten.",
+  figuren:
+    "Wichtige Personen, um die es gehen soll – Notizen, noch keine ausgearbeiteten Charaktere. Fließt in den Handlungsentwurf und den Story Arc ein. Ein zufällig erzeugtes Szenario füllt das Feld mit.",
   handlung:
     "Wer gerät hier mit wem worüber aneinander? Lässt sich aus den Festlegungen und den zugeordneten Charakteren erzeugen – dafür muss das Szenario gespeichert sein und Figuren enthalten.",
 };
@@ -630,6 +649,7 @@ export const SCENARIO_MULTILINE: ReadonlySet<keyof ScenarioDetails> = new Set([
   "zeit",
   "regeln",
   "beschreibung",
+  "figuren",
   "handlung",
 ]);
 

@@ -818,6 +818,11 @@ export function generateStoryArc(
     ton?: string;
     /** Erzählform (`STORY_FORMS`-Wert). Leer/`allround` = ohne Erzählform-Block. */
     form?: string;
+    /**
+     * Wichtige Figuren (`details.figuren`) – Notizen, die als zusätzliche
+     * Besetzung in den Arc eingehen. Leer = wie bisher.
+     */
+    figuren?: string;
   } = {},
 ) {
   return postJson<{ storyArc: StoryArc }>("/api/scenario-arc", {

@@ -99,13 +99,15 @@ export async function POST(request: Request) {
       },
     });
 
-    // Ohne Besetzung kein Handlungsentwurf. Ein Text über niemanden wäre
-    // teurer Unsinn – und die Meldung sagt, was zu tun ist.
-    if (rows.length === 0) {
+    // Ohne Besetzung kein Handlungsentwurf. „Besetzung" ist entweder ein
+    // zugeordneter Charakter **oder** eine Notiz im Figuren-Feld – letzteres
+    // erlaubt einen Entwurf direkt aus einem (zufällig erzeugten) Szenario,
+    // bevor Charaktere angelegt sind. Fehlt beides, wäre der Text über niemanden.
+    if (rows.length === 0 && !details.figuren?.trim()) {
       return NextResponse.json(
         {
           error:
-            "Diesem Szenario ist noch kein Charakter zugeordnet. Der Handlungsentwurf entsteht aus den Figuren – ordne in der Charakter-Übersicht welche zu.",
+            "Diesem Szenario ist noch kein Charakter zugeordnet und das Figuren-Feld ist leer. Der Handlungsentwurf entsteht aus den Figuren – ordne welche zu oder trag wichtige Personen ins Figuren-Feld ein.",
         },
         { status: 400 },
       );
