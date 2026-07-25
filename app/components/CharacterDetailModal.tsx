@@ -170,6 +170,8 @@ export function CharacterDetailModal({
   const [exportError, setExportError] = useState<string | null>(null);
   const [namingAI, setNamingAI] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
+  /** Schon vorgeschlagene Namen – Ausschlussliste gegen Wiederholungen. */
+  const [nameHistory, setNameHistory] = useState<string[]>([]);
 
   /**
    * Nachträglich einen neuen Namen würfeln. Grundlage sind die **Merkmale**
@@ -203,8 +205,14 @@ export function CharacterDetailModal({
     setNamingAI(true);
     setNameError(null);
     try {
-      const { name } = await generateName(c.input, edited.merkmale);
+      const { name } = await generateName(
+        c.input,
+        edited.merkmale,
+        // Der aktuelle Name zählt mit – er soll nicht gleich wieder kommen.
+        Array.from(new Set([edited.name, ...nameHistory].filter(Boolean))),
+      );
       setField("name", name);
+      setNameHistory((h) => [...h, name].slice(-20));
     } catch (e) {
       setNameError(e instanceof Error ? e.message : "Fehler.");
     } finally {

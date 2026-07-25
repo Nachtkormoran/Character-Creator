@@ -73,8 +73,17 @@ export function generateText(input: CharacterInput) {
  * Ein einzelner Namensvorschlag. `traits` gibt es nur für bereits erzeugte
  * Charaktere (Galerie) und hat im Prompt Vorrang vor den Vorgaben.
  */
-export function generateName(input: CharacterInput, traits?: CharacterTraits) {
-  return postJson<{ name: string }>("/api/generate-name", { input, traits });
+export function generateName(
+  input: CharacterInput,
+  traits?: CharacterTraits,
+  /** Ausschlussliste gegen Wiederholungen – schon vorgeschlagene Namen. */
+  vorhandene: string[] = [],
+) {
+  return postJson<{ name: string }>("/api/generate-name", {
+    input,
+    traits,
+    vorhandene,
+  });
 }
 
 /**

@@ -18,7 +18,12 @@ export async function POST(request: Request) {
     }
 
     const { client: openai, model, extraParams } = await getTextClient();
-    const prompt = buildTextPrompt(parsed.data);
+    // Zufälliger Anfangsbuchstabe gegen die Gleichförmigkeit der Namen – greift
+    // nur, wenn kein Wunschname vorgegeben ist (s. `buildTextPrompt`). Q/X/Y/Z
+    // ausgelassen (als Initiale selten – s. `generate-name`).
+    const INITIALEN = "ABCDEFGHIJKLMNOPRSTUVW";
+    const initial = INITIALEN[Math.floor(Math.random() * INITIALEN.length)];
+    const prompt = buildTextPrompt(parsed.data, initial);
 
     const completion = await openai.chat.completions.parse({
       model,

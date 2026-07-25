@@ -54,7 +54,17 @@ function formHinweis(form?: string): string {
  * JSON zurückgeben (via Structured Outputs), daher beschreibt der Prompt nur
  * Inhalt und Ton – nicht das Format.
  */
-export function buildTextPrompt(input: CharacterInput): string {
+export function buildTextPrompt(
+  input: CharacterInput,
+  /**
+   * Zufälliger Anfangsbuchstabe für den Vornamen – **nur** wirksam, wenn kein
+   * Wunschname vorgegeben ist (sonst gilt der). Dekorreliert identische
+   * Vorgaben und wirkt der Gleichförmigkeit der Namen entgegen; wie bei
+   * `buildNamePrompt` in der Route gezogen, damit der Baukasten deterministisch
+   * bleibt.
+   */
+  initial?: string,
+): string {
   const wunschname = (input.name || "").trim();
   /**
    * Ein einzelnes Wort verstehen wir als Vornamen, der um einen passenden
@@ -79,7 +89,11 @@ export function buildTextPrompt(input: CharacterInput): string {
   // Die Namens-Anforderung ersetzt die freie Namenswahl, sobald etwas
   // vorgegeben ist – sonst stünden beide widersprüchlich nebeneinander.
   const nameAnforderung = !wunschname
-    ? "- Ein vollständiger, zum Setting passender Name."
+    ? `- Ein vollständiger, zum Setting passender Name – authentisch zur Herkunft, aber **nicht** der naheliegendste Allerweltsname.${
+        initial
+          ? ` Der Vorname soll möglichst mit „${initial}" beginnen (nur wenn das für die Herkunft unnatürlich wäre, weiche auf einen nahen Buchstaben aus).`
+          : ""
+      }`
     : nurVorname
       ? `- Der Vorname lautet exakt „${wunschname}". Übernimm ihn unverändert (auch Schreibweise) und ergänze einen dazu passenden Nachnamen, stimmig zu Herkunft und Setting. Das Feld für den Namen enthält beides zusammen.`
       : `- Der Name lautet exakt „${wunschname}". Übernimm ihn unverändert und ergänze nichts.`;
@@ -1140,6 +1154,16 @@ export function buildNamePrompt(
    * Herkunftsfeld – und haben deshalb Vorrang.
    */
   traits?: CharacterTraits,
+  /**
+   * Gegenmittel gegen die Gleichförmigkeit: Namensverteilungen sind bei
+   * gängigen Herkünften extrem „spitz", und identische Vorgaben liefern trotz
+   * hoher Temperatur immer wieder den Prior-Kopf. `vorhandene` ist eine
+   * **Ausschlussliste** (schon vorgeschlagene Namen – wähle einen anderen),
+   * `initial` ein **zufälliger Anfangsbuchstabe**, der den Prompt dekorreliert
+   * und das Modell in einen anderen Teil der Verteilung zwingt. Beide werden in
+   * der **Route** gezogen, damit der Prompt-Baukasten deterministisch bleibt.
+   */
+  options: { vorhandene?: string[]; initial?: string } = {},
 ): string {
   const hintergrund = (input.background || "").trim().slice(0, 200);
 
@@ -1156,9 +1180,22 @@ export function buildNamePrompt(
     line("Beruf/Rolle", input.occupation) +
     line("Hintergrund", hintergrund);
 
+  const ausschluss = options.vorhandene?.length
+    ? `\nDiese Namen sind bereits vergeben oder wurden gerade vorgeschlagen – wähle einen **deutlich anderen** (anderer Vorname **und** Nachname):\n${options.vorhandene
+        .map((n) => `- ${n}`)
+        .join("\n")}\n`
+    : "";
+
+  const initialHinweis = options.initial
+    ? `\n- Der **Vorname** soll möglichst mit „${options.initial}" beginnen; nur wenn das für die Herkunft unnatürlich wäre, weiche auf einen nahen, passenden Buchstaben aus.`
+    : "";
+
   return `Erfinde einen vollständigen Namen (Vorname und Nachname) für einen Charakter mit diesen Vorgaben:
 
-${vorgaben || "- (keine Vorgaben – wähle frei)\n"}
+${vorgaben || "- (keine Vorgaben – wähle frei)\n"}${ausschluss}
+Anforderungen:
+- Authentisch zur Herkunft, aber **nicht** der naheliegendste Allerweltsname – trau dich zu selteneren, eigenständigen Namen.${initialHinweis}
+
 Antworte mit nichts als dem Namen, ohne Anführungszeichen und ohne Erklärung.`;
 }
 

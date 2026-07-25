@@ -11,7 +11,20 @@ import { z } from "zod";
 const bodySchema = z.object({
   input: characterInputSchema,
   traits: characterTraitsSchema.optional(),
+  /**
+   * Ausschlussliste: schon vorgeschlagene (oder vorhandene) Namen, die der
+   * nächste Vorschlag meiden soll. Ohne sie liefert wiederholtes Klicken bei
+   * gleichen Vorgaben denselben Prior-Kopf – s. `buildNamePrompt`.
+   */
+  vorhandene: z.array(z.string().trim().max(120)).max(50).optional().default([]),
 });
+
+/**
+ * Anfangsbuchstaben, aus denen der zufällige Anker gezogen wird. Q, X, Y, Z
+ * sind als Vornamens-Initialen selten und würden die „weiche aus"-Klausel zu
+ * oft auslösen – der Anker soll dekorrelieren, nicht ins Leere laufen.
+ */
+const INITIALEN = "ABCDEFGHIJKLMNOPRSTUVW";
 
 export const runtime = "nodejs";
 
@@ -41,6 +54,11 @@ export async function POST(request: Request) {
 
     const { client: openai, model, extraParams } = await getTextClient();
 
+    // Zufälliger Anfangsbuchstabe – dekorreliert identische Vorgaben und drückt
+    // das Modell aus dem immer gleichen Prior-Kopf (s. `buildNamePrompt`).
+    const initial =
+      INITIALEN[Math.floor(Math.random() * INITIALEN.length)];
+
     // Bewusst `create` statt `parse` mit Structured Outputs: ein Name ist ein
     // einzelner String, das JSON-Schema drumherum wäre reiner Token-Aufschlag.
     // `max_tokens` deckelt zusätzlich den Fall, dass das Modell doch schwatzt.
@@ -55,7 +73,10 @@ export async function POST(request: Request) {
         },
         {
           role: "user",
-          content: buildNamePrompt(parsed.data.input, parsed.data.traits),
+          content: buildNamePrompt(parsed.data.input, parsed.data.traits, {
+            vorhandene: parsed.data.vorhandene,
+            initial,
+          }),
         },
       ],
       // Hoch, damit wiederholtes Klicken auch wirklich verschiedene Namen
