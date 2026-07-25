@@ -18,6 +18,7 @@ import {
   getScenario,
   listScenarios,
   updateCharacterContent,
+  updateCharacterProtagonist,
   updateCharacterScenario,
   updateScenario,
 } from "@/lib/client";
@@ -258,6 +259,8 @@ export default function ScenarioDetailPage({
 
   /** Ob das „Charakter hinzufügen"-Modal (bestehende Figur zuordnen) offen ist. */
   const [addOffen, setAddOffen] = useState(false);
+  /** Welche Figur gerade ihre Protagonisten-Markierung umschaltet (sperrt sie). */
+  const [protagonistBusy, setProtagonistBusy] = useState<string | null>(null);
 
   /**
    * Hier ist alles erzeugbar: Ort, Zeit und Regeln lassen sich ergänzen, die
@@ -590,6 +593,25 @@ export default function ScenarioDetailPage({
     setCharacters((cs) =>
       cs.some((c) => c.id === neu.id) ? cs : [...cs, neu],
     );
+  }
+
+  /**
+   * Eine Figur als Protagonist markieren/entmarken. Wie die Zuordnung sofort
+   * persistiert (eigener PATCH, kann nichts halb geändert sein). Ist das
+   * Detail-Modal für dieselbe Figur offen, zieht seine Auswahl mit.
+   */
+  async function protagonistUmschalten(c: StoredCharacter) {
+    if (protagonistBusy) return;
+    setProtagonistBusy(c.id);
+    try {
+      const updated = await updateCharacterProtagonist(c.id, !c.isProtagonist);
+      setCharacters((cs) => cs.map((x) => (x.id === c.id ? updated : x)));
+      setSelectedChar((sel) => (sel && sel.id === c.id ? updated : sel));
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setProtagonistBusy(null);
+    }
   }
 
   // Der aktuelle Stand als Vergleichswert für den „Ungespeichert"-Balken. Die
@@ -1442,6 +1464,13 @@ export default function ScenarioDetailPage({
             </Link>
           </div>
         </div>
+        {characters.length > 0 && (
+          <p className="mb-3 text-xs text-foreground/50">
+            Mit dem ⭐ markierst du <strong>Protagonisten</strong> – der
+            Handlungsentwurf dreht sich dann um sie, die übrigen sind
+            Nebenfiguren. Ohne Markierung bleibt alles wie bisher.
+          </p>
+        )}
         {dirty && (
           <p className="mb-3 text-xs text-amber-700 dark:text-amber-400">
             Ungespeicherte Änderungen werden nicht übernommen – erst speichern,
@@ -1461,34 +1490,69 @@ export default function ScenarioDetailPage({
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
             {characters.map((c) => {
               const preview = primaryImage(c)?.thumbnail;
+              // Wrapper, damit der Stern ein **Geschwister** des Kachel-Knopfes
+              // ist – verschachtelte Buttons sind ungültiges HTML.
               return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setSelectedChar(c)}
-                  title={c.character.kurzbeschreibung}
-                  className="flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border border-black/10 bg-white text-left transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
-                >
-                  <div className="relative aspect-square w-full bg-black/[0.03] dark:bg-white/[0.03]">
-                    {preview ? (
-                      <Image
-                        src={preview}
-                        alt={c.character.name}
-                        fill
-                        sizes="(max-width: 640px) 50vw, 16vw"
-                        className="object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-2xl opacity-30">
-                        🧑
-                      </div>
-                    )}
-                  </div>
-                  <span className="block truncate p-1.5 text-xs font-medium">
-                    {c.character.name}
-                  </span>
-                </button>
+                <div key={c.id} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedChar(c)}
+                    title={c.character.kurzbeschreibung}
+                    className={`flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border bg-white text-left transition hover:shadow-md dark:bg-white/[0.03] ${
+                      c.isProtagonist
+                        ? "border-amber-400 ring-1 ring-amber-400/60 dark:border-amber-400/70"
+                        : "border-black/10 dark:border-white/10"
+                    }`}
+                  >
+                    <div className="relative aspect-square w-full bg-black/[0.03] dark:bg-white/[0.03]">
+                      {preview ? (
+                        <Image
+                          src={preview}
+                          alt={c.character.name}
+                          fill
+                          sizes="(max-width: 640px) 50vw, 16vw"
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-2xl opacity-30">
+                          🧑
+                        </div>
+                      )}
+                    </div>
+                    <span className="block truncate p-1.5 text-xs font-medium">
+                      {c.character.name}
+                    </span>
+                  </button>
+                  {/*
+                    Protagonisten-Stern, oben rechts über dem Bild. Eigener
+                    Button (nicht im Kachel-Knopf), mit gut lesbarem Chip über
+                    dem Thumbnail. Sofort persistiert.
+                  */}
+                  <button
+                    type="button"
+                    onClick={() => protagonistUmschalten(c)}
+                    disabled={protagonistBusy === c.id}
+                    aria-pressed={c.isProtagonist}
+                    aria-label={
+                      c.isProtagonist
+                        ? `${c.character.name} als Protagonist aufheben`
+                        : `${c.character.name} als Protagonist markieren`
+                    }
+                    title={
+                      c.isProtagonist
+                        ? "Protagonist – klicken zum Aufheben"
+                        : "Als Protagonist markieren (der Handlungsentwurf dreht sich dann um die Protagonisten)"
+                    }
+                    className={`absolute right-1 top-1 rounded-full bg-black/45 px-1.5 py-0.5 text-sm leading-none backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-50 ${
+                      c.isProtagonist
+                        ? "text-amber-300"
+                        : "text-white/75 hover:text-amber-200"
+                    }`}
+                  >
+                    {c.isProtagonist ? "⭐" : "☆"}
+                  </button>
+                </div>
               );
             })}
           </div>

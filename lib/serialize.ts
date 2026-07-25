@@ -62,6 +62,11 @@ export interface StoredCharacter {
    */
   storyHooks: string;
   /**
+   * Protagonist des zugeordneten Szenarios? Steuert den Handlungsentwurf (s.
+   * `buildScenarioPlotPrompt`). Nur innerhalb eines Szenarios sinnvoll.
+   */
+  isProtagonist: boolean;
+  /**
    * Alle Bilder, neueste zuerst – **ohne** `imageData`. Die Originale sind je
    * ~2 MB; das Original holt sich die Anzeige bei Bedarf einzeln über
    * `GET /api/characters/[id]/images/[imageId]`.
@@ -111,6 +116,7 @@ export function serializeCharacter(
     },
     scenarioId: row.scenarioId,
     storyHooks: row.storyHooks ?? "",
+    isProtagonist: row.isProtagonist,
     images: (row.images ?? []).map(serializeImage),
   };
 }

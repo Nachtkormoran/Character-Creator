@@ -100,6 +100,7 @@ export async function POST(request: Request) {
         description: true,
         traits: true,
         storyHooks: true,
+        isProtagonist: true,
       },
     });
 
@@ -121,6 +122,7 @@ export async function POST(request: Request) {
       beschreibung: r.description,
       merkmale: normalizeTraits(JSON.parse(r.traits)),
       storyHooks: r.storyHooks ?? "",
+      isProtagonist: r.isProtagonist,
     }));
 
     const { client: openai, model, extraParams } = await getTextClient();

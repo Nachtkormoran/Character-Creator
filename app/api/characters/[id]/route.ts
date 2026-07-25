@@ -40,6 +40,11 @@ const patchSchema = z
      * angelegten Charaktere dauerhaft „Gegenwart".
      */
     genre: z.enum(GENRE_TEMPLATES.map((g) => g.id) as [string, ...string[]]),
+    /**
+     * Protagonist des Szenarios? Eigener Schlüssel wie `scenarioId` – die
+     * Zuordnungs-Ebene der Figur, nicht ihr Inhalt. Wird sofort umgeschaltet.
+     */
+    isProtagonist: z.boolean(),
   })
   .partial()
   .refine((d) => Object.keys(d).length > 0, {
@@ -80,9 +85,11 @@ export async function PATCH(request: Request, { params }: Context) {
       traits?: string;
       storyHooks?: string;
       input?: string;
+      isProtagonist?: boolean;
     } = {};
     if (p.name !== undefined) data.name = p.name;
     if (p.scenarioId !== undefined) data.scenarioId = p.scenarioId;
+    if (p.isProtagonist !== undefined) data.isProtagonist = p.isProtagonist;
     if (p.shortDescription !== undefined)
       data.shortDescription = p.shortDescription;
     if (p.description !== undefined) data.description = p.description;

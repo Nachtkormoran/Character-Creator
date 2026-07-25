@@ -95,6 +95,7 @@ export async function POST(request: Request) {
         description: true,
         traits: true,
         storyHooks: true,
+        isProtagonist: true,
       },
     });
 
@@ -118,6 +119,7 @@ export async function POST(request: Request) {
       // nicht, und der Prompt läuft über die vollständige Tabelle.
       merkmale: normalizeTraits(JSON.parse(r.traits)),
       storyHooks: r.storyHooks ?? "",
+      isProtagonist: r.isProtagonist,
     }));
 
     const { client: openai, model, extraParams } = await getTextClient();

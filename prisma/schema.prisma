@@ -96,6 +96,12 @@ model Character {
   scenarioId  String?
   scenario    Scenario? @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
 
+  // Ist die Figur ein Protagonist ihres Szenarios? Steuert den
+  // Handlungsentwurf: sind welche markiert, dreht sich die Handlung um sie, die
+  // übrigen sind Nebenfiguren. Ist niemand markiert, läuft alles wie bisher
+  // (alle gleichrangig). Default false; nur innerhalb eines Szenarios sinnvoll.
+  isProtagonist Boolean @default(false)
+
   // Ursprüngliche Formular-Eingaben als JSON-String
   input       String
 

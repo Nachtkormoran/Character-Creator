@@ -375,6 +375,12 @@ export interface PlotCharacter {
   merkmale: CharacterTraits;
   /** Die Ansatzpunkte der Figur, sofern erzeugt. */
   storyHooks: string;
+  /**
+   * Protagonist des Szenarios? Nur `buildScenarioPlotPrompt` wertet es aus –
+   * und **nur, wenn mindestens eine Figur markiert ist**; sonst bleibt der
+   * Prompt unverändert (alle gleichrangig, wie bisher).
+   */
+  isProtagonist?: boolean;
 }
 
 /**
@@ -497,9 +503,17 @@ export function buildScenarioPlotPrompt(
         c.storyHooks &&
           `   Offene Ansatzpunkte:\n${einrücken(c.storyHooks)}`,
       ].filter(Boolean);
-      return [`${i + 1}. ${c.name}`, ...zeilen].join("\n");
+      // Markierung nur, wenn überhaupt Protagonisten gewählt sind – sonst bleibt
+      // die Zeile unverändert (kein markierter → `marke` überall leer).
+      const marke = c.isProtagonist ? " (Protagonist)" : "";
+      return [`${i + 1}. ${c.name}${marke}`, ...zeilen].join("\n");
     })
     .join("\n\n");
+
+  // Dreht sich die Handlung um bestimmte Figuren? Nur dann kommt überhaupt eine
+  // Protagonisten-Anweisung in den Prompt; ohne Markierung ist der Prompt
+  // zeichengenau der von vorher (alle Figuren gleichrangig).
+  const hatProtagonisten = characters.some((c) => c.isProtagonist);
 
   const zusatzBlock = zusatz?.trim()
     ? `\nBesonders wichtig – zusätzliche Wünsche für diesen Entwurf:\n${zusatz.trim()}\n`
@@ -558,6 +572,20 @@ export function buildScenarioPlotPrompt(
       ? "Diese Figuren gibt es – sie tragen die Handlung (weitere neue Personen führst du wie unten angegeben zusätzlich ein):"
       : "Diese Figuren gibt es, und nur diese:";
 
+  // Anweisung nur bei markierten Protagonisten – sonst leer, und der Prompt ist
+  // zeichengenau der von vorher.
+  const protagonisten = characters
+    .filter((c) => c.isProtagonist)
+    .map((c) => c.name.trim())
+    .filter(Boolean);
+  const protagonistBlock = hatProtagonisten
+    ? `\n- **Die Handlung dreht sich um ${
+        protagonisten.length === 1 ? "den Protagonisten" : "die Protagonisten"
+      }** (oben mit „(Protagonist)" markiert): ${protagonisten.join(
+        ", ",
+      )}. Im Zentrum stehen ihre Entscheidungen und ihr Konflikt; die übrigen Figuren sind **Nebenfiguren**, die sie stützen, herausfordern oder mit ihnen ringen, ohne selbst die Hauptrolle zu spielen.`
+    : "";
+
   return `${auftrag}
 
 Die Welt steht fest:
@@ -568,7 +596,7 @@ ${figuren}
 ${basisBlock}
 Anforderungen:${basisAnforderung}
 ${laengeZeile}
-${figurenRegel}
+${figurenRegel}${protagonistBlock}
 - Benenne, **wer was von wem will** und woran es sich entzündet. Ein Konflikt braucht mindestens zwei Personen mit unvereinbaren Absichten.
 - Lies die Beschreibungen genau: Dort steht die Vorgeschichte, und dort liegen die Reibungsflächen zwischen den Figuren. Auch scheinbare Nebensachen aus den Merkmalen – Herkunft, eine Narbe, ein Hobby – taugen als Anknüpfungspunkt.
 - Sind offene Ansatzpunkte genannt, greife sie auf und verbinde sie: Das Interessante entsteht dort, wo das Anliegen der einen die Wunde der anderen trifft.
@@ -666,7 +694,10 @@ export function buildStoryArcPrompt(
         c.beschreibung && `   Beschreibung:\n${einrücken(c.beschreibung)}`,
         c.storyHooks && `   Offene Ansatzpunkte:\n${einrücken(c.storyHooks)}`,
       ].filter(Boolean);
-      return [`${i + 1}. ${c.name}`, ...zeilen].join("\n");
+      // Markierung nur bei gewählten Protagonisten – sonst leer, Zeile
+      // unverändert (byte-identisch wie bisher).
+      const marke = c.isProtagonist ? " (Protagonist)" : "";
+      return [`${i + 1}. ${c.name}${marke}`, ...zeilen].join("\n");
     })
     .join("\n\n");
 
@@ -676,6 +707,21 @@ export function buildStoryArcPrompt(
     .map((c) => c.name.trim())
     .filter(Boolean)
     .join(", ");
+
+  // Dreht sich der Arc um bestimmte Figuren? Nur dann kommt eine Anweisung in
+  // den Prompt; ohne Markierung bleibt er zeichengenau der von vorher.
+  const hatProtagonisten = characters.some((c) => c.isProtagonist);
+  const protagonisten = characters
+    .filter((c) => c.isProtagonist)
+    .map((c) => c.name.trim())
+    .filter(Boolean);
+  const protagonistZeile = hatProtagonisten
+    ? `\n- **Der Arc dreht sich um ${
+        protagonisten.length === 1 ? "den Protagonisten" : "die Protagonisten"
+      }** (oben mit „(Protagonist)" markiert): ${protagonisten.join(
+        ", ",
+      )}. Die tragenden Stationen gehören ihnen und ihrem Weg; die übrigen Figuren treten stützend, herausfordernd oder als Gegenspieler hinzu, ohne den Arc selbst zu tragen.`
+    : "";
 
   // Format-Tonlage: dieselbe Zerlegung, aber die Stationen sind mal
   // Erzählabschnitte, mal spielbare Szenen.
@@ -746,7 +792,7 @@ Der Arc hat **genau ${anzahl} Stationen** mit diesen Phasen, in dieser Reihenfol
 ${folgeListe}
 
 Anforderungen:
-${kernAnforderung}
+${kernAnforderung}${protagonistZeile}
 - Jede Station **verändert die Lage** gegenüber der vorigen. Keine zwei Stationen, die dasselbe noch einmal sagen.
 - Jede Station nennt in ihren Figuren die Namen, die sie tragen – **ausschließlich** aus dieser Besetzung: ${namen}. Erfinde keine neuen Namen.
 ${formatZeile}

@@ -516,6 +516,25 @@ export async function updateCharacterScenario(
 }
 
 /**
+ * Eine Figur als Protagonist ihres Szenarios markieren (oder die Markierung
+ * aufheben). Wie die Zuordnung sofort persistiert; steuert den
+ * Handlungsentwurf.
+ */
+export async function updateCharacterProtagonist(
+  id: string,
+  isProtagonist: boolean,
+): Promise<StoredCharacter> {
+  const res = await fetch(`/api/characters/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isProtagonist }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Markierung fehlgeschlagen.");
+  return data.character as StoredCharacter;
+}
+
+/**
  * Einen Charakter **klonen** und die Kopie einem Szenario zuordnen (oder
  * keinem). Legt eine eigenständige neue Figur mit eigenen Bildern an; das
  * Original bleibt unangetastet. Gedacht für „Charakter hinzufügen" aus einem
