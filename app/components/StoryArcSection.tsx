@@ -255,72 +255,83 @@ export function StoryArcSection({
           </p>
         </div>
 
-        {/* Parameter + Ableiten-Knopf. Wirken nur auf die Arc-Erzeugung. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={params.laenge}
-            onChange={(e) =>
-              onParamsChange({ ...params, laenge: e.target.value as ArcLength })
-            }
-            disabled={disabled || busy}
-            aria-label="Länge des Story Arcs"
-            title="Wie viele Stationen erzeugt werden"
-            className={`${CHIP_BTN} bg-white dark:bg-white/5`}
-          >
-            {ARC_LENGTHS.map((l) => (
-              <option key={l.value} value={l.value}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={params.format}
-            onChange={(e) =>
-              onParamsChange({ ...params, format: e.target.value as ArcFormat })
-            }
-            disabled={disabled || busy}
-            aria-label="Format des Story Arcs"
-            title="Erzählabschnitte (Buch) oder spielbare Szenen (Spiel)"
-            className={`${CHIP_BTN} bg-white dark:bg-white/5`}
-          >
-            {ARC_FORMATS.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={params.form}
-            onChange={(e) =>
-              onParamsChange({ ...params, form: e.target.value as StoryForm })
-            }
-            disabled={disabled || busy}
-            aria-label="Erzählform der Geschichte"
-            title="Die Art der Geschichte (Krimi, Liebe, Abenteuer …) – gilt für Arc und Kapitel und prägt deren Aufbau, unabhängig vom Genre der Welt. „Allround“ = gemischt wie bisher."
-            className={`${CHIP_BTN} bg-white dark:bg-white/5`}
-          >
-            {STORY_FORMS.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.value === "allround" ? f.label : `Form: ${f.label}`}
-              </option>
-            ))}
-          </select>
-          <select
-            value={params.ton}
-            onChange={(e) =>
-              onParamsChange({ ...params, ton: e.target.value as StoryTone })
-            }
-            disabled={disabled || busy}
-            aria-label="Ton der Sprache"
-            title="Ton und Sprache – gilt für Arc und Kapitel und nimmt den Ton der späteren Geschichte vorweg"
-            className={`${CHIP_BTN} bg-white dark:bg-white/5`}
-          >
-            {STORY_TONES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.value === "neutral" ? t.label : `Ton: ${t.label}`}
-              </option>
-            ))}
-          </select>
+        {/* Parameter + Ableiten-Knopf. Wirken nur auf die Arc-Erzeugung. Jeder
+            Selektor trägt eine sichtbare Beschriftung; das `<label>` umschließt
+            das Feld, daher braucht es kein `aria-label` (die Beschriftung ist
+            der Name). Die Feinheiten stehen weiter im `title`. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+            Länge:
+            <select
+              value={params.laenge}
+              onChange={(e) =>
+                onParamsChange({ ...params, laenge: e.target.value as ArcLength })
+              }
+              disabled={disabled || busy}
+              title="Wie viele Stationen erzeugt werden"
+              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+            >
+              {ARC_LENGTHS.map((l) => (
+                <option key={l.value} value={l.value}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+            Format:
+            <select
+              value={params.format}
+              onChange={(e) =>
+                onParamsChange({ ...params, format: e.target.value as ArcFormat })
+              }
+              disabled={disabled || busy}
+              title="Erzählabschnitte (Buch) oder spielbare Szenen (Spiel)"
+              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+            >
+              {ARC_FORMATS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+            Erzählform:
+            <select
+              value={params.form}
+              onChange={(e) =>
+                onParamsChange({ ...params, form: e.target.value as StoryForm })
+              }
+              disabled={disabled || busy}
+              title="Die Art der Geschichte (Krimi, Liebe, Abenteuer …) – gilt für Arc und Kapitel und prägt deren Aufbau, unabhängig vom Genre der Welt. „Allround“ = gemischt wie bisher."
+              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+            >
+              {STORY_FORMS.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+            Ton:
+            <select
+              value={params.ton}
+              onChange={(e) =>
+                onParamsChange({ ...params, ton: e.target.value as StoryTone })
+              }
+              disabled={disabled || busy}
+              title="Ton und Sprache – gilt für Arc und Kapitel und nimmt den Ton der späteren Geschichte vorweg"
+              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+            >
+              {STORY_TONES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             onClick={onAbleiten}
