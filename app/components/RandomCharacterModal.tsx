@@ -143,7 +143,7 @@ export function RandomCharacterModal({
             disabled={busy}
             className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
           >
-            {busy ? "Erzeuge …" : "🎲 Formular ausfüllen"}
+            {busy ? "Erzeuge …" : "✨ Formular ausfüllen"}
           </button>
         </div>
       </div>
