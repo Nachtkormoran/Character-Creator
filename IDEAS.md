@@ -18,6 +18,41 @@ umschaltbarer Text-Anbieter).
   stehen bereits zur Auswahl. **Achtung:** `gpt-image-2` unterstützt keine
   Referenzbilder (`images.edit`).
 
+## Name der App
+
+Die App heißt noch „Charakter Creator", macht aber längst mehr als Charaktere:
+Sie hat drei Säulen – **Figuren**, **Welten** (Szenarien) und die
+**Geschichten** dazwischen (Handlungsentwurf, Story Arc, Kapitel-Prosa). Ein
+neuer Name sollte über allen dreien sitzen und am besten das Verbindende
+betonen: das Erzählen.
+
+**Favoriten:**
+
+- ⭐ **Erzählwerk** – deckt Figur, Welt und Geschichte ab, klingt nach
+  Werkzeug/Werkstatt („-werk"), schlank und modern.
+- **Geschichtenschmiede** – warm und bildhaft: Aus Figuren und Welten wird eine
+  Geschichte *geschmiedet*. Sofort verständlich.
+- **Fabula** – lateinisch für „Geschichte"; kurz, brandbar, international, wenn
+  es eher nach Produktname als nach Werkstatt klingen soll.
+
+**Weitere Ideen:**
+
+- *Bildhaft/deutsch:* Weltenweber (betont die Welt etwas mehr), Erzählatelier,
+  Weltenschmiede, Fabelwerk
+- *Nüchtern/beschreibend:* Figuren & Welten, Charaktere & Szenarien,
+  Erzähl-Studio
+- *Kurz/markig:* Narrativ, Ensemble (die „Besetzung" – lässt die Welt außen
+  vor), Dramaturg (die App nennt sich in ihren Prompts schon so; trifft das
+  *Strukturieren* gut, klingt aber weniger nach „erschaffen")
+
+**Empfehlung:** **Erzählwerk**, wenn deutsch und nach Werkstatt; **Fabula** für
+einen kurzen Produktnamen.
+
+**Umfang der Umbenennung:** Der sichtbare Titel (Header, `<title>` in
+`app/layout.tsx`, Seiten-Metadaten) ist schnell geändert. Ordner- und
+Paketname (`charakter-creator`, Repo „Character-Creator") umzubenennen ist ein
+größerer Eingriff (Git-Remote, evtl. Pfade) und sollte getrennt geschehen.
+
 ## Top-3-Empfehlungen
 
 Wenn nur drei umgesetzt würden, mit dem größten Nutzen. Der bisherige Platz 1
