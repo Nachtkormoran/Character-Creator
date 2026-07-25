@@ -921,6 +921,25 @@ export function buildChapterTextPrompt(
     ? "- **Schreibe ausschließlich das markierte Kapitel aus – nicht die ganze Station.** Die anderen Kapitel oben sind nicht dein Gegenstand; ihr Inhalt gehört in ihre eigenen Texte. Beginne dort, wo dieses Kapitel öffnet, und höre auf, wo das nächste beginnt."
     : "- **Schreibe nur dieses eine Kapitel aus** – bleib bei seinem Inhalt, geh nicht darüber hinaus.";
 
+  // Folgekapitel (Index > 0) schließen an ein vorheriges an und werden mit ihm
+  // hintereinander gelesen. Ohne Hinweis eröffnet das Modell jedes Kapitel mit
+  // einer frischen Stimmungs-Einstimmung – beim ersten richtig, beim zweiten
+  // eine Dopplung, weil Ort und Stimmung schon dastehen. Deshalb: direkt in die
+  // laufende Handlung, Atmosphäre nur beiläufig statt als Auftakt.
+  const anschluss = kapitelIndex > 0;
+  const vorheriges =
+    kapitelListe[kapitelIndex - 1]?.titel.trim() || `Kapitel ${kapitelIndex}`;
+  const anschlussAnforderung = anschluss
+    ? `- **Dieses Kapitel setzt „${vorheriges}" unmittelbar fort** – die Kapitel werden hintereinander gelesen. Ort, Zeit und Grundstimmung sind bereits eingeführt: **beginne nicht mit einer erneuten Einstimmung**, sondern steig direkt in die laufende Handlung ein, dort wo das vorige Kapitel aufhört. Schauplatz und Stimmung neu schildern nur dann, wenn die Szene an einen anderen Ort oder in eine andere Zeit springt.`
+    : "";
+
+  // Die Atmosphäre-Anforderung selbst wird im Folgekapitel entschärft: kein
+  // frisches Einfangen der ganzen Szene, sondern eingewobene Details dort, wo
+  // sich etwas ändert. Im ersten Kapitel bleibt sie wie zuvor.
+  const atmosphaereBullet = anschluss
+    ? "- **Atmosphäre beiläufig, nicht als Auftakt**: Der Schauplatz steht schon aus dem vorigen Kapitel. Schildere ihn nicht von vorn – streu sinnliche Details (Licht, Geräusch, Geruch, Temperatur) dort ein, wo sich etwas ändert oder die Handlung sie berührt."
+    : "- **Fange die Atmosphäre des Ortes ein**: Licht, Geräusche, Gerüche, Temperatur, Stimmung – passend zu Ort und Zeit oben.";
+
   return `Schreibe den ausformulierten Prosatext für **ein einzelnes Kapitel** einer Geschichte – eine ausgeschriebene Szene, nicht eine Zusammenfassung.
 ${tonKopf}
 Die Welt:
@@ -932,10 +951,10 @@ Was darin geschieht (dein Gerüst – erfülle genau dies, nicht mehr):
 ${ziel.inhalt.trim() || "(keine Angabe – halte dich an die Station und die Welt, aber bleib bei diesem einen Kapitel)"}
 ${figurenTeil}
 Anforderungen:
-${grenzAnforderung}
+${grenzAnforderung}${anschlussAnforderung ? "\n" + anschlussAnforderung : ""}
 - ${laenge}
 - **Beschreibe die Personen genau** – ihr Aussehen und Auftreten – und schildere ihre **Tätigkeiten** Schritt für Schritt, konkret und sichtbar.
-- **Fange die Atmosphäre des Ortes ein**: Licht, Geräusche, Gerüche, Temperatur, Stimmung – passend zu Ort und Zeit oben.
+${atmosphaereBullet}
 - **Baue Dialog in wörtlicher Rede ein** (mit Anführungszeichen), der die Figuren charakterisiert und die Handlung trägt. Nicht nur berichten, was gesagt wird – lass sie sprechen.
 - Gehorche den Regeln der Welt. Erfinde nichts, was ihnen widerspricht; führe keine neuen tragenden Personen ein.
 ${stilZeile}
