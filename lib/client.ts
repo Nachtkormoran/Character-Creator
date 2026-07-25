@@ -473,6 +473,27 @@ export async function updateCharacterScenario(
 }
 
 /**
+ * Einen Charakter **klonen** und die Kopie einem Szenario zuordnen (oder
+ * keinem). Legt eine eigenständige neue Figur mit eigenen Bildern an; das
+ * Original bleibt unangetastet. Gedacht für „Charakter hinzufügen" aus einem
+ * Szenario, wenn die gewählte Figur schon zu einem anderen gehört – ein bloßes
+ * Umhängen wäre dort ein Wegnehmen.
+ */
+export async function cloneCharacter(
+  id: string,
+  scenarioId: string | null,
+): Promise<StoredCharacter> {
+  const res = await fetch(`/api/characters/${id}/clone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Kopie fehlgeschlagen.");
+  return data.character as StoredCharacter;
+}
+
+/**
  * `storyHooks` und `genre` sind optional, weil beide außerhalb des
  * Charakter-Objekts stehen: Sie gehören zum Charakter, sind aber **kein** Teil
  * dessen, was das Modell bei der Erstgenerierung liefert

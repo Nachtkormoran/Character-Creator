@@ -51,6 +51,7 @@ import {
   type StoredCharacter,
   type StoredScenario,
 } from "@/lib/serialize";
+import { AddCharacterToScenarioModal } from "../../components/AddCharacterToScenarioModal";
 import { CharacterDetailModal } from "../../components/CharacterDetailModal";
 import { PlotPersonModal } from "../../components/PlotPersonModal";
 import { ScenarioFields } from "../../components/ScenarioFields";
@@ -240,6 +241,9 @@ export default function ScenarioDetailPage({
    */
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [bildModalOffen, setBildModalOffen] = useState(false);
+
+  /** Ob das „Charakter hinzufügen"-Modal (bestehende Figur zuordnen) offen ist. */
+  const [addOffen, setAddOffen] = useState(false);
 
   /**
    * Hier ist alles erzeugbar: Ort, Zeit und Regeln lassen sich ergänzen, die
@@ -560,6 +564,17 @@ export default function ScenarioDetailPage({
       setCharacters((cs) => cs.filter((c) => c.id !== cid));
       setSelectedChar(null);
     }
+  }
+
+  /**
+   * Ein über „Charakter hinzufügen" zugeordneter oder kopierter Charakter –
+   * in die Kachelliste einreihen. Dedupe nach Id, falls er (z. B. nach einem
+   * Reload im Modal) schon dabei wäre.
+   */
+  function charHinzugefuegt(neu: StoredCharacter) {
+    setCharacters((cs) =>
+      cs.some((c) => c.id === neu.id) ? cs : [...cs, neu],
+    );
   }
 
   // Der aktuelle Stand als Vergleichswert für den „Ungespeichert"-Balken. Die
@@ -1361,18 +1376,34 @@ export default function ScenarioDetailPage({
           <h2 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
             Charaktere ({characters.length})
           </h2>
-          {/*
-            Führt aufs Erstellen-Formular, mit dem Szenario im Parameter: es
-            belegt Genre, Setting und Weltkontext vor und ist als Zuordnung
-            ausgewählt. Bewusst ein Link und kein Knopf – es ist eine
-            Navigation, und man soll ihn in einem neuen Tab öffnen können.
-          */}
-          <Link
-            href={`/?scenario=${id}`}
-            className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition hover:opacity-90"
-          >
-            + Charakter für dieses Szenario
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {/*
+              Bestehenden Charakter zuordnen: zeigt nur Figuren, die noch nicht
+              hier sind. Gehört eine schon zu einem anderen Szenario, wird auf
+              Wunsch eine Kopie angelegt. Ein Knopf und kein Link – es öffnet ein
+              Modal, keine Navigation.
+            */}
+            <button
+              type="button"
+              onClick={() => setAddOffen(true)}
+              title="Einen bereits vorhandenen Charakter diesem Szenario zuordnen"
+              className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              + Vorhandenen hinzufügen
+            </button>
+            {/*
+              Führt aufs Erstellen-Formular, mit dem Szenario im Parameter: es
+              belegt Genre, Setting und Weltkontext vor und ist als Zuordnung
+              ausgewählt. Bewusst ein Link und kein Knopf – es ist eine
+              Navigation, und man soll ihn in einem neuen Tab öffnen können.
+            */}
+            <Link
+              href={`/?scenario=${id}`}
+              className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition hover:opacity-90"
+            >
+              + Neuen erstellen
+            </Link>
+          </div>
         </div>
         {dirty && (
           <p className="mb-3 text-xs text-amber-700 dark:text-amber-400">
@@ -1382,12 +1413,8 @@ export default function ScenarioDetailPage({
         )}
         {characters.length === 0 ? (
           <div className="rounded-xl border border-dashed border-black/15 p-8 text-center text-sm text-foreground/60 dark:border-white/15">
-            Diesem Szenario ist noch niemand zugeordnet. Die Zuordnung passiert
-            in der{" "}
-            <Link href="/gallery" className="underline">
-              Charakter-Übersicht
-            </Link>
-            .
+            Diesem Szenario ist noch niemand zugeordnet. Füge über die Knöpfe
+            oben einen vorhandenen Charakter hinzu oder erstelle einen neuen.
           </div>
         ) : (
           // Rund halb so große Kacheln wie in der Galerie: doppelt so viele
@@ -1489,6 +1516,15 @@ export default function ScenarioDetailPage({
           dirty={dirty}
           onConfirm={() => personAnlegen(gewaehlt)}
           onClose={() => setGewaehlt(null)}
+        />
+      )}
+
+      {addOffen && (
+        <AddCharacterToScenarioModal
+          scenarioId={id}
+          scenarios={allScenarios}
+          onAdded={charHinzugefuegt}
+          onClose={() => setAddOffen(false)}
         />
       )}
 

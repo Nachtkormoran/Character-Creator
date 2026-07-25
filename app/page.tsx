@@ -309,13 +309,30 @@ function Home() {
         <h1 className="text-3xl font-semibold tracking-tight">
           Dein Charakter
         </h1>
-        <button
-          type="button"
-          onClick={handleNew}
-          className="shrink-0 rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
-        >
-          + Neuen Charakter erstellen
-        </button>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {/*
+            Kam der Nutzer über ein Szenario hierher, führt dieser Knopf zurück
+            dorthin – für den Fall, dass man es sich anders überlegt und die
+            Figur doch nicht anlegen will. Der erzeugte, ungespeicherte
+            Charakter wird dabei verworfen; das ist der Sinn des Knopfes, also
+            ohne Rückfrage. Nur sichtbar, wenn es ein Herkunfts-Szenario gibt.
+          */}
+          {scenarioParam && (
+            <Link
+              href={`/scenarios/${scenarioParam}`}
+              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              ← Zum Szenario
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={handleNew}
+            className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+          >
+            + Neuen Charakter erstellen
+          </button>
+        </div>
       </div>
 
       {textError && (
