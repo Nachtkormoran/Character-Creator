@@ -8,12 +8,14 @@ import {
   KAPITEL_COUNTS,
   MAX_ARC_STUFEN,
   MAX_KAPITEL_PRO_STUFE,
+  STORY_FORMS,
   STORY_TONES,
   type ArcFormat,
   type ArcLength,
   type ArcPhase,
   type KapitelCount,
   type StoryArc,
+  type StoryForm,
   type StoryTone,
 } from "@/lib/schema";
 import { AutoTextarea } from "./AutoTextarea";
@@ -103,6 +105,7 @@ export function StoryArcSection({
     weiterspinnen: boolean;
     kapitelAnzahl: KapitelCount;
     ton: StoryTone;
+    form: StoryForm;
   };
   onParamsChange: (p: {
     laenge: ArcLength;
@@ -112,6 +115,7 @@ export function StoryArcSection({
     weiterspinnen: boolean;
     kapitelAnzahl: KapitelCount;
     ton: StoryTone;
+    form: StoryForm;
   }) => void;
   /** Kapitel für die Station am Index ableiten. */
   onKapitelAbleiten: (stufeIndex: number) => void;
@@ -282,6 +286,22 @@ export function StoryArcSection({
             {ARC_FORMATS.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={params.form}
+            onChange={(e) =>
+              onParamsChange({ ...params, form: e.target.value as StoryForm })
+            }
+            disabled={disabled || busy}
+            aria-label="Erzählform der Geschichte"
+            title="Die Art der Geschichte (Krimi, Liebe, Abenteuer …) – gilt für Arc und Kapitel und prägt deren Aufbau, unabhängig vom Genre der Welt. „Allround“ = gemischt wie bisher."
+            className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+          >
+            {STORY_FORMS.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.value === "allround" ? f.label : `Form: ${f.label}`}
               </option>
             ))}
           </select>

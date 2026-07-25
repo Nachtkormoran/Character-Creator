@@ -758,6 +758,56 @@ export function toneHint(value: string): string {
 }
 
 /**
+ * **Erzählform** – die *Art* der Geschichte (Kriminalgeschichte,
+ * Liebesgeschichte …). Eine **dritte Achse** neben Genre (der Welt) und Ton (dem
+ * Wie): Anders als das Genre ist sie **nicht exklusiv zur Welt** – ein Krimi
+ * spielt in jeder Welt, eine Liebesgeschichte auch. Sie steuert **Konflikt,
+ * Aufbau und Schwerpunkt** der Handlung, nicht die Welt und nicht die Wortwahl.
+ * Geteilt von Handlungsentwurf, Story Arc und Kapiteln; ein Lauf-Parameter
+ * (nicht gespeichert), genau nach dem Muster von `STORY_TONES`.
+ *
+ * `allround` trägt bewusst **keinen** `hint`: dann kommt kein Erzählform-Block in
+ * den Prompt und der Entwurf entsteht wie bisher (gemischt/offen). Der `hint`
+ * beschreibt nie die Welt, damit dieselbe Form in jedem Genre funktioniert.
+ */
+export const STORY_FORMS = [
+  { value: "allround", label: "Allround", hint: "" },
+  {
+    value: "liebe",
+    label: "Liebesgeschichte",
+    hint: "Erzähle eine Liebesgeschichte: Ins Zentrum gehört eine sich entwickelnde Beziehung zwischen zwei (oder mehr) Figuren – Anziehung und Nähe, das, was sie trennt oder auf die Probe stellt, ein Bruch oder eine Prüfung und am Ende eine Entscheidung über die Bindung. Die zentrale Frage ist eine des Herzens: Finden sie zueinander, halten sie zusammen? Konflikte entspringen Gefühlen, Missverständnissen und widerstreitenden Loyalitäten.",
+  },
+  {
+    value: "abenteuer",
+    label: "Abenteuergeschichte",
+    hint: "Erzähle ein Abenteuer: Ins Zentrum gehört ein Aufbruch mit einem greifbaren Ziel – eine Reise, ein Wagnis, eine Suche –, das gegen Hindernisse, fremde Orte und Gefahren errungen wird. Mut, Findigkeit und Zusammenhalt treiben die Handlung; die Spannung kommt aus äußeren Prüfungen und dem Vorwärtsdrang, nicht aus Grübeln. Jede Station bringt ein neues Hindernis oder eine neue Etappe.",
+  },
+  {
+    value: "krimi",
+    label: "Kriminalgeschichte",
+    hint: "Erzähle eine Kriminalgeschichte: Ins Zentrum gehören eine Tat (ein Verbrechen, ein Vergehen) und die Suche nach der Wahrheit – Spuren, Verdächtige, falsche Fährten und am Ende eine Aufklärung, wer es war und warum. Die Spannung entsteht aus der Kluft zwischen Schein und Wahrheit; die Handlung schreitet als Ermittlung voran, in der nach und nach etwas ans Licht kommt.",
+  },
+  {
+    value: "drama",
+    label: "Drama",
+    hint: "Erzähle ein Drama: Ins Zentrum gehören ein innerer und zwischenmenschlicher Konflikt – Beziehungen, moralische Zwickmühlen, Schuld, Verlust. Der Einsatz ist emotional und ethisch, nicht äußerlich; die Wendepunkte sind Entscheidungen und ihre Folgen. Es braucht kein großes Spektakel – die Geschichte lebt von den Figuren, ihren Widersprüchen und dem, was zwischen ihnen zerbricht oder heilt.",
+  },
+  {
+    value: "thriller",
+    label: "Thriller",
+    hint: "Erzähle einen Thriller: Ins Zentrum gehören eine akute Bedrohung und wachsender Druck – Gefahr, eine tickende Uhr, Verfolgung, hoher Einsatz. Die Figuren müssen handeln, um ein Unheil abzuwenden; die Spannung kommt aus Unmittelbarkeit und der Ungewissheit über Gelingen oder Überleben. Jede Station verschärft die Lage und zieht die Schlinge enger.",
+  },
+] as const;
+
+export type StoryForm = (typeof STORY_FORMS)[number]["value"];
+export const DEFAULT_STORY_FORM: StoryForm = "allround";
+
+/** Die Erzählform-Anweisung zu einer Wahl (leer bei `allround` oder unbekannt). */
+export function formHint(value: string): string {
+  return STORY_FORMS.find((f) => f.value === value)?.hint ?? "";
+}
+
+/**
  * **Länge des Arcs** – steuert, in wie viele Stationen der Handlungsentwurf
  * zerlegt wird. Die Zahl bestimmt die Dramaturgie: 3 = Kurzbogen (Anfang,
  * Wende, Ende), 5 = klassischer Fünfakter, 8 = Roman/Kampagne. Beschreibt einen

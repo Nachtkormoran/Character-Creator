@@ -698,6 +698,8 @@ export function generateScenarioPlot(
   neuePersonen = 0,
   /** Optionale Namens-/Rollen-Vorgaben zu den neuen Personen (Freitext). */
   neuePersonenWunsch = "",
+  /** Erzählform (`STORY_FORMS`-Wert). Leer/`allround` = gemischt wie bisher. */
+  form = "",
 ) {
   return postJson<{ handlung: string; characters: number }>(
     "/api/scenario-plot",
@@ -711,6 +713,7 @@ export function generateScenarioPlot(
       ton,
       neuePersonen,
       neuePersonenWunsch,
+      form,
     },
   );
 }
@@ -732,6 +735,8 @@ export function generateStoryArc(
     kreativ?: boolean;
     weiterspinnen?: boolean;
     ton?: string;
+    /** Erzählform (`STORY_FORMS`-Wert). Leer/`allround` = ohne Erzählform-Block. */
+    form?: string;
   } = {},
 ) {
   return postJson<{ storyArc: StoryArc }>("/api/scenario-arc", {
@@ -752,7 +757,13 @@ export function generateStoryArcChapters(
     beschreibung: string;
     figuren: string[];
   },
-  options: { kreativ?: boolean; anzahl?: KapitelCount; ton?: string } = {},
+  options: {
+    kreativ?: boolean;
+    anzahl?: KapitelCount;
+    ton?: string;
+    /** Erzählform (`STORY_FORMS`-Wert). Leer/`allround` = ohne Erzählform-Block. */
+    form?: string;
+  } = {},
 ) {
   return postJson<{ kapitel: Kapitel[] }>("/api/story-arc-chapters", {
     stufe,
@@ -776,7 +787,12 @@ export function generateChapterText(
   kapitelListe: { titel: string; inhalt: string }[],
   /** Index des auszuschreibenden Kapitels in `kapitelListe`. */
   kapitelIndex: number,
-  options: { ton?: string; kreativ?: boolean } = {},
+  options: {
+    ton?: string;
+    kreativ?: boolean;
+    /** Erzählform (`STORY_FORMS`-Wert). Leer/`allround` = ohne Erzählform-Block. */
+    form?: string;
+  } = {},
 ) {
   return postJson<{ text: string }>("/api/story-chapter-text", {
     scenarioId,

@@ -52,6 +52,8 @@ const bodySchema = z.object({
   kapitelIndex: z.number().int().min(0),
   // Ton und Sprache – ohne Allowlist als String (unbekannt = kein Ton-Block).
   ton: z.string().trim().max(40).optional().default(""),
+  // Erzählform (Krimi, Liebe, …) – als String ohne Allowlist.
+  form: z.string().trim().max(40).optional().default(""),
   // Kreativ: längerer, stärker ausgemalter Text; höhere Temperatur.
   kreativ: z.boolean().optional().default(false),
 });
@@ -76,8 +78,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const { scenarioId, details, stufe, kapitelListe, kapitelIndex, ton, kreativ } =
-      parsed.data;
+    const {
+      scenarioId,
+      details,
+      stufe,
+      kapitelListe,
+      kapitelIndex,
+      ton,
+      form,
+      kreativ,
+    } = parsed.data;
 
     // Der Index muss in die Liste zeigen.
     if (kapitelIndex >= kapitelListe.length) {
@@ -150,7 +160,7 @@ export async function POST(request: Request) {
             kapitelListe,
             kapitelIndex,
             figuren,
-            { ton, kreativ },
+            { ton, kreativ, form },
           ),
         },
       ],

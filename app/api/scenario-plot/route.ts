@@ -52,6 +52,9 @@ const bodySchema = z.object({
     .default(0),
   // Optionale Namens-/Rollen-Vorgaben zu den neuen Personen (Freitext).
   neuePersonenWunsch: z.string().trim().max(500).optional().default(""),
+  // Erzählform (Krimi, Liebe, …) – als String ohne Allowlist (unbekannt =
+  // kein Erzählform-Block, `formHint` gibt "").
+  form: z.string().trim().max(40).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -75,6 +78,7 @@ export async function POST(request: Request) {
       ton,
       neuePersonen,
       neuePersonenWunsch,
+      form,
     } = parsed.data;
 
     const rows = await prisma.character.findMany({
@@ -139,6 +143,7 @@ export async function POST(request: Request) {
             weiterspinnen,
             neuePersonen,
             neuePersonenWunsch,
+            form,
           ),
         },
       ],

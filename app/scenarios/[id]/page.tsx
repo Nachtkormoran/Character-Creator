@@ -27,16 +27,19 @@ import {
   DEFAULT_ARC_FORMAT,
   DEFAULT_ARC_LENGTH,
   DEFAULT_KAPITEL_COUNT,
+  DEFAULT_STORY_FORM,
   DEFAULT_STORY_TONE,
   MAX_NEUE_PLOT_PERSONEN,
   MAX_PLOT_VARIANTS,
   MAX_STORY_ARCS,
   SCENARIO_LABELS,
+  STORY_FORMS,
   STORY_TONES,
   normalizeScenarioDetails,
   type ArcFormat,
   type ArcLength,
   type KapitelCount,
+  type StoryForm,
   type StoryTone,
   type GeneratedCharacter,
   type PlotPerson,
@@ -113,6 +116,8 @@ export default function ScenarioDetailPage({
     kapitelAnzahl: KapitelCount;
     /** Ton und Sprache – für Arc **und** Kapitel. */
     ton: StoryTone;
+    /** Erzählform (Krimi, Liebe, …) – für Arc **und** Kapitel. */
+    form: StoryForm;
   }>({
     laenge: DEFAULT_ARC_LENGTH,
     format: DEFAULT_ARC_FORMAT,
@@ -121,6 +126,7 @@ export default function ScenarioDetailPage({
     weiterspinnen: false,
     kapitelAnzahl: DEFAULT_KAPITEL_COUNT,
     ton: DEFAULT_STORY_TONE,
+    form: DEFAULT_STORY_FORM,
   });
   /** Welche Station gerade Kapitel erzeugt, und ein etwaiger Fehler dazu. */
   const [kapitelBusy, setKapitelBusy] = useState<number | null>(null);
@@ -217,6 +223,14 @@ export default function ScenarioDetailPage({
    * man Entwurf und Arc unabhängig einstellen kann). Nicht gespeichert.
    */
   const [handlungTon, setHandlungTon] = useState<StoryTone>(DEFAULT_STORY_TONE);
+
+  /**
+   * **Erzählform** des Handlungsentwurfs (Krimi, Liebe, Abenteuer …) – die dritte
+   * Achse neben Genre (Welt) und Ton (wie): sie prägt Konflikt und Aufbau. Eigen
+   * neben dem Story-Arc-Wert, damit Entwurf und Arc unabhängig einstellbar sind.
+   * Nicht gespeichert (beschreibt einen Lauf).
+   */
+  const [handlungForm, setHandlungForm] = useState<StoryForm>(DEFAULT_STORY_FORM);
 
   /**
    * Wie viele **neue benannte Personen** der nächste Entwurf zusätzlich einführt
@@ -462,6 +476,7 @@ export default function ScenarioDetailPage({
           handlungTon,
           handlungNeuePersonen,
           handlungNeuePersonenWunsch,
+          handlungForm,
         );
         const items = [...aktuelleVarianten(), handlung];
         setVarianten(items);
@@ -683,6 +698,7 @@ export default function ScenarioDetailPage({
         kreativ: arcParams.kreativ,
         weiterspinnen: arcParams.weiterspinnen,
         ton: arcParams.ton,
+        form: arcParams.form,
       });
       const items = [...aktuelleArcs(), neu];
       setArcVarianten(items);
@@ -718,6 +734,7 @@ export default function ScenarioDetailPage({
           kreativ: arcParams.kreativ,
           anzahl: arcParams.kapitelAnzahl,
           ton: arcParams.ton,
+          form: arcParams.form,
         },
       );
       // Die Route liefert nur Titel und Inhalt; der Prosatext (`text`) entsteht
@@ -767,7 +784,7 @@ export default function ScenarioDetailPage({
         // Route nur dieses eine Kapitel aus, nicht die ganze Station.
         stufe.kapitel.map((c) => ({ titel: c.titel, inhalt: c.inhalt })),
         kapitelIndex,
-        { ton: arcParams.ton, kreativ: arcParams.kreativ },
+        { ton: arcParams.ton, kreativ: arcParams.kreativ, form: arcParams.form },
       );
       setStoryArc((arc) => ({
         stufen: arc.stufen.map((s, si) =>
@@ -1156,25 +1173,45 @@ export default function ScenarioDetailPage({
         )}
         <div className="mb-3 flex flex-col gap-2">
           {/*
-            Ton und Sprache des Handlungsentwurfs – eigener Ton neben dem des
-            Story Arcs, damit Entwurf und Arc unabhängig einstellbar sind.
+            Erzählform und Ton des Handlungsentwurfs – eigene Werte neben denen
+            des Story Arcs, damit Entwurf und Arc unabhängig einstellbar sind.
+            Erzählform = welche Art Geschichte (Krimi, Liebe …), Ton = wie
+            erzählt. Zwei getrennte Achsen, beide unabhängig vom Genre der Welt.
           */}
-          <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70">
-            <span>Ton:</span>
-            <select
-              value={handlungTon}
-              onChange={(e) => setHandlungTon(e.target.value as StoryTone)}
-              disabled={saving || generatingField !== null}
-              title="Ton und Sprache des Handlungsentwurfs – nimmt den Ton der späteren Geschichte vorweg"
-              className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
-            >
-              {STORY_TONES.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70">
+              <span>Erzählform:</span>
+              <select
+                value={handlungForm}
+                onChange={(e) => setHandlungForm(e.target.value as StoryForm)}
+                disabled={saving || generatingField !== null}
+                title="Die Art der Geschichte (Krimi, Liebe, Abenteuer …) – prägt Konflikt und Aufbau des Entwurfs, unabhängig vom Genre der Welt. „Allround“ = gemischt wie bisher."
+                className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              >
+                {STORY_FORMS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70">
+              <span>Ton:</span>
+              <select
+                value={handlungTon}
+                onChange={(e) => setHandlungTon(e.target.value as StoryTone)}
+                disabled={saving || generatingField !== null}
+                title="Ton und Sprache des Handlungsentwurfs – nimmt den Ton der späteren Geschichte vorweg"
+                className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              >
+                {STORY_TONES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           {/*
             Handlung weiterspinnen – **immer** sichtbar, denn es gilt auch für

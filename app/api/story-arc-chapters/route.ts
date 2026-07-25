@@ -47,6 +47,8 @@ const bodySchema = z.object({
     .default(DEFAULT_KAPITEL_COUNT),
   // Ton und Sprache – als String ohne Allowlist (unbekannt = kein Ton-Block).
   ton: z.string().trim().max(40).optional().default(""),
+  // Erzählform (Krimi, Liebe, …) – als String ohne Allowlist.
+  form: z.string().trim().max(40).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -60,7 +62,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { stufe, kreativ, anzahl, ton } = parsed.data;
+    const { stufe, kreativ, anzahl, ton, form } = parsed.data;
     const { min, max } = kapitelSpanne(anzahl);
 
     const { client: openai, model, extraParams } = await getTextClient();
@@ -70,6 +72,7 @@ export async function POST(request: Request) {
       min,
       max,
       ton,
+      form,
     });
 
     const versuch = () =>

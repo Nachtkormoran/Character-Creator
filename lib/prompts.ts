@@ -2,6 +2,7 @@ import {
   DEFAULT_STORY_HOOK_ANCHOR,
   MAX_NEUE_PLOT_PERSONEN,
   TRAIT_LABELS,
+  formHint,
   toneHint,
 } from "./schema";
 import { DEFAULT_GENRE, genreLabel } from "./templates";
@@ -31,6 +32,20 @@ function tonHinweis(ton?: string): string {
   const hint = toneHint(ton ?? "");
   return hint
     ? `\nTon und Sprache (er nimmt den Ton der späteren Geschichte vorweg): ${hint}\n`
+    : "";
+}
+
+/**
+ * Erzählform-Block für die Erzeugungs-Prompts (Handlungsentwurf, Story Arc,
+ * Kapitel). Leer bei `allround`/unbekannt – dann bleibt der Prompt wie zuvor.
+ * Anders als der Ton (der die Sprache prägt) steuert die Erzählform **Konflikt,
+ * Aufbau und Schwerpunkt** – deshalb ein eigener, deutlich benannter Block und
+ * nicht in die Ton-Zeile gemischt.
+ */
+function formHinweis(form?: string): string {
+  const hint = formHint(form ?? "");
+  return hint
+    ? `\nErzählform – die Art dieser Geschichte (sie prägt Konflikt, Aufbau und Schwerpunkt, nicht die Welt): ${hint}\n`
     : "";
 }
 
@@ -409,6 +424,12 @@ export function buildScenarioPlotPrompt(
    * aus Welt und Konflikt. Wirkt nur zusammen mit `neuePersonen ≥ 1`.
    */
   neuePersonenWunsch?: string,
+  /**
+   * **Erzählform** (`STORY_FORMS`-Wert): Krimi, Liebe, Abenteuer … Leer/`allround`
+   * = ohne Erzählform-Block (gemischt wie bisher). Prägt Konflikt und Schwerpunkt
+   * des Entwurfs, nicht die Welt.
+   */
+  form?: string,
 ): string {
   const nutzeBasis = !!basis?.trim();
   const anzahlNeue = Math.max(
@@ -471,6 +492,7 @@ export function buildScenarioPlotPrompt(
     : "";
 
   const tonBlock = tonHinweis(ton);
+  const formBlock = formHinweis(form);
 
   // Auftrag: zwei Achsen, unabhängig voneinander. **Basis** – frisch aus Welt
   // und Figuren oder aus einem vorhandenen Entwurf. **Weiterspinnen** – eine
@@ -540,7 +562,7 @@ ${figurenRegel}
 - Alles muss den Regeln des Szenarios gehorchen. Was dort gilt, gilt auch hier.
 ${ergebnisAnforderung}
 - Reiner Fließtext auf Deutsch, ohne Markdown, ohne Überschriften, ohne Aufzählung.
-${tonBlock}${zusatzBlock}
+${formBlock}${tonBlock}${zusatzBlock}
 Antworte mit nichts als dem Entwurf selbst.`;
 }
 
@@ -599,6 +621,12 @@ export function buildStoryArcPrompt(
   weiterspinnen?: boolean,
   /** **Ton und Sprache** (`STORY_TONES`-Wert). Leer/`neutral` = ohne Ton-Block. */
   ton?: string,
+  /**
+   * **Erzählform** (`STORY_FORMS`-Wert): Krimi, Liebe, Abenteuer … Leer/`allround`
+   * = ohne Erzählform-Block. Prägt den **Aufbau** des Arcs (welche Art von
+   * Zuspitzung und Auflösung die Phasen tragen), nicht die Welt.
+   */
+  form?: string,
 ): string {
   /** Rückt einen mehrzeiligen Block ein, damit die Zuordnung zur Figur hält. */
   const einrücken = (text: string, tiefe = "     ") =>
@@ -710,7 +738,7 @@ ${kernAnforderung}
 ${formatZeile}
 - Titel kurz und prägnant (2–5 Wörter). Beschreibung als Fließtext, ohne Nummerierung, ohne Aufzählungszeichen.
 - Alles auf Deutsch.
-${tonHinweis(ton)}${sparksBlock}${zusatzBlock}`;
+${formHinweis(form)}${tonHinweis(ton)}${sparksBlock}${zusatzBlock}`;
 }
 
 /**
@@ -738,6 +766,8 @@ export function buildStoryArcChaptersPrompt(
     max?: number;
     /** **Ton und Sprache** (`STORY_TONES`-Wert). */
     ton?: string;
+    /** **Erzählform** (`STORY_FORMS`-Wert). Leer/`allround` = ohne Block. */
+    form?: string;
   } = {},
 ): string {
   const kreativ = !!options.kreativ;
@@ -781,7 +811,7 @@ Anforderungen:
 ${ausarbeitung}
 - Jedes Kapitel trägt die Handlung ein Stück weiter; keine zwei, die dasselbe sagen.
 - Alles auf Deutsch, ohne Nummerierung und ohne Aufzählungszeichen im Text.
-${tonHinweis(options.ton)}${sparksBlock}`;
+${formHinweis(options.form)}${tonHinweis(options.ton)}${sparksBlock}`;
 }
 
 /**
@@ -834,7 +864,7 @@ export function buildChapterTextPrompt(
   /** Welches Kapitel aus `kapitelListe` ausgeschrieben wird. */
   kapitelIndex: number,
   figuren: ChapterCharacter[],
-  options: { ton?: string; kreativ?: boolean } = {},
+  options: { ton?: string; kreativ?: boolean; form?: string } = {},
 ): string {
   const ziel = kapitelListe[kapitelIndex] ?? { titel: "", inhalt: "" };
   const mehrere = kapitelListe.length > 1;
@@ -917,6 +947,11 @@ export function buildChapterTextPrompt(
     ? "- Auf Deutsch, lebendig und plastisch."
     : "- Auf Deutsch, lebendig und plastisch, aber ohne Kitsch.";
 
+  // Erzählform prägt auch die einzelne Szene: worauf der Blick fällt (Spuren im
+  // Krimi, Nähe in der Liebesgeschichte, Gefahr im Thriller). Leer bei
+  // `allround`, dann bleibt der Prompt wie zuvor.
+  const formBlock = formHinweis(options.form);
+
   const grenzAnforderung = mehrere
     ? "- **Schreibe ausschließlich das markierte Kapitel aus – nicht die ganze Station.** Die anderen Kapitel oben sind nicht dein Gegenstand; ihr Inhalt gehört in ihre eigenen Texte. Beginne dort, wo dieses Kapitel öffnet, und höre auf, wo das nächste beginnt."
     : "- **Schreibe nur dieses eine Kapitel aus** – bleib bei seinem Inhalt, geh nicht darüber hinaus.";
@@ -941,7 +976,7 @@ export function buildChapterTextPrompt(
     : "- **Fange die Atmosphäre des Ortes ein**: Licht, Geräusche, Gerüche, Temperatur, Stimmung – passend zu Ort und Zeit oben.";
 
   return `Schreibe den ausformulierten Prosatext für **ein einzelnes Kapitel** einer Geschichte – eine ausgeschriebene Szene, nicht eine Zusammenfassung.
-${tonKopf}
+${tonKopf}${formBlock}
 Die Welt:
 ${weltZeilen}${weltText}
 Die Station „${stufe.titel.trim() || "(ohne Titel)"}" – nur zur Einordnung, **nicht** ausschreiben:

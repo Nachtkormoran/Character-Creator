@@ -62,6 +62,9 @@ const bodySchema = z.object({
   weiterspinnen: z.boolean().optional().default(false),
   // Ton und Sprache – als String ohne Allowlist (unbekannt = kein Ton-Block).
   ton: z.string().trim().max(40).optional().default(""),
+  // Erzählform (Krimi, Liebe, …) – als String ohne Allowlist (unbekannt =
+  // kein Erzählform-Block).
+  form: z.string().trim().max(40).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -84,6 +87,7 @@ export async function POST(request: Request) {
       kreativ,
       weiterspinnen,
       ton,
+      form,
     } = parsed.data;
     const anzahl = arcStationen(laenge);
 
@@ -131,6 +135,7 @@ export async function POST(request: Request) {
       sparks,
       weiterspinnen,
       ton,
+      form,
     );
 
     // Die System-Rolle folgt dem Auftrag: gliedern oder weiterentwickeln.
