@@ -106,6 +106,8 @@ export function StoryArcSection({
     kapitelAnzahl: KapitelCount;
     ton: StoryTone;
     form: StoryForm;
+    /** Ob das Figuren-Textfeld des Szenarios in den Arc einfließt (Default aus). */
+    figurenVerwenden: boolean;
   };
   onParamsChange: (p: {
     laenge: ArcLength;
@@ -116,6 +118,7 @@ export function StoryArcSection({
     kapitelAnzahl: KapitelCount;
     ton: StoryTone;
     form: StoryForm;
+    figurenVerwenden: boolean;
   }) => void;
   /** Kapitel für die Station am Index ableiten. */
   onKapitelAbleiten: (stufeIndex: number) => void;
@@ -478,6 +481,27 @@ export function StoryArcSection({
           className="size-4 accent-foreground"
         />
         ✨ Kreativ – Impulse und ausgearbeitete Kapitel
+      </label>
+
+      {/*
+        Figuren-Textfeld berücksichtigen – **Default aus**. Ohne Häkchen wird
+        das Figuren-Feld des Szenarios beim „Ableiten" komplett ignoriert; mit
+        Häkchen treten seine Notizen als zusätzliche Besetzung in den Arc.
+      */}
+      <label
+        className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+        title="Angehakt fließen die Notizen aus dem Figuren-Textfeld des Szenarios als zusätzliche Besetzung in den Arc ein. Ohne Häkchen wird das Feld vollständig ignoriert. Wirkt auf „Ableiten“."
+      >
+        <input
+          type="checkbox"
+          checked={params.figurenVerwenden}
+          onChange={(e) =>
+            onParamsChange({ ...params, figurenVerwenden: e.target.checked })
+          }
+          disabled={disabled || busy}
+          className="size-4 accent-foreground"
+        />
+        👥 Figuren-Textfeld berücksichtigen
       </label>
 
       {/* Zusatzwunsch für die Arc-Erzeugung. */}

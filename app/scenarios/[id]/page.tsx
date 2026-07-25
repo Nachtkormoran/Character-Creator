@@ -8,9 +8,11 @@ import {
   buildScenarioFile,
   deleteCharacter,
   deleteScenario,
+  findFigurePersons,
   findPlotPersons,
   generateScenarioDescription,
   generateScenarioField,
+  generateScenarioFigures,
   generateScenarioPlot,
   generateStoryArc,
   generateChapterText,
@@ -119,6 +121,11 @@ export default function ScenarioDetailPage({
     ton: StoryTone;
     /** Erzählform (Krimi, Liebe, …) – für Arc **und** Kapitel. */
     form: StoryForm;
+    /**
+     * Ob das **Figuren-Textfeld** in den Arc einfließt. Default `false` – ohne
+     * Häkchen wird `details.figuren` beim Ableiten komplett ignoriert.
+     */
+    figurenVerwenden: boolean;
   }>({
     laenge: DEFAULT_ARC_LENGTH,
     format: DEFAULT_ARC_FORMAT,
@@ -128,6 +135,7 @@ export default function ScenarioDetailPage({
     kapitelAnzahl: DEFAULT_KAPITEL_COUNT,
     ton: DEFAULT_STORY_TONE,
     form: DEFAULT_STORY_FORM,
+    figurenVerwenden: false,
   });
   /** Welche Station gerade Kapitel erzeugt, und ein etwaiger Fehler dazu. */
   const [kapitelBusy, setKapitelBusy] = useState<number | null>(null);
@@ -243,6 +251,15 @@ export default function ScenarioDetailPage({
   const [handlungNeuePersonenWunsch, setHandlungNeuePersonenWunsch] =
     useState("");
 
+  /**
+   * Ob das **Figuren-Textfeld** des Szenarios in den nächsten Handlungsentwurf
+   * einfließt. **Default `false`** – ohne Häkchen wird `details.figuren` beim
+   * Erzeugen komplett ignoriert (leer übergeben), der Prompt ist dann
+   * zeichengenau der ohne Figuren-Notizen. Nicht gespeichert (beschreibt einen
+   * Lauf, wie Ton und Weiterspinnen).
+   */
+  const [handlungFiguren, setHandlungFiguren] = useState(false);
+
   // -------------------------------------------------------------------------
   // Weltbild des Szenarios
   // -------------------------------------------------------------------------
@@ -272,6 +289,7 @@ export default function ScenarioDetailPage({
     "zeit",
     "regeln",
     "beschreibung",
+    "figuren",
     "handlung",
   ]);
 
@@ -455,6 +473,16 @@ export default function ScenarioDetailPage({
           zusatz[key] ?? "",
         );
         setDetails((d) => ({ ...d, [key]: wert }));
+      } else if (key === "figuren") {
+        // Wie Ort/Zeit/Regeln **ergänzt**: Vorhandenes bleibt stehen und prägt
+        // die neuen Figuren; die Route gibt das ganze Feld zurück (Vorhandenes
+        // + etwa drei neue). Deshalb keine Rückfrage.
+        const { wert } = await generateScenarioFigures(
+          name.trim(),
+          details,
+          zusatz.figuren ?? "",
+        );
+        setDetails((d) => ({ ...d, figuren: wert }));
       } else if (key === "handlung") {
         // Jeder Lauf hängt einen **neuen** Entwurf an und schaltet auf ihn um –
         // der vorige bleibt als Variante erhalten.
@@ -472,7 +500,9 @@ export default function ScenarioDetailPage({
         const { handlung } = await generateScenarioPlot(
           id,
           name.trim(),
-          details,
+          // Figuren-Notizen nur mitgeben, wenn die Checkbox gesetzt ist –
+          // sonst leer, damit das Feld komplett ignoriert wird.
+          handlungFiguren ? details : { ...details, figuren: "" },
           zusatz.handlung ?? "",
           basis,
           handlungWeiterspinnen,
@@ -683,10 +713,53 @@ export default function ScenarioDetailPage({
    * `sessionStorage` statt über die Adresse ist in `personHandoff.ts`
    * begründet; `?scenario=` bleibt daneben stehen, weil es die Zuordnung und
    * die Weltvorbelegung auslöst – beides gilt hier genauso.
+   *
+   * Von **beiden** Suchen genutzt (Handlungsentwurf und Figuren-Feld) – die
+   * Übergabe ist gleich, nur die Quelle des Vorschlags unterscheidet sich.
    */
   function personAnlegen(person: PlotPerson) {
     stashPlotPerson(person);
     router.push(`/?scenario=${id}`);
+  }
+
+  /**
+   * Personensuche im **Figuren-Feld** – dasselbe Muster wie oben, nur auf
+   * `details.figuren` statt `details.handlung`. Das Ergebnis wird an den Text
+   * gebunden, zu dem es gehört: Ändert sich das Feld, ist es hinfällig. Der
+   * gewählte Vorschlag (`gewaehlt`) und die Übergabe (`personAnlegen`) sind mit
+   * der Plot-Suche geteilt – beide führen denselben `PlotPersonModal`.
+   */
+  const [figurenErgebnis, setFigurenErgebnis] = useState<{
+    figuren: string;
+    personen: PlotPerson[] | null;
+    fehler: string | null;
+  } | null>(null);
+  const [figurenSuchend, setFigurenSuchend] = useState(false);
+
+  const figurenAktuell =
+    figurenErgebnis && figurenErgebnis.figuren === details.figuren
+      ? figurenErgebnis
+      : null;
+  const figurenPersonen = figurenAktuell?.personen ?? null;
+  const figurenSuchFehler = figurenAktuell?.fehler ?? null;
+
+  async function figurenPersonenSuchen() {
+    const figuren = details.figuren;
+    if (figurenSuchend || !figuren.trim()) return;
+    setFigurenSuchend(true);
+    setFigurenErgebnis(null);
+    try {
+      const { personen } = await findFigurePersons(id, figuren);
+      setFigurenErgebnis({ figuren, personen, fehler: null });
+    } catch (e) {
+      setFigurenErgebnis({
+        figuren,
+        personen: null,
+        fehler: e instanceof Error ? e.message : "Fehler.",
+      });
+    } finally {
+      setFigurenSuchend(false);
+    }
   }
 
   /**
@@ -721,7 +794,8 @@ export default function ScenarioDetailPage({
         weiterspinnen: arcParams.weiterspinnen,
         ton: arcParams.ton,
         form: arcParams.form,
-        figuren: details.figuren,
+        // Nur mit Häkchen; sonst leer, damit das Figuren-Feld ignoriert wird.
+        figuren: arcParams.figurenVerwenden ? details.figuren : "",
       });
       const items = [...aktuelleArcs(), neu];
       setArcVarianten(items);
@@ -1111,15 +1185,82 @@ export default function ScenarioDetailPage({
             setZusatz((z) => ({ ...z, [key]: value }))
           }
         />
+
+        {/*
+          Personen aus dem Figuren-Feld – wie „Personen im Entwurf suchen" beim
+          Handlungsentwurf, nur mit den Notizen als Quelle. Auf Knopfdruck (KI-
+          Aufruf). Anklickbare Tabs legen daraus Charaktere fürs Szenario an –
+          über denselben Modal und dieselbe Übergabe wie beim Entwurf.
+        */}
+        {details.figuren.trim() && (
+          <div className="mt-4 border-t border-black/10 pt-4 dark:border-white/10">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={figurenPersonenSuchen}
+                disabled={figurenSuchend}
+                title="Sucht im Figuren-Feld nach Personen (Namen und Bezeichnungen), die dem Szenario noch nicht zugeordnet sind"
+                className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              >
+                {figurenSuchend ? "Sucht …" : "🔍 Personen im Figuren-Feld suchen"}
+              </button>
+              {figurenPersonen === null && !figurenSuchend && (
+                <span className="text-xs text-foreground/50">
+                  Findet Namen und Bezeichnungen, für die es noch keinen
+                  Charakter gibt.
+                </span>
+              )}
+            </div>
+
+            {figurenSuchFehler && (
+              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                {figurenSuchFehler}
+              </p>
+            )}
+
+            {figurenPersonen !== null &&
+              (figurenPersonen.length === 0 ? (
+                <p className="mt-2 text-xs text-foreground/50">
+                  Keine neuen Personen – das Feld nennt nur Figuren, die dem
+                  Szenario schon zugeordnet sind.
+                </p>
+              ) : (
+                <div className="mt-3">
+                  <p className="mb-2 text-xs text-foreground/60">
+                    Noch nicht im Szenario – anklicken, um daraus einen Charakter
+                    anzulegen:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {figurenPersonen.map((p, i) => (
+                      <button
+                        key={`${p.name}-${i}`}
+                        type="button"
+                        onClick={() => setGewaehlt(p)}
+                        title={`Charakter für „${p.name}" anlegen`}
+                        className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-500/20 dark:text-amber-300"
+                      >
+                        + {p.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
       </section>
 
       {/*
         Der Handlungsentwurf steht als eigene Karte unter den Festlegungen: Er
         handelt von den Figuren und ihrer Geschichte, nicht von der Welt selbst.
-        Das Feld trägt seine eigene Beschriftung („Handlungsentwurf"), deshalb
-        hier keine zusätzliche Überschrift.
+        Die Überschrift steht – wie bei „Festlegungen" und „Figuren" – als
+        Sektions-`<h2>` **oben**; das Feld-Label darunter ist deshalb per
+        `hideLabel` ausgeblendet (für Screenreader bleibt es erhalten), sonst
+        stünde „Handlungsentwurf" doppelt da.
       */}
       <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+        <h2 className="mb-4 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+          Handlungsentwurf
+        </h2>
         {/*
           Reiter-Leiste über dem Feld: zwischen mehreren Handlungsentwürfen
           umschalten. Erscheint erst ab zwei Entwürfen – „✨ Neu erzeugen" im
@@ -1283,6 +1424,29 @@ export default function ScenarioDetailPage({
           </label>
 
           {/*
+            Figuren-Textfeld berücksichtigen – **Default aus**. Ohne Häkchen
+            wird `details.figuren` beim Erzeugen komplett ignoriert. Immer
+            sichtbar (wie „weiterspinnen"); ist das Feld leer, sagt ein Zusatz,
+            dass das Häkchen dann nichts bewirkt.
+          */}
+          <label
+            className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+            title="Angehakt fließen die Notizen aus dem Figuren-Textfeld des Szenarios als zusätzliche Besetzung in den Handlungsentwurf ein. Ohne Häkchen wird das Feld vollständig ignoriert."
+          >
+            <input
+              type="checkbox"
+              checked={handlungFiguren}
+              onChange={(e) => setHandlungFiguren(e.target.checked)}
+              disabled={saving || generatingField !== null}
+              className="size-4 accent-foreground"
+            />
+            👥 Figuren-Textfeld berücksichtigen
+            {!details.figuren.trim() && (
+              <span className="text-foreground/40">(Feld ist leer)</span>
+            )}
+          </label>
+
+          {/*
             Nächsten Entwurf auf dem aktuellen aufbauen. Erscheint nur, wenn es
             einen gibt – ohne Grundlage ist die Wahl leer. Die Stichwörter im
             Feld-Kopf steuern dann zusätzlich, wohin sich die neue Fassung
@@ -1360,6 +1524,7 @@ export default function ScenarioDetailPage({
           onZusatzChange={(key, value) =>
             setZusatz((z) => ({ ...z, [key]: value }))
           }
+          hideLabel
         />
 
         {/*

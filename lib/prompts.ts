@@ -1793,6 +1793,55 @@ Alle Angaben auf Deutsch.`;
 }
 
 /**
+ * Baut den Prompt für die **Personensuche im Figuren-Feld** eines Szenarios –
+ * das Gegenstück zu `buildPlotPersonsPrompt`, aber für die **Notizen zu
+ * wichtigen Figuren** statt für einen Handlungsentwurf.
+ *
+ * Ein wichtiger Unterschied: Der Plot-Prompt lässt **namenlose Rollen** bewusst
+ * weg („ein Bote" ließe sich im Fließtext später nicht wiederfinden). Hier ist
+ * das Feld selbst die Quelle, und der Nutzer will ausdrücklich **auch
+ * Bezeichnungen**, die für eine Person stehen („die Hafenmeisterin", „der alte
+ * Schmied"). Steht kein Eigenname da, wird die Bezeichnung selbst zum `name` –
+ * im Formular lässt er sich noch ändern.
+ */
+export function buildFigurePersonsPrompt(
+  figuren: string,
+  /** Namen der Figuren, die dem Szenario schon zugeordnet sind. */
+  bekannte: string[],
+): string {
+  const bekanntBlock = bekannte.length
+    ? `Diese Figuren gehören bereits zum Szenario:
+${bekannte.map((n) => `- ${n}`).join("\n")}
+
+- Sie sind **nicht** gesucht. Lass sie weg, auch wenn die Notizen sie nur mit dem Vornamen oder einer Kurzform nennen („Thora" für „Thora Eisenbach").
+- Erkenne dabei auch abweichende Schreibweisen und Beugungen als dieselbe Person.
+`
+    : "Dem Szenario ist bisher niemand zugeordnet – alle genannten Personen sind gesucht.\n";
+
+  return `Finde in diesen Notizen zu wichtigen Figuren alle **Personen**, die noch nicht zum Szenario gehören.
+
+Notizen (Figuren-Feld des Szenarios):
+${figuren.trim()}
+
+${bekanntBlock}
+Was zählt als Person:
+- Ein **einzelner Mensch** – mit Eigennamen („Bengt Eisenhauer") **oder** nur mit einer Bezeichnung, die für **eine bestimmte Person** steht („der alte Schmied", „die Hafenmeisterin", „ein geheimnisvoller Fremder").
+- **Keine** Gruppen („die Ratsversammlung", „die Dorfbewohner"), keine Orte, keine Organisationen, keine Gegenstände.
+- Im Deutschen ist jedes Substantiv großgeschrieben. Großschreibung allein macht ein Wort **nicht** zu einer Person: „Der Schmied Bengt am Hafen" ist **eine** Person (Bengt), nicht drei.
+
+Für jede gefundene Person:
+- **name**: Hat sie einen Eigennamen, gib ihn exakt an (Vor- und Nachname, wenn genannt), im Nominativ. Steht **nur** eine Bezeichnung da, gib **diese** als Name an (z. B. „Die Hafenmeisterin") – sie lässt sich im Formular noch ändern.
+- **beruf**: die Rolle oder Funktion, wenn die Notiz eine nennt (auch die Bezeichnung selbst, wenn sie eine Rolle ist).
+- **geschlecht**: „weiblich", „männlich" oder „divers" – nur wenn die Notiz es hergibt (Artikel, Endung, Anrede). Sonst leer.
+- **alter**, **hintergrund**, **persoenlichkeit**, **aussehen**: nur, was die Notiz tatsächlich sagt.
+
+Wichtig: **Erfinde nichts.** Sagt die Notiz zum Aussehen nichts, bleibt das Feld leer. Ein leeres Feld ist richtig, eine plausible Erfindung ist falsch – diese Angaben werden später als Vorgaben angezeigt, und was darin steht, soll aus den Notizen stammen.
+
+Kommt keine neue Person vor, gib eine leere Liste zurück.
+Alle Angaben auf Deutsch.`;
+}
+
+/**
  * Baut den Prompt für das **Ergänzen einer einzelnen Festlegung** eines
  * Szenarios (Ort, Zeit oder Regeln).
  *
@@ -1921,6 +1970,83 @@ Form der Antwort: ${
       ? "vollständige Sätze hintereinander, als Fließtext."
       : "**eine Zeile je Angabe**, durch Zeilenumbrüche getrennt, jede ein einzelner Satz."
   } Keine Nummerierung, keine Spiegelstriche, keine Doppelpunkt-Überschriften wie „Hafenviertel: …", kein Markdown, keine Einleitung und keine Erklärung. Antworte mit **nichts als dem fertigen Feldinhalt** – einschließlich des Vorhandenen, an der richtigen Stelle eingefügt.`;
+}
+
+/**
+ * Baut den Prompt fürs **KI-Ergänzen des Figuren-Feldes** – ein Set von etwa
+ * drei Figuren, passend zur ganzen Welt (Genre, Ort, Zeit, Regeln, Beschreibung).
+ *
+ * Das Gegenstück zum Würfel (`scenarioFigures.ts`): Der mischt Bausteine blind,
+ * dieser liest die Festlegungen **und** die schon vorhandenen Figuren und macht
+ * die neuen dazu passend. Wie bei `buildScenarioFieldPrompt` ist das Vorhandene
+ * **Vorgabe, nicht Vorschlag**: Es geht wörtlich mit und bleibt unverändert;
+ * ergänzt werden nur weitere Figuren.
+ *
+ * Die Form ist bewusst dieselbe wie beim Würfel und beim zufälligen Szenario –
+ * „Name: was sie tut; woran sie kippt." –, damit sich die drei Quellen im Feld
+ * mischen lassen, ohne dass ein Bruch entsteht.
+ */
+export function buildScenarioFiguresPrompt(
+  name: string,
+  /** Nur die Felder, die `figuren` laut `SCENARIO_READS` lesen darf. */
+  umfeld: Partial<Record<string, string>>,
+  /** Was im Feld schon steht – bleibt unverändert und prägt die neuen Figuren. */
+  vorhanden: string,
+  zusatz?: string,
+  /** Höchstlänge des Feldes (`SCENARIO_MAXLENGTHS.figuren`); die ganze Antwort zählt. */
+  maxLen?: number,
+): string {
+  const kontext =
+    line("Szenario", name) +
+    line("Genre", umfeld.genre ? genreLabel(umfeld.genre) : undefined) +
+    line("Ort", umfeld.ort) +
+    line("Zeit", umfeld.zeit) +
+    line("Regeln", umfeld.regeln) +
+    line("Beschreibung", umfeld.beschreibung);
+
+  const bestand = vorhanden.trim();
+
+  const bestandBlock = bestand
+    ? `\nDiese Figuren stehen schon fest – **übernimm sie wörtlich und unverändert** und ergänze weitere, die zu ihnen passen (gemeinsame Geschichte, Abhängigkeiten, Gegnerschaft sind willkommen):\n${bestand}\n`
+    : "";
+
+  const zusatzBlock = zusatz?.trim()
+    ? `\nBesonders wichtig – berücksichtige diese Stichwörter:\n${zusatz.trim()}\n`
+    : "";
+
+  const budgetBlock =
+    bestand && maxLen
+      ? (() => {
+          const rest = maxLen - bestand.length - 1;
+          const knapp = rest < 400;
+          return `- Das ganze Feld – Vorhandenes **und** Neues – muss unter ${maxLen} Zeichen bleiben.${
+            rest > 0
+              ? ` Für die neuen Figuren sind noch etwa ${rest} Zeichen frei${
+                  knapp ? " – ergänze also nur ein bis zwei" : ""
+                }.`
+              : " Es ist kaum Platz – ergänze höchstens eine sehr knappe Figur."
+          }\n`;
+        })()
+      : "";
+
+  return `${
+    bestand
+      ? "Ergänze die Besetzung eines Szenarios um weitere Figuren."
+      : "Entwirf die Besetzung eines Szenarios: die Menschen, um die es in ihm gehen könnte."
+  }
+
+Was über dieses Szenario schon feststeht:
+${kontext || "- (noch nichts)\n"}${bestandBlock}
+Anforderungen:
+- ${bestand ? "Ergänze **etwa drei** weitere Figuren" : "Entwirf **etwa drei** Figuren"}, jede in **einer Zeile**.
+- Form je Zeile: „Name: was die Figur in dieser Welt tut; woran sie kippt." – erst ein Name, dann ihre Rolle, dann nach einem Semikolon ihr **Riss**.
+- Der **Riss** ist der Kern: etwas Verschwiegenes, Ersehntes oder Ungelöstes, an dem sich eine Geschichte entzünden kann. Ein bloßer Beruf ist kein Riss.
+- Die Namen passen zu Herkunft und Genre; die Figuren passen zueinander und zur Welt und bergen Reibung.
+- **Alles muss zu den Festlegungen oben passen** – widersprich ihnen nie; das Genre bindet am stärksten.
+${budgetBlock}${zusatzBlock}
+Form der Antwort: **eine Figur je Zeile**, durch Zeilenumbrüche getrennt. Keine Nummerierung, keine Spiegelstriche, kein Markdown, keine Einleitung und keine Erklärung. Antworte mit **nichts als den Figuren-Zeilen**${
+    bestand ? " – die vorhandenen zuerst, wörtlich, dann die neuen" : ""
+  }.`;
 }
 
 /**

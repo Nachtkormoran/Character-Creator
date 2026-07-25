@@ -104,6 +104,7 @@ als eines, das immer dasselbe ist.
   `POST /api/generate-name`, `POST /api/generate-input-field`,
   `POST /api/regenerate-text`,
   `POST /api/scenario-description`, `POST /api/scenario-field`,
+  `POST /api/scenario-figures`,
   `POST /api/scenario-plot`, `POST /api/scenario-plot-persons`,
   `POST /api/scenario-from-character`, `POST /api/scenario-arc`,
   `POST /api/story-arc-chapters`, `POST /api/story-chapter-text`,
@@ -529,6 +530,32 @@ Gegen den Dev-Server geprüft (Testdaten entfernt): `random-scenario` liefert
 Figuren; Plot/Arc mit leerem Feld + ohne Charaktere → 400 wie bisher, mit
 gefülltem Feld + ohne Charaktere → 200; die notierten Namen überstehen den
 Arc-Filter.
+
+**Würfel und KI am Figuren-Feld.** Wie Ort/Zeit/Regeln hat auch `figuren` beide
+Knöpfe:
+- **Würfel** aus `scenarioFigures.ts` – **kombinatorisch**, nicht aus fertigen
+  Einträgen: je Genre eine Liste **Rollen** (was eine Figur *tut*) und eine
+  **Risse** (woran sie *kippt*), beide **subjektlose Verbalphrasen ohne
+  Pronomen** (wie `backgrounds.ts`, damit sie kein Geschlecht festlegen).
+  `randomFigure` zieht Rolle + Riss und setzt einen genre-passenden Namen aus
+  `names.ts` davor → „Name: Rolle; Riss." Ins **leere** Feld kommen 2–3, beim
+  **Ergänzen** eine weitere (`anhaengen`, mit Zeilenumbruch – dieselbe Logik wie
+  Ort/Zeit). Nach Genre getrennt, nie gemischt; unbekanntes Genre → Gegenwart.
+  *Umfang aktuell ~30 Rollen + ~30 Risse je Genre* (≈900 Kombinationen/Genre ×
+  Namensvielfalt); auf die vollen 100+100 lässt sich die Liste jederzeit
+  aufstocken, ohne Codeänderung.
+- **KI „✨ Ergänzen"** (`POST /api/scenario-figures`, `buildScenarioFiguresPrompt`,
+  Client `generateScenarioFigures`): erzeugt **etwa drei** Figuren aus der
+  **ganzen Welt** – `SCENARIO_READS.figuren` gibt Genre, Ort, Zeit, Regeln **und
+  Beschreibung** frei (mehr als Ort/Zeit/Regeln, die die Beschreibung nicht
+  lesen). Wie beim Feld-Ergänzen ist das **Vorhandene Vorgabe**: Es geht wörtlich
+  mit, bleibt erhalten und **prägt die neuen** (die Route gibt das ganze Feld
+  zurück, der Client ersetzt – Outcome „alt + neu", wie bei Ort/Zeit/Regeln).
+  Dieselbe Zeilenform „Name: Rolle; Riss.", damit sich Würfel, KI und das
+  zufällige Szenario im Feld mischen. Deckelung/Kürzung an Wortgrenze wie
+  `scenario-field`; beides in Detailansicht **und** Anlege-Formular verdrahtet.
+  *Geprüft:* leer → drei stimmige, weltgebundene Figuren; mit Bestand bleibt der
+  Bestand wörtlich und die neuen knüpfen an ihn und die Welt an.
 
 An **Ort, Zeit und Regeln** hängt je ein **Würfel** (`scenarioPlaces.ts`,
 `scenarioTimes.ts`, `scenarioRules.ts` – je neun Listen zu 100, eine pro

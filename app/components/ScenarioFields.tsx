@@ -11,6 +11,7 @@ import { GENRE_TEMPLATES } from "@/lib/templates";
 import { randomPlace } from "@/lib/scenarioPlaces";
 import { randomTime } from "@/lib/scenarioTimes";
 import { randomRules } from "@/lib/scenarioRules";
+import { randomFigure } from "@/lib/scenarioFigures";
 import { useRef } from "react";
 import { useAutoGrow } from "./useAutoGrow";
 
@@ -28,6 +29,7 @@ const WUERFEL: Partial<
   ort: randomPlace,
   zeit: randomTime,
   regeln: randomRules,
+  figuren: randomFigure,
 };
 
 /**
@@ -68,6 +70,7 @@ const MINDESTZEILEN: Partial<Record<keyof ScenarioDetails, number>> = {
   zeit: 3,
   regeln: 3,
   beschreibung: 8,
+  figuren: 4,
   handlung: 8,
 };
 
@@ -136,6 +139,7 @@ const ZUSATZ_PLATZHALTER: Partial<Record<keyof ScenarioDetails, string>> = {
   zeit: "Stichwörter – kurz vor dem Umbruch …",
   regeln: "Stichwörter – wer schweigt, wer zahlt …",
   beschreibung: "Stichwörter – Regen, misstrauisch …",
+  figuren: "Stichwörter – eine Verräterin, ein Kind …",
   handlung: "Stichwörter – Streit am Hafen, kein Toter …",
 };
 
@@ -149,6 +153,7 @@ const ERGAENZT: ReadonlySet<keyof ScenarioDetails> = new Set([
   "ort",
   "zeit",
   "regeln",
+  "figuren",
 ]);
 
 /** Was der KI-Knopf je Feld tut – als Titel am Knopf. */
@@ -158,6 +163,8 @@ const GENERATE_HINTS: Partial<Record<keyof ScenarioDetails, string>> = {
   regeln:
     "Ergänzt die Regeln passend zu Genre, Ort und Zeit – was schon dasteht, bleibt stehen",
   beschreibung: "Erzeugt die Beschreibung aus Genre, Ort, Zeit und Regeln",
+  figuren:
+    "Ergänzt etwa drei Figuren passend zu Genre, Ort, Zeit, Regeln und Beschreibung – was schon dasteht, bleibt stehen und prägt die neuen",
   handlung:
     "Erzeugt einen Handlungsentwurf aus den Festlegungen und den zugeordneten Charakteren samt ihren Ansatzpunkten",
 };
@@ -187,6 +194,7 @@ export function ScenarioFields({
   generatingField = null,
   zusatz,
   onZusatzChange,
+  hideLabel = false,
 }: {
   details: ScenarioDetails;
   onChange: (details: ScenarioDetails) => void;
@@ -227,6 +235,13 @@ export function ScenarioFields({
    */
   zusatz?: Partial<Record<keyof ScenarioDetails, string>>;
   onZusatzChange?: (key: keyof ScenarioDetails, value: string) => void;
+  /**
+   * Die sichtbare Feld-Beschriftung ausblenden – wenn die aufrufende Seite die
+   * Überschrift schon als Sektions-`<h2>` trägt (z. B. der Handlungsentwurf).
+   * Das Label bleibt für Screenreader über `sr-only` und die `htmlFor`-Bindung
+   * erhalten; nur die doppelte sichtbare Beschriftung entfällt.
+   */
+  hideLabel?: boolean;
 }) {
   const set = (key: keyof ScenarioDetails, value: string) =>
     onChange({ ...details, [key]: value });
@@ -271,7 +286,10 @@ export function ScenarioFields({
           return (
             <div key={key} className="flex flex-col gap-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor={feldId} className="text-sm font-medium">
+                <label
+                  htmlFor={feldId}
+                  className={hideLabel ? "sr-only" : "text-sm font-medium"}
+                >
                   {SCENARIO_LABELS[key]}
                 </label>
 

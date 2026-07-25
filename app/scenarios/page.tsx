@@ -7,6 +7,7 @@ import {
   createScenario,
   generateScenarioDescription,
   generateScenarioField,
+  generateScenarioFigures,
   importScenarioFile,
   listScenarios,
 } from "@/lib/client";
@@ -144,6 +145,7 @@ export default function ScenariosPage() {
     "zeit",
     "regeln",
     "beschreibung",
+    "figuren",
   ]);
 
   /**
@@ -171,6 +173,14 @@ export default function ScenariosPage() {
           zusatz[key] ?? "",
         );
         setDetails((d) => ({ ...d, [key]: wert }));
+      } else if (key === "figuren") {
+        // Ergänzt wie Ort/Zeit/Regeln: Vorhandenes bleibt und prägt die neuen.
+        const { wert } = await generateScenarioFigures(
+          name.trim(),
+          details,
+          zusatz.figuren ?? "",
+        );
+        setDetails((d) => ({ ...d, figuren: wert }));
       } else {
         const { beschreibung } = await generateScenarioDescription(
           name.trim(),

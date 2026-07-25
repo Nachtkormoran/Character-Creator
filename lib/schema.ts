@@ -634,6 +634,10 @@ export const SCENARIO_READS: Partial<
   zeit: ["genre", "ort", "regeln"],
   regeln: ["genre", "ort", "zeit"],
   beschreibung: ["genre", "ort", "zeit", "regeln"],
+  // Die Figuren entstehen aus der ganzen Welt – Beschreibung eingeschlossen.
+  // Sie stehen erzeugungslogisch **hinter** ihr (wie die Handlung), fließen aber
+  // nicht in sie zurück; ein Kreis entstünde also nicht.
+  figuren: ["genre", "ort", "zeit", "regeln", "beschreibung"],
   handlung: ["genre", "ort", "zeit", "regeln", "beschreibung"],
 };
 

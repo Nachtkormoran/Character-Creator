@@ -172,6 +172,20 @@ export function findPlotPersons(scenarioId: string, handlung: string) {
   });
 }
 
+/**
+ * Personen aus dem **Figuren-Feld** eines Szenarios, die ihm noch nicht
+ * zugeordnet sind – wie `findPlotPersons`, nur mit den Figuren-Notizen als
+ * Quelle. Nimmt bewusst auch Bezeichnungen für Personen auf, nicht nur
+ * Eigennamen (s. Route). `figuren` kommt aus dem – womöglich ungespeicherten –
+ * Formularzustand.
+ */
+export function findFigurePersons(scenarioId: string, figuren: string) {
+  return postJson<{ personen: PlotPerson[] }>("/api/scenario-figure-persons", {
+    scenarioId,
+    figuren,
+  });
+}
+
 export function generateImage(
   character: GeneratedCharacter,
   imageStyle: string,
@@ -708,6 +722,23 @@ export function generateScenarioField(
 ) {
   return postJson<{ wert: string }>("/api/scenario-field", {
     feld,
+    name,
+    details,
+    zusatz,
+  });
+}
+
+/**
+ * Das Figuren-Feld eines Szenarios **ergänzen** – ein Set von etwa drei Figuren,
+ * passend zu Genre, Ort, Zeit, Regeln und Beschreibung. Das schon Vorhandene
+ * geht mit und bleibt erhalten; zurück kommt das ganze Feld. Persistiert nichts.
+ */
+export function generateScenarioFigures(
+  name: string,
+  details: ScenarioDetails,
+  zusatz = "",
+) {
+  return postJson<{ wert: string }>("/api/scenario-figures", {
     name,
     details,
     zusatz,
