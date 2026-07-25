@@ -737,11 +737,14 @@ export function generateScenarioFigures(
   name: string,
   details: ScenarioDetails,
   zusatz = "",
+  /** Wie viele Figuren erzeugt/ergänzt werden (Selektor am Feld). */
+  anzahl = 3,
 ) {
   return postJson<{ wert: string }>("/api/scenario-figures", {
     name,
     details,
     zusatz,
+    anzahl,
   });
 }
 

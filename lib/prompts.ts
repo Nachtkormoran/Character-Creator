@@ -1995,6 +1995,8 @@ export function buildScenarioFiguresPrompt(
   zusatz?: string,
   /** Höchstlänge des Feldes (`SCENARIO_MAXLENGTHS.figuren`); die ganze Antwort zählt. */
   maxLen?: number,
+  /** Wie viele Figuren erzeugt/ergänzt werden (Selektor am Feld). */
+  anzahl = 3,
 ): string {
   const kontext =
     line("Szenario", name) +
@@ -2038,7 +2040,11 @@ export function buildScenarioFiguresPrompt(
 Was über dieses Szenario schon feststeht:
 ${kontext || "- (noch nichts)\n"}${bestandBlock}
 Anforderungen:
-- ${bestand ? "Ergänze **etwa drei** weitere Figuren" : "Entwirf **etwa drei** Figuren"}, jede in **einer Zeile**.
+- ${
+    bestand
+      ? `Ergänze **${anzahl}** weitere ${anzahl === 1 ? "Figur" : "Figuren"}`
+      : `Entwirf **${anzahl}** ${anzahl === 1 ? "Figur" : "Figuren"}`
+  }, jede in **einer Zeile**.
 - Form je Zeile: „Name: was die Figur in dieser Welt tut; woran sie kippt." – erst ein Name, dann ihre Rolle, dann nach einem Semikolon ihr **Riss**.
 - Der **Riss** ist der Kern: etwas Verschwiegenes, Ersehntes oder Ungelöstes, an dem sich eine Geschichte entzünden kann. Ein bloßer Beruf ist kein Riss.
 - Die Namen passen zu Herkunft und Genre; die Figuren passen zueinander und zur Welt und bergen Reibung.

@@ -153,7 +153,7 @@ export default function ScenariosPage() {
    * deshalb die Rückfrage, sobald dort schon etwas ist. Von Hand Geschriebenes
    * wäre sonst still weg.
    */
-  async function handleGenerate(key: keyof ScenarioDetails) {
+  async function handleGenerate(key: keyof ScenarioDetails, anzahl?: number) {
     if (generatingField) return;
     // Nur die Beschreibung wird ersetzt; Ort, Zeit und Regeln werden ergänzt.
     if (
@@ -179,6 +179,7 @@ export default function ScenariosPage() {
           name.trim(),
           details,
           zusatz.figuren ?? "",
+          anzahl,
         );
         setDetails((d) => ({ ...d, figuren: wert }));
       } else {

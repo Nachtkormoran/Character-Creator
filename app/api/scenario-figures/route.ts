@@ -28,6 +28,9 @@ const bodySchema = z.object({
   name: z.string().trim().max(80).optional().default(""),
   details: scenarioDetailsSchema,
   zusatz: z.string().trim().max(1000).optional().default(""),
+  // Wie viele Figuren erzeugt/ergänzt werden (Selektor am Feld). Gedeckelt,
+  // damit ein zu großer Wunsch nicht das Feld-Limit sprengt.
+  anzahl: z.number().int().min(1).max(8).optional().default(3),
 });
 
 export async function POST(request: Request) {
@@ -41,7 +44,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, details, zusatz } = parsed.data;
+    const { name, details, zusatz, anzahl } = parsed.data;
 
     // Nur die erlaubten Nachbarfelder – alles andere sieht das Modell nicht.
     const umfeld: Partial<Record<string, string>> = {};
@@ -74,6 +77,7 @@ export async function POST(request: Request) {
             details.figuren,
             zusatz,
             maxLen,
+            anzahl,
           ),
         },
       ],

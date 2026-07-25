@@ -11,8 +11,8 @@ import { GENRE_TEMPLATES } from "@/lib/templates";
 import { randomPlace } from "@/lib/scenarioPlaces";
 import { randomTime } from "@/lib/scenarioTimes";
 import { randomRules } from "@/lib/scenarioRules";
-import { randomFigure } from "@/lib/scenarioFigures";
-import { useRef } from "react";
+import { randomFigure, randomFigures } from "@/lib/scenarioFigures";
+import { useRef, useState } from "react";
 import { useAutoGrow } from "./useAutoGrow";
 
 /**
@@ -221,7 +221,7 @@ export function ScenarioFields({
    * Erzeugt den Inhalt eines Feldes per KI. Die Anfrage macht die aufrufende
    * Seite – diese Komponente bleibt darstellend und kennt kein `fetch`.
    */
-  onGenerate?: (key: keyof ScenarioDetails) => void;
+  onGenerate?: (key: keyof ScenarioDetails, anzahl?: number) => void;
   /** Welches Feld gerade erzeugt wird (für Beschriftung und Sperre). */
   generatingField?: keyof ScenarioDetails | null;
   /**
@@ -245,6 +245,13 @@ export function ScenarioFields({
 }) {
   const set = (key: keyof ScenarioDetails, value: string) =>
     onChange({ ...details, [key]: value });
+
+  /**
+   * Wie viele Figuren „🎲 Würfeln/Ergänzen" und „✨ Erzeugen/Ergänzen" am
+   * Figuren-Feld hinzufügen. Gilt für **beide** – Würfel (lokal) und KI (Route).
+   * Nur beim Figuren-Feld sichtbar; nicht gespeichert.
+   */
+  const [figurenAnzahl, setFigurenAnzahl] = useState(3);
 
   const controlClass =
     "w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
@@ -323,6 +330,34 @@ export function ScenarioFields({
                     />
                   )}
 
+                  {/*
+                    Anzahl-Selektor – nur am Figuren-Feld. Gilt für **beide**
+                    Knöpfe daneben: den lokalen Würfel und die KI-Erzeugung.
+                  */}
+                  {key === "figuren" && (
+                    <label
+                      className={`${kopfzeilenClass} flex items-center gap-1.5 bg-white font-normal dark:bg-white/5`}
+                      title="Wie viele Figuren „Würfeln/Ergänzen“ und „Erzeugen/Ergänzen“ hinzufügen – gilt für Würfel und KI."
+                    >
+                      <span className="text-foreground/60">Anzahl</span>
+                      <select
+                        value={figurenAnzahl}
+                        onChange={(e) =>
+                          setFigurenAnzahl(Number(e.target.value))
+                        }
+                        disabled={disabled || generatingField !== null}
+                        aria-label="Anzahl der hinzuzufügenden Figuren"
+                        className="bg-transparent outline-none"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+
                   {WUERFEL[key] && (
                     <button
                       type="button"
@@ -332,10 +367,14 @@ export function ScenarioFields({
                           anhaengen(
                             key,
                             details[key],
-                            WUERFEL[key]!(
-                              details.genre,
-                              details[key].trim() !== "",
-                            ),
+                            // Figuren: genau die im Selektor gewählte Anzahl;
+                            // die übrigen Felder wie bisher (ein Baustein).
+                            key === "figuren"
+                              ? randomFigures(details.genre, figurenAnzahl)
+                              : WUERFEL[key]!(
+                                  details.genre,
+                                  details[key].trim() !== "",
+                                ),
                           ),
                         )
                       }
@@ -356,7 +395,12 @@ export function ScenarioFields({
                   {generatable?.has(key) && onGenerate && (
                     <button
                       type="button"
-                      onClick={() => onGenerate(key)}
+                      onClick={() =>
+                        onGenerate(
+                          key,
+                          key === "figuren" ? figurenAnzahl : undefined,
+                        )
+                      }
                       // Während irgendein Feld erzeugt wird, sind alle Knöpfe
                       // gesperrt: die Erzeugung liest die übrigen Felder mit,
                       // und zwei gleichzeitige Läufe säßen auf verschiedenen

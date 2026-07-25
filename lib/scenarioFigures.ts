@@ -675,10 +675,23 @@ function macheFigur(rolle: string, riss: string, genre?: string): string {
  * wird **nie gemischt**.
  */
 export function randomFigure(genre?: string, ergaenzen = false): string {
+  return randomFigures(genre, ergaenzen ? 1 : 2 + Math.floor(Math.random() * 2));
+}
+
+/**
+ * Würfelt **genau `anzahl`** Figuren fürs Feld „Figuren" – die Anzahl kommt aus
+ * dem Selektor am Feld und gilt für Würfel **und** KI. Rollen und Risse werden
+ * innerhalb eines Wurfs ohne Wiederholung gezogen (`pickSome`); die Anzahl ist
+ * auf die Listenlänge gedeckelt und mindestens eins.
+ */
+export function randomFigures(
+  genre: string | undefined,
+  anzahl: number,
+): string {
   const rollen = ROLLEN_BY_GENRE[genre ?? ""] ?? GEGENWART_ROLLEN;
   const risse = RISSE_BY_GENRE[genre ?? ""] ?? GEGENWART_RISSE;
-  const anzahl = ergaenzen ? 1 : 2 + Math.floor(Math.random() * 2); // 2–3
-  const r = pickSome(rollen, anzahl, anzahl);
-  const k = pickSome(risse, anzahl, anzahl);
+  const n = Math.max(1, Math.min(Math.floor(anzahl), rollen.length, risse.length));
+  const r = pickSome(rollen, n, n);
+  const k = pickSome(risse, n, n);
   return r.map((rolle, i) => macheFigur(rolle, k[i], genre)).join("\n");
 }

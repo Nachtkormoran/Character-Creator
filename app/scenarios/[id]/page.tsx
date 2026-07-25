@@ -446,7 +446,7 @@ export default function ScenarioDetailPage({
    * Charaktere für den Handlungsentwurf lädt dagegen die Route selbst – die
    * gespeicherte Zuordnung ist dort die einzige, die es gibt.
    */
-  async function handleGenerate(key: keyof ScenarioDetails) {
+  async function handleGenerate(key: keyof ScenarioDetails, anzahl?: number) {
     if (generatingField) return;
     // Ort, Zeit und Regeln werden **ergänzt**, der Handlungsentwurf **angehängt**
     // (als neue Variante) – in allen dreien kann nichts verlorengehen, also
@@ -481,6 +481,7 @@ export default function ScenarioDetailPage({
           name.trim(),
           details,
           zusatz.figuren ?? "",
+          anzahl,
         );
         setDetails((d) => ({ ...d, figuren: wert }));
       } else if (key === "handlung") {
