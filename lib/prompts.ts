@@ -5,7 +5,7 @@ import {
   formHint,
   toneHint,
 } from "./schema";
-import { DEFAULT_GENRE, genreLabel } from "./templates";
+import { DEFAULT_GENRE, GENRE_TEMPLATES, genreLabel } from "./templates";
 import type { ScenarioSamples } from "./scenarioSamples";
 import type {
   CharacterInput,
@@ -1160,6 +1160,247 @@ export function buildNamePrompt(
 
 ${vorgaben || "- (keine Vorgaben – wähle frei)\n"}
 Antworte mit nichts als dem Namen, ohne Anführungszeichen und ohne Erklärung.`;
+}
+
+/** Die Formularfelder, die sich per KI befüllen lassen (neben dem Namen). */
+export type InputField =
+  | "appearance"
+  | "personality"
+  | "occupation"
+  | "background";
+
+const INPUT_FIELD_LABELS: Record<InputField, string> = {
+  appearance: "Aussehen",
+  personality: "Persönlichkeit",
+  occupation: "Beruf / Rolle",
+  background: "Hintergrund",
+};
+
+/**
+ * Die Aufgabe je Feld – bewusst auf denselben **Umfang und dieselbe Form** wie
+ * der jeweilige Würfel gemünzt (s. `inspiration.ts`, `backgrounds.ts`,
+ * `professions.ts`): Aussehen und Hintergrund mit **Semikolon** (die Einträge
+ * enthalten selbst Kommas), Persönlichkeit mit Komma, Beruf ein einzelnes Wort.
+ * So fügt sich das Ergebnis genauso ins Feld wie ein Wurf.
+ */
+const INPUT_FIELD_TASK: Record<InputField, string> = {
+  appearance: `Nenne **4 bis 6 äußere Merkmale** – Haare, Augen, Statur, Haut, Kleidung, Auffälligkeiten. Stichwortartig, mit **Semikolon** getrennt (einzelne Merkmale dürfen ein Komma enthalten). Keine ganzen Sätze, keine Aufzählungszeichen.`,
+  personality: `Nenne **3 bis 4 Wesenszüge**, mit Komma getrennt. Nur die Züge, kein ganzer Satz.`,
+  occupation: `Nenne **einen einzigen** Beruf oder eine Rolle – nur die Bezeichnung, kein Satz, keine Beschreibung.`,
+  background: `Nenne **1 bis 3 prägende Lebensstationen oder Ereignisse** als kurze Halbsätze, mit **Semikolon** getrennt. **Subjektlos** – beginne mit dem Verb, kein „Sie"/„Er" (z. B. „wuchs in einem Fischerdorf auf; verlor früh die Eltern").`,
+};
+
+/**
+ * Baut den Prompt fürs **KI-Befüllen eines einzelnen Formularfeldes** (Aussehen,
+ * Persönlichkeit, Beruf, Hintergrund). Das schlaue Gegenstück zum Würfel: Der
+ * zieht kontextblind aus Listen, dieser liest die **übrigen ausgefüllten
+ * Felder** und erzeugt etwas Stimmiges im selben Umfang wie ein Wurf.
+ *
+ * Das **Zielfeld selbst geht nicht mit** – der Knopf ersetzt seinen Inhalt (wie
+ * der Würfel), und wiederholtes Klicken soll Varianten liefern statt den Text
+ * anwachsen zu lassen. Das Genre steht immer im Kontext (Default „Gegenwart"),
+ * ist also ein verlässlicher Anker, selbst wenn sonst nichts ausgefüllt ist.
+ */
+export function buildInputFieldPrompt(
+  feld: InputField,
+  input: CharacterInput,
+): string {
+  const geschlecht =
+    input.gender && input.gender !== "egal" ? input.gender : "";
+
+  // Alle übrigen Felder als Kontext, ohne das Zielfeld. `line` lässt leere weg.
+  const nachbar: Array<[InputField | "andere", string, string]> = [
+    ["andere", "Geschlecht", geschlecht],
+    ["andere", "Alter", input.age],
+    ["andere", "Herkunft/Ethnie", input.ethnicity],
+    ["andere", "Setting", input.setting],
+    ["occupation", "Beruf / Rolle", input.occupation],
+    ["appearance", "Aussehen", input.appearance],
+    ["personality", "Persönlichkeit", input.personality],
+    ["background", "Hintergrund", input.background],
+    ["andere", "Weitere Wünsche", input.notes],
+  ];
+
+  const kontext =
+    line("Genre", genreLabel(input.genre)) +
+    nachbar
+      .filter(([owner]) => owner !== feld)
+      .map(([, label, wert]) => line(label, wert))
+      .join("");
+
+  return `Fülle für einen Charakter das Feld „${INPUT_FIELD_LABELS[feld]}".
+
+${INPUT_FIELD_TASK[feld]}
+
+Diese Angaben stehen schon fest – dein Ergebnis muss dazu passen und darf ihnen nicht widersprechen:
+${kontext}
+Alles auf Deutsch. Antworte mit nichts als dem Inhalt für dieses eine Feld – keine Vorrede, keine Anführungszeichen, keine Beschriftung.`;
+}
+
+/**
+ * Baut den Prompt für die **zufällige Figur** – das ganze Erstellen-Formular auf
+ * einmal, als **Structured Output** (`randomInputSchema`).
+ *
+ * Der Kern ist die Regel „bereits Ausgefülltes bleibt, der Rest wird erfunden":
+ * Die gesetzten Felder gehen als **feste Vorgabe** in den Prompt (und die Route
+ * setzt sie danach ohnehin wieder darüber), die leeren sollen stimmig dazu
+ * entstehen. Alles muss **zusammenpassen** – eine Figur, kein Zettelkasten.
+ *
+ * Das **Genre** ist ein Sonderfall: Das Formular hat immer eines gewählt (Default
+ * „Gegenwart"), ein leeres gibt es nicht. Deshalb keine „ausfüllen, wenn leer"-
+ * Regel, sondern „behalte das aktuelle, **wenn** es zum Konzept passt, sonst
+ * wähle das passende" – so kippt eine bewusst gewählte Welt nicht grundlos, ein
+ * bloß stehengebliebener Default aber schon.
+ *
+ * `freitext` ist die freie Vorgabe aus dem Modal: das Thema, dem die Figur folgen
+ * soll. Leer = völliger Zufall.
+ *
+ * `genreWuerfeln` steuert das oben beschriebene Sonderproblem: Ist es **false**
+ * (Standard), steht das aktuelle Genre **fest** und alle Felder müssen dazu
+ * passen – so kippt eine bewusst gewählte Welt nie. Ist es **true**, wählt das
+ * Modell das passende Genre frei aus der Liste (die Checkbox „Genre auch
+ * zufällig wählen"). Das Formular hat immer ein Genre gewählt, ein „leeres" gibt
+ * es nicht – deshalb diese ausdrückliche Wahl statt einer „ausfüllen, wenn
+ * leer"-Regel.
+ */
+export function buildRandomInputPrompt(
+  input: CharacterInput,
+  freitext: string,
+  genreWuerfeln = false,
+): string {
+  // „egal" beim Geschlecht heißt „überrasch mich" – dann ist es **nicht** fest,
+  // sondern soll konkret gewählt werden.
+  const geschlechtFest =
+    input.gender && input.gender !== "egal" ? input.gender : "";
+
+  // Die füllbaren Textfelder in Anzeige-Reihenfolge. Ein gesetztes Feld ist
+  // fest, ein leeres wird erfunden.
+  const felder: Array<[string, string]> = [
+    ["Name", input.name],
+    ["Geschlecht", geschlechtFest],
+    ["Alter", input.age],
+    ["Herkunft / Ethnie", input.ethnicity],
+    ["Aussehen", input.appearance],
+    ["Setting", input.setting],
+    ["Beruf / Rolle", input.occupation],
+    ["Hintergrund", input.background],
+    ["Persönlichkeit", input.personality],
+    ["Weitere Wünsche", input.notes],
+  ];
+
+  const fest = felder.filter(([, wert]) => wert.trim());
+  const offen = felder.filter(([, wert]) => !wert.trim());
+
+  const festBlock = fest.length
+    ? `Diese Felder sind bereits festgelegt und dürfen **nicht** geändert werden – alles Übrige muss zu ihnen passen:\n${fest
+        .map(([label, wert]) => `- ${label}: ${wert.trim()}`)
+        .join("\n")}\n`
+    : "Es ist noch nichts festgelegt – erfinde die ganze Figur frei.\n";
+
+  const offenBlock = offen.length
+    ? `\nDiese Felder sollst du stimmig ausfüllen:\n${offen
+        .map(([label]) => `- ${label}`)
+        .join("\n")}\n`
+    : "";
+
+  const genreliste = GENRE_TEMPLATES.map(
+    (g) => `${g.id} (${g.label})`,
+  ).join(", ");
+
+  const themaBlock = freitext.trim()
+    ? `\nVorgabe für die Figur – die ganze Figur soll dazu passen:\n${freitext.trim()}\n`
+    : "\nEs gibt keine besondere Vorgabe – überrasch mit einer originellen, in sich stimmigen Figur.\n";
+
+  // Zwei Fassungen: festes Genre (Default) oder frei gewählt (Checkbox). In
+  // beiden Fällen erzwingt die Route den Wert zusätzlich – der Prompt sorgt nur
+  // dafür, dass die übrigen Felder zum richtigen Genre passen.
+  const genreBlock = genreWuerfeln
+    ? `Zum **Genre**: Wähle das am besten zur Figur passende aus dieser Liste (gib die Id im Feld „genre" zurück): ${genreliste}. Alle Felder müssen zum gewählten Genre passen.`
+    : `Zum **Genre**: Die Figur spielt im Genre „${genreLabel(input.genre)}" (${input.genre}) – das steht **fest** und darf nicht gewechselt werden. Gib im Feld „genre" genau „${input.genre}" zurück, und alle Felder müssen zu diesem Genre passen.`;
+
+  return `Erfinde eine **vollständige, in sich stimmige** Figur und fülle damit ein Charakter-Formular. Es entsteht **noch kein** Beschreibungstext – nur die Vorgaben, wie sie ein Mensch ins Formular tippen würde: knapp und konkret.
+
+${festBlock}${offenBlock}${themaBlock}
+${genreBlock}
+
+Anforderungen:
+- Alle Felder ergeben **eine** Figur – Beruf, Herkunft, Aussehen und Wesen greifen ineinander und passen zu Genre und Setting.
+- Jeder Wert ist **knapp** wie eine Formulareingabe: Name aus Vor- und Nachname; Alter kurz; Aussehen ein bis zwei Sätze (Haare, Augen, Statur, Kleidung); Setting wenige Worte; Beruf eine Rolle; Hintergrund zwei bis drei Sätze; Persönlichkeit einige Wesenszüge; „Weitere Wünsche" eine einzelne prägende Eigenheit.
+- Das Geschlecht ist konkret (weiblich, männlich oder divers), nie „egal".
+- Alles auf Deutsch.`;
+}
+
+/**
+ * Baut den Prompt für ein **zufälliges Szenario** – das Anlege-Formular auf
+ * einmal, als **Structured Output** (`randomScenarioSchema`). Das Gegenstück zu
+ * `buildRandomInputPrompt` beim Charakter, mit denselben zwei Regeln:
+ * bereits Ausgefülltes bleibt (feste Vorgabe im Prompt, von der Route erzwungen),
+ * und das Genre bleibt fest, außer `genreWuerfeln` erlaubt die freie Wahl.
+ *
+ * Erzeugt wird die **Welt**, nicht die Geschichte darin: Name, Ort, Zeit, Regeln
+ * und Beschreibung. **Kein Handlungsentwurf** – der braucht Figuren.
+ */
+export function buildRandomScenarioPrompt(
+  name: string,
+  details: {
+    genre?: string;
+    ort?: string;
+    zeit?: string;
+    regeln?: string;
+    beschreibung?: string;
+  },
+  freitext: string,
+  genreWuerfeln = false,
+): string {
+  const felder: Array<[string, string]> = [
+    ["Name", name],
+    ["Ort", details.ort ?? ""],
+    ["Zeit", details.zeit ?? ""],
+    ["Regeln", details.regeln ?? ""],
+    ["Beschreibung", details.beschreibung ?? ""],
+  ];
+
+  const fest = felder.filter(([, wert]) => wert.trim());
+  const offen = felder.filter(([, wert]) => !wert.trim());
+
+  const festBlock = fest.length
+    ? `Diese Felder sind bereits festgelegt und dürfen **nicht** geändert werden – alles Übrige muss zu ihnen passen:\n${fest
+        .map(([label, wert]) => `- ${label}: ${wert.trim()}`)
+        .join("\n")}\n`
+    : "Es ist noch nichts festgelegt – erfinde die Welt frei.\n";
+
+  const offenBlock = offen.length
+    ? `\nDiese Felder sollst du stimmig ausfüllen:\n${offen
+        .map(([label]) => `- ${label}`)
+        .join("\n")}\n`
+    : "";
+
+  const genreliste = GENRE_TEMPLATES.map(
+    (g) => `${g.id} (${g.label})`,
+  ).join(", ");
+  const aktuellesGenre = details.genre?.trim() || DEFAULT_GENRE;
+
+  const themaBlock = freitext.trim()
+    ? `\nVorgabe für das Szenario – die ganze Welt soll dazu passen:\n${freitext.trim()}\n`
+    : "\nEs gibt keine besondere Vorgabe – überrasch mit einer originellen, in sich stimmigen Welt.\n";
+
+  const genreBlock = genreWuerfeln
+    ? `Zum **Genre**: Wähle das am besten zur Welt passende aus dieser Liste (gib die Id im Feld „genre" zurück): ${genreliste}. Alle Felder müssen zum gewählten Genre passen.`
+    : `Zum **Genre**: Die Welt spielt im Genre „${genreLabel(aktuellesGenre)}" (${aktuellesGenre}) – das steht **fest** und darf nicht gewechselt werden. Gib im Feld „genre" genau „${aktuellesGenre}" zurück, und alle Felder müssen zu diesem Genre passen.`;
+
+  return `Erfinde ein **vollständiges, in sich stimmiges Szenario** – eine Welt, in der Geschichten spielen können – und fülle damit ein Formular. Es entstehen die Festlegungen, wie sie ein Mensch einträgt.
+
+${festBlock}${offenBlock}${themaBlock}
+${genreBlock}
+
+Anforderungen:
+- Alle Felder ergeben **eine** Welt – Ort, Zeit, Regeln und Beschreibung greifen ineinander und passen zum Genre.
+- **Name**: kurz und treffend (2–5 Wörter), kein ganzer Satz.
+- **Ort**: ein Gebiet – ein Rahmen (Stadt, Landstrich, Station) und zwei bis drei Schauplätze darin, jeder mit einer Reibungsfläche. Kein einzelner Punkt.
+- **Zeit**: ein Zeitraum – ein Rahmen (Epoche, Jahreszeit) und eine Spanne, über die sich etwas verschiebt. Kein bloßes Datum.
+- **Regeln**: vollständige Sätze über den Technik-/Weltenstand, mit Leerzeichen verbunden. Keine Zahlen, keine Eigennamen – zwei Regeln müssen nebeneinander stehen können.
+- **Beschreibung**: zwei bis drei Absätze, konkret und sinnlich (Atmosphäre, Alltag), ohne den übrigen Feldern zu widersprechen.
+- Alles auf Deutsch.`;
 }
 
 /**

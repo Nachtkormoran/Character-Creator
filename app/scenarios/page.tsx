@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -18,6 +18,7 @@ import {
 import type { StoredScenario } from "@/lib/serialize";
 import { genreLabel } from "@/lib/templates";
 import { ScenarioFields } from "../components/ScenarioFields";
+import { RandomScenarioModal } from "../components/RandomScenarioModal";
 
 /**
  * Die Zeile unter dem Namen in der Übersicht: die gefüllten Festlegungen,
@@ -43,10 +44,57 @@ function summary(details: ScenarioDetails): string {
 
 const LEER: ScenarioDetails = normalizeScenarioDetails({});
 
+/** Gemeinsame Optik der Bedienelemente (Auswahl + Suche) – wie in der Galerie. */
+const controlClass =
+  "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
+
+type SortKey = "name-asc" | "name-desc" | "newest" | "oldest";
+
+const SORT_LABELS: Record<SortKey, string> = {
+  "name-asc": "Name A–Z",
+  "name-desc": "Name Z–A",
+  newest: "Neueste zuerst",
+  oldest: "Älteste zuerst",
+};
+
+/**
+ * Kleinschreibung ohne Diakritika, damit „muller" auch „Müller" findet – dieselbe
+ * Normalisierung wie in der Charakterübersicht (dort lokal, hier lokal: die
+ * beiden Seiten teilen sonst nichts, und die Funktion ist winzig).
+ */
+function normalize(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/ß/g, "ss")
+    .replace(/['’‘´`]/g, "")
+    .toLowerCase();
+}
+
+/**
+ * Durchsuchbarer Text eines Szenarios: Name und **alle** Festlegungen (Genre als
+ * Label, nicht als Id). Läuft über `SCENARIO_LABELS`, damit ein später ergänztes
+ * Feld automatisch mitdurchsucht wird – dieselbe Idee wie bei `summary`.
+ */
+function searchableText(s: StoredScenario): string {
+  const felder = (Object.keys(SCENARIO_LABELS) as Array<keyof ScenarioDetails>)
+    .map((key) => {
+      const value = s.details[key]?.trim();
+      if (!value) return "";
+      return key === "genre" ? genreLabel(value) : value;
+    });
+  return normalize([s.name, ...felder].join(" "));
+}
+
 export default function ScenariosPage() {
   const [scenarios, setScenarios] = useState<StoredScenario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Suche und Sortierung – wie in der Charakterübersicht. Standard bleibt die
+  // alphabetische Reihenfolge (die die Listen-Route ohnehin liefert).
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("name-asc");
 
   // Anlege-Formular. Eingeklappt, solange es nicht gebraucht wird: die Seite
   // ist in erster Linie eine Übersicht.
@@ -58,6 +106,8 @@ export default function ScenariosPage() {
   const [generatingField, setGeneratingField] = useState<
     keyof ScenarioDetails | null
   >(null);
+  /** Ob das „Zufälliges Szenario"-Modal offen ist. */
+  const [randomOpen, setRandomOpen] = useState(false);
 
   // Import einer Szenario-Datei.
   const [importing, setImporting] = useState(false);
@@ -138,6 +188,35 @@ export default function ScenariosPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Suchtext je Szenario einmal vorberechnen – die Beschreibungen sind lang.
+  const searchIndex = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of scenarios) m.set(s.id, searchableText(s));
+    return m;
+  }, [scenarios]);
+
+  const visibleScenarios = useMemo(() => {
+    // Mehrere Suchbegriffe werden UND-verknüpft (wie in der Galerie).
+    const terms = normalize(query).split(/\s+/).filter(Boolean);
+    const matching = scenarios.filter((s) => {
+      if (terms.length === 0) return true;
+      const haystack = searchIndex.get(s.id) ?? "";
+      return terms.every((t) => haystack.includes(t));
+    });
+    return matching.sort((a, b) => {
+      switch (sort) {
+        case "name-desc":
+          return b.name.localeCompare(a.name, "de");
+        case "newest":
+          return b.createdAt.localeCompare(a.createdAt);
+        case "oldest":
+          return a.createdAt.localeCompare(b.createdAt);
+        default:
+          return a.name.localeCompare(b.name, "de");
+      }
+    });
+  }, [scenarios, query, sort, searchIndex]);
+
   /**
    * Eine Szenario-Exportdatei einspielen.
    *
@@ -186,6 +265,17 @@ export default function ScenariosPage() {
     setName("");
     setDetails(LEER);
     setZusatz({});
+    setFormError(null);
+  }
+
+  /**
+   * Das Ergebnis des „Zufälligen Szenarios" ins Formular übernehmen: Name und
+   * Festlegungen ersetzen. Die gefüllten `details` enthalten den (unveränderten)
+   * Handlungsentwurf schon mit.
+   */
+  function applyRandom(neuerName: string, neueDetails: ScenarioDetails) {
+    setName(neuerName);
+    setDetails(neueDetails);
     setFormError(null);
   }
 
@@ -276,6 +366,23 @@ export default function ScenariosPage() {
           onSubmit={handleCreate}
           className="flex flex-col gap-4 rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]"
         >
+          {/*
+            Ganz oben: das ganze Szenario auf einmal würfeln. Öffnet ein Modal
+            mit freier Vorgabe; bereits ausgefüllte Felder bleiben, der Rest wird
+            gefüllt. Rechtsbündig wie beim Charakter-Formular.
+          */}
+          <div className="-mb-1 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setRandomOpen(true)}
+              disabled={saving}
+              title="Das ganze Formular per KI ausfüllen – bereits ausgefüllte Felder bleiben erhalten"
+              className="rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              🎲 Zufälliges Szenario
+            </button>
+          </div>
+
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">Name</span>
             <input
@@ -343,9 +450,58 @@ export default function ScenariosPage() {
         </div>
       )}
 
+      {/* Sortieren & Suchen – wie in der Charakterübersicht. Erst ab einem
+          Szenario sinnvoll; die Leiste bleibt auch stehen, wenn die Suche
+          gerade nichts findet (sonst käme man an das Zurücksetzen nicht heran). */}
       {scenarios.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-black/10 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]">
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-foreground/60">Sortieren:</span>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+              className={controlClass}
+            >
+              {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+                <option key={key} value={key}>
+                  {SORT_LABELS[key]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="relative flex min-w-48 flex-1 items-center">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Suchen …"
+              aria-label="Szenarien durchsuchen (Name und Festlegungen)"
+              className={`${controlClass} w-full`}
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Suche zurücksetzen"
+                className="absolute right-2 text-foreground/40 transition hover:text-foreground"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {scenarios.length > 0 && visibleScenarios.length === 0 && (
+        <div className="rounded-xl border border-dashed border-black/15 p-8 text-center text-sm text-foreground/60 dark:border-white/15">
+          Kein Szenario passt zur Suche.
+        </div>
+      )}
+
+      {visibleScenarios.length > 0 && (
         <ul className="flex flex-col gap-3">
-          {scenarios.map((s) => {
+          {visibleScenarios.map((s) => {
             const zeile = summary(s.details);
             return (
               <li key={s.id}>
@@ -379,6 +535,15 @@ export default function ScenariosPage() {
             );
           })}
         </ul>
+      )}
+
+      {randomOpen && (
+        <RandomScenarioModal
+          currentName={name}
+          currentDetails={details}
+          onFilled={applyRandom}
+          onClose={() => setRandomOpen(false)}
+        />
       )}
     </div>
   );

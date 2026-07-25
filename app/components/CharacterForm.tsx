@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { generateName } from "@/lib/client";
+import { generateInputField, generateName } from "@/lib/client";
 import { randomName } from "@/lib/names";
 import { randomAppearance, randomPersonality } from "@/lib/inspiration";
 import { randomBackground } from "@/lib/backgrounds";
 import { randomProfession } from "@/lib/professions";
+import type { InputField } from "@/lib/prompts";
 import { DEFAULT_IMAGE_STYLE, GENDERS, type CharacterInput } from "@/lib/schema";
 import {
   DEFAULT_GENRE,
   GENRE_TEMPLATES,
 } from "@/lib/templates";
+import { RandomCharacterModal } from "./RandomCharacterModal";
 
 const EMPTY: CharacterInput = {
   genre: DEFAULT_GENRE,
@@ -76,6 +78,39 @@ function DiceButton({
   );
 }
 
+/**
+ * Das schlaue Gegenstück zum Würfel: befüllt das Feld per KI, passend zu den
+ * übrigen Angaben. `busy` zeigt den Lauf **dieses** Feldes, `disabled` sperrt
+ * alle KI-Knöpfe, solange irgendeiner läuft (die Erzeugung liest die anderen
+ * Felder mit).
+ */
+function AiButton({
+  onClick,
+  busy,
+  disabled,
+  label,
+  title,
+}: {
+  onClick: () => void;
+  busy: boolean;
+  disabled: boolean;
+  label: string;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={title}
+      className="shrink-0 rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+    >
+      {busy ? "…" : "✨"}
+    </button>
+  );
+}
+
 export function CharacterForm({
   onGenerate,
   loading,
@@ -104,6 +139,15 @@ export function CharacterForm({
   const genre = form.genre;
   const [namingAI, setNamingAI] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
+  /** Ob das „Zufällige Figur"-Modal offen ist. */
+  const [randomOpen, setRandomOpen] = useState(false);
+  /** Welches Feld gerade per KI erzeugt wird (sperrt alle KI-Knöpfe). */
+  const [aiField, setAiField] = useState<InputField | null>(null);
+  /** Fehler der Feld-KI, dem verursachenden Feld zugeordnet. */
+  const [aiFieldError, setAiFieldError] = useState<{
+    feld: InputField;
+    msg: string;
+  } | null>(null);
 
   function update<K extends keyof CharacterInput>(
     key: K,
@@ -161,6 +205,39 @@ export function CharacterForm({
     }
   }
 
+  /**
+   * Ein Feld per KI befüllen – das schlaue Gegenstück zum Würfel: Es liest die
+   * übrigen ausgefüllten Angaben mit und erzeugt Stimmiges im selben Umfang.
+   * Ersetzt den Feldinhalt (wie der Würfel); das Zielfeld selbst geht nicht mit.
+   */
+  async function suggestField(feld: InputField) {
+    if (aiField) return;
+    setAiField(feld);
+    setAiFieldError(null);
+    try {
+      const { wert } = await generateInputField(feld, form);
+      update(feld, wert);
+    } catch (err) {
+      setAiFieldError({
+        feld,
+        msg: err instanceof Error ? err.message : "Fehler.",
+      });
+    } finally {
+      setAiField(null);
+    }
+  }
+
+  /**
+   * Das Ergebnis der „Zufällige Figur" ins Formular übernehmen: die gefüllten
+   * Felder über den bestehenden Zustand legen. Bewusst **kein** `applyGenre`
+   * hinterher – das würde die eben erzeugten Felder mit den Genre-Vorlagewerten
+   * überschreiben; das Genre kommt hier schon fertig mit.
+   */
+  function applyRandom(fields: Partial<CharacterInput>) {
+    setForm((f) => ({ ...f, ...fields }));
+    setNameError(null);
+  }
+
   return (
     <form
       onSubmit={(e) => {
@@ -169,6 +246,24 @@ export function CharacterForm({
       }}
       className="flex flex-col gap-5 rounded-xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03]"
     >
+      {/*
+        Ganz oben: die ganze Figur auf einmal würfeln. Öffnet ein Modal mit
+        freier Themen-Vorgabe; bereits ausgefüllte Felder bleiben, der Rest wird
+        gefüllt. Rechtsbündig, damit es das Formular nicht anführt, sondern als
+        Abkürzung danebensteht.
+      */}
+      <div className="-mb-1 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setRandomOpen(true)}
+          disabled={loading}
+          title="Das ganze Formular per KI ausfüllen – bereits ausgefüllte Felder bleiben erhalten"
+          className="rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+        >
+          🎲 Zufällige Figur
+        </button>
+      </div>
+
       <Field
         label="Genre"
         hint="Belegt das Setting genre-passend vor, steuert die Würfel und wird am Charakter gespeichert – alle anderen Felder bleiben unverändert."
@@ -274,7 +369,19 @@ export function CharacterForm({
             label="Aussehen würfeln"
             title="Zufällige Merkmale zum Aussehen, passend zum gewählten Geschlecht"
           />
+          <AiButton
+            onClick={() => suggestField("appearance")}
+            busy={aiField === "appearance"}
+            disabled={loading || aiField !== null}
+            label="Aussehen per KI erzeugen"
+            title="Aussehen per KI, passend zu Geschlecht, Alter, Herkunft und Beruf"
+          />
         </div>
+        {aiFieldError?.feld === "appearance" && (
+          <span className="text-xs text-red-600 dark:text-red-400">
+            {aiFieldError.msg}
+          </span>
+        )}
       </Field>
 
       <Field label="Persönlichkeit">
@@ -291,7 +398,19 @@ export function CharacterForm({
             label="Persönlichkeit würfeln"
             title="Drei bis vier zufällige Wesenszüge"
           />
+          <AiButton
+            onClick={() => suggestField("personality")}
+            busy={aiField === "personality"}
+            disabled={loading || aiField !== null}
+            label="Persönlichkeit per KI erzeugen"
+            title="Persönlichkeit per KI, passend zu den übrigen Angaben"
+          />
         </div>
+        {aiFieldError?.feld === "personality" && (
+          <span className="text-xs text-red-600 dark:text-red-400">
+            {aiFieldError.msg}
+          </span>
+        )}
       </Field>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -318,7 +437,19 @@ export function CharacterForm({
               label="Beruf würfeln"
               title="Zufälliger Beruf, passend zur Genre-Vorlage"
             />
+            <AiButton
+              onClick={() => suggestField("occupation")}
+              busy={aiField === "occupation"}
+              disabled={loading || aiField !== null}
+              label="Beruf per KI erzeugen"
+              title="Beruf per KI, passend zu Genre, Setting und Hintergrund"
+            />
           </div>
+          {aiFieldError?.feld === "occupation" && (
+            <span className="text-xs text-red-600 dark:text-red-400">
+              {aiFieldError.msg}
+            </span>
+          )}
         </Field>
       </div>
 
@@ -336,7 +467,19 @@ export function CharacterForm({
             label="Hintergrund würfeln"
             title="Ein bis drei zufällige prägende Ereignisse, passend zur Genre-Vorlage"
           />
+          <AiButton
+            onClick={() => suggestField("background")}
+            busy={aiField === "background"}
+            disabled={loading || aiField !== null}
+            label="Hintergrund per KI erzeugen"
+            title="Hintergrund per KI, passend zu Herkunft, Beruf und Genre"
+          />
         </div>
+        {aiFieldError?.feld === "background" && (
+          <span className="text-xs text-red-600 dark:text-red-400">
+            {aiFieldError.msg}
+          </span>
+        )}
       </Field>
 
       <Field label="Weitere Wünsche">
@@ -365,6 +508,14 @@ export function CharacterForm({
           Zurücksetzen
         </button>
       </div>
+
+      {randomOpen && (
+        <RandomCharacterModal
+          current={form}
+          onFilled={applyRandom}
+          onClose={() => setRandomOpen(false)}
+        />
+      )}
     </form>
   );
 }

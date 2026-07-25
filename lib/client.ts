@@ -29,6 +29,7 @@ import type {
   StoryHookAnchor,
 } from "./schema";
 import type { StoredCharacter, StoredScenario } from "./serialize";
+import type { InputField } from "./prompts";
 
 /**
  * Erzeugt das Vorschaubild. Schlägt das fehl (etwa weil Canvas das Bild nicht
@@ -74,6 +75,39 @@ export function generateText(input: CharacterInput) {
  */
 export function generateName(input: CharacterInput, traits?: CharacterTraits) {
   return postJson<{ name: string }>("/api/generate-name", { input, traits });
+}
+
+/**
+ * Befüllt ein einzelnes Formularfeld per KI (Aussehen, Persönlichkeit, Beruf,
+ * Hintergrund) – das schlaue Gegenstück zum Würfel: Es liest die übrigen
+ * Vorgaben mit und erzeugt Stimmiges im selben Umfang wie ein Wurf.
+ */
+export function generateInputField(feld: InputField, input: CharacterInput) {
+  return postJson<{ wert: string }>("/api/generate-input-field", {
+    feld,
+    input,
+  });
+}
+
+/**
+ * **Zufällige Figur:** füllt das ganze Erstellen-Formular auf einmal. Bereits
+ * ausgefüllte Felder bleiben (das erzwingt die Route), leere werden erfunden,
+ * `prompt` ist die freie Themen-Vorgabe (leer = völliger Zufall). Das Genre
+ * **bleibt** standardmäßig beim aktuell gewählten; nur mit `genreWuerfeln`
+ * wählt die KI es passend zur Vorgabe. Zurück kommen nur die füllbaren Felder –
+ * der Aufrufer legt sie über seinen Formularzustand (`imageStyle`/`model`
+ * bleiben).
+ */
+export function generateRandomInput(
+  input: CharacterInput,
+  prompt: string,
+  genreWuerfeln = false,
+) {
+  return postJson<{ input: Partial<CharacterInput> }>("/api/random-input", {
+    input,
+    prompt,
+    genreWuerfeln,
+  });
 }
 
 /**
@@ -666,6 +700,25 @@ export function generateScenarioDescription(
     details,
     zusatz,
   });
+}
+
+/**
+ * **Zufälliges Szenario:** füllt das Anlege-Formular auf einmal (Name + Welt).
+ * Bereits ausgefüllte Felder bleiben (das erzwingt die Route), leere werden
+ * erfunden. Das Genre **bleibt** standardmäßig beim gewählten; nur mit
+ * `genreWuerfeln` wählt die KI es passend. Der **Handlungsentwurf** wird nicht
+ * erzeugt (braucht Figuren) und bleibt unverändert. `prompt` = freie Vorgabe.
+ */
+export function generateRandomScenario(
+  name: string,
+  details: ScenarioDetails,
+  prompt: string,
+  genreWuerfeln = false,
+) {
+  return postJson<{ name: string; details: ScenarioDetails }>(
+    "/api/random-scenario",
+    { name, details, prompt, genreWuerfeln },
+  );
 }
 
 /**

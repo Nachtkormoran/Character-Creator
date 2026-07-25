@@ -222,6 +222,40 @@ export const characterInputSchema = z.object({
 
 export type CharacterInput = z.infer<typeof characterInputSchema>;
 
+/**
+ * **Zufällige Figur:** das Schema, mit dem die KI das *ganze* Erstellen-Formular
+ * auf einmal füllt (Structured Output). Es enthält genau die vom Nutzer
+ * ausfüllbaren Felder – **kein** `imageStyle` (eine Darstellungswahl, kein
+ * Inhalt) und **kein** `model` (steht erst beim Speichern fest).
+ *
+ * Anders als in `characterInputSchema` ist das **Geschlecht** hier auf konkrete
+ * Werte beschränkt: „egal" ist eine *Vorgabe* („überrasch mich"), keine
+ * *Antwort* – die Zufallsfigur soll ein Geschlecht haben. Und **keine**
+ * `.max()`-Grenzen: Structured Outputs verträgt `maxLength` nicht überall
+ * zuverlässig, und die Route deckelt die Antwort ohnehin auf die
+ * `characterInputSchema`-Grenzen (dieselbe Überlegung wie bei `.int()`, s.
+ * Fallstricke in CLAUDE.md).
+ */
+export const randomInputSchema = z.object({
+  genre: z
+    .enum(GENRE_TEMPLATES.map((g) => g.id) as [string, ...string[]])
+    .describe("Passendes Genre aus der vorgegebenen Liste"),
+  name: z.string().describe("Vollständiger Name (Vor- und Nachname)"),
+  gender: z
+    .enum(["weiblich", "männlich", "divers"])
+    .describe("Konkretes Geschlecht – nie 'egal'"),
+  age: z.string().describe("Alter, z. B. 'Mitte 30' oder '19'"),
+  ethnicity: z.string().describe("Herkunft / Ethnie"),
+  appearance: z.string().describe("Aussehen: Haare, Augen, Statur, Kleidung"),
+  setting: z.string().describe("Setting in wenigen Worten (Welt, Epoche)"),
+  occupation: z.string().describe("Beruf / Rolle"),
+  background: z.string().describe("Hintergrund: Herkunft, prägende Ereignisse"),
+  personality: z.string().describe("Persönlichkeit: einige Wesenszüge"),
+  notes: z.string().describe("Weitere prägende Eigenheit für die Figur"),
+});
+
+export type RandomInput = z.infer<typeof randomInputSchema>;
+
 // ---------------------------------------------------------------------------
 // Merkmale (LLM-Ausgabe, strukturiert → Tabelle)
 // ---------------------------------------------------------------------------
@@ -465,6 +499,42 @@ export const scenarioDetailsSchema = z.object({
     .optional()
     .default(""),
 });
+
+/**
+ * **Zufälliges Szenario:** das Schema, mit dem die KI das Anlege-Formular auf
+ * einmal füllt (Structured Output) – das Gegenstück zu `randomInputSchema` beim
+ * Charakter.
+ *
+ * Enthält **Name** (eine echte Spalte, kein Teil der Festlegungen) plus die
+ * **Welt**-Felder. **Kein `handlung`**: Der Handlungsentwurf ist im Projekt aus
+ * den zugeordneten Figuren abgeleitet, und ein frisches Szenario hat keine – er
+ * hat auf der Anlege-Seite deshalb auch keinen Erzeugen-Knopf. Wie beim
+ * Charakter ist das **Genre** ein Enum (die Route erzwingt den Wert zusätzlich)
+ * und es gibt **keine** `.max()`-Grenzen (die Route deckelt auf
+ * `SCENARIO_MAXLENGTHS`).
+ */
+export const randomScenarioSchema = z.object({
+  name: z.string().describe("Kurzer, treffender Name des Szenarios"),
+  genre: z
+    .enum(GENRE_TEMPLATES.map((g) => g.id) as [string, ...string[]])
+    .describe("Passendes Genre aus der vorgegebenen Liste"),
+  ort: z
+    .string()
+    .describe("Ort als Gebiet: ein Rahmen plus zwei bis drei Schauplätze darin"),
+  zeit: z
+    .string()
+    .describe("Zeit als Zeitraum: ein Rahmen plus eine Spanne"),
+  regeln: z
+    .string()
+    .describe(
+      "Regeln/Technikstand der Welt als vollständige Sätze, ohne Eigennamen und Zahlen",
+    ),
+  beschreibung: z
+    .string()
+    .describe("Zwei bis drei Absätze über die Welt: Atmosphäre, Alltag, Stimmung"),
+});
+
+export type RandomScenario = z.infer<typeof randomScenarioSchema>;
 
 export type ScenarioDetails = z.infer<typeof scenarioDetailsSchema>;
 
@@ -744,7 +814,7 @@ export const STORY_TONES = [
   },
   {
     value: "explizit",
-    label: "Sexuell explizit",
+    label: "Explizit",
     hint: "Schildere intime und sexuelle Momente ausdrücklich und detailliert, statt sie auszublenden oder anzudeuten – körperlich, sinnlich und konkret. Genau in diesen Momenten wird die Sprache direkter und etwas vulgär: deftige, körperliche Wörter statt Umschreibungen. Außerhalb solcher Szenen bleibt der Ton normal erzählend. Alle daran Beteiligten sind erwachsen und handeln einvernehmlich.",
   },
 ] as const;
