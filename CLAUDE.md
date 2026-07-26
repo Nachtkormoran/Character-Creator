@@ -822,9 +822,10 @@ kommt zurück und wird als `meta[…].titel` an die neue Variante gehängt. Schl
 der Aufruf fehl, bleibt der Titel leer und der Reiter zeigt den Rückfall
 „Entwurf N"/„Arc N" – der Entwurf entsteht trotzdem (der Titel ist Beiwerk).
 Alte/leere/von Hand angelegte Varianten tragen keinen Titel und kein Badge. Das
-Badge (`variantBadge`) lässt die **neutralen Vorgaben** (`allround`, `neutral`)
-und leere Werte **weg** – sie unterscheiden keine Varianten und wären nur
-Rauschen.
+Badge (`variantBadge`) zeigt **Erzählform zuerst, dann Ton**, und zwar **auch die
+Vorgaben** (`allround`/`neutral`) – nur **leere** Werte (Altbestände, von Hand
+angelegt) fallen weg. (Anfangs waren die Vorgaben ausgeblendet; das ließ die
+Erzählform bei Standard-Läufen verschwinden, sodass nur der Ton stand.)
 
 **Die `meta`-Liste muss mit `items` in Deckung bleiben.** Alle Mutationen
 (Erzeugen, Löschen, „Alle löschen", leeren Entwurf anhängen) pflegen sie parallel;
@@ -979,12 +980,18 @@ Arc **und** Kapitel **und** Prosa gemeinsam.
 
 **Erzählform** (`STORY_FORMS` + `formHint` in `schema.ts`, Zwilling von
 `STORY_TONES`/`toneHint`): die **dritte Achse** neben Genre (der Welt) und Ton
-(dem Wie) – *welche Art* Geschichte: `allround` (Default, kein Hinweis = wie
-bisher), `liebe`, `abenteuer`, `krimi`, `drama`, `thriller`. Sie prägt
-**Konflikt und Aufbau**, nicht die Welt, und ist bewusst **kein Genre**: ein
-Krimi spielt in jeder Welt (ein „Fantasy-Krimi" ist möglich). Ein
-Lauf-Parameter, **nicht gespeichert**, ohne Allowlist als String durchgereicht
-(unbekannt = leerer Block). `formHinweis(form)` wird in **alle vier**
+(dem Wie) – *welche Art* Geschichte: `allround` (Label **„Allgemein"**, Default,
+kein Hinweis = wie bisher), `liebe`, `abenteuer`, `krimi`, `drama`, `thriller`,
+`komoedie`, `tragoedie`, `mystery` (Label „Rätselgeschichte"), `reifung` (Label
+„Reifungsgeschichte"), `intrige`, `rache` (Label „Rachegeschichte"), `survival`
+(Label „Überlebensgeschichte"), `satire`. Sie prägt **Konflikt und Aufbau**,
+nicht die Welt, und ist bewusst **kein Genre**: ein Krimi spielt in jeder Welt
+(ein „Fantasy-Krimi" ist möglich). Ein Lauf-Parameter, **nicht gespeichert**,
+ohne Allowlist als String durchgereicht (unbekannt = leerer Block). Eine neue
+Form kostet **einen `STORY_FORMS`-Eintrag** (`value`/`label`/`hint`) – Menüs
+(Entwurf, Arc), `formLabel`, `formHint` und das Reiter-Badge ziehen automatisch
+mit; `value` einer bestehenden Form bleibt stabil (Bestandsdaten), nur Labels
+sind frei. `formHinweis(form)` wird in **alle vier**
 Erzeugungs-Prompts eingespeist (`buildScenarioPlotPrompt`, `buildStoryArcPrompt`,
 `buildStoryArcChaptersPrompt`, `buildChapterTextPrompt`). Handlungsentwurf
 (`handlungForm`) und Arc (`arcParams.form`) haben **getrennte** Erzählformen –

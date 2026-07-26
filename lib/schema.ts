@@ -941,7 +941,9 @@ export function toneHint(value: string): string {
  * beschreibt nie die Welt, damit dieselbe Form in jedem Genre funktioniert.
  */
 export const STORY_FORMS = [
-  { value: "allround", label: "Allround", hint: "" },
+  // `value` bleibt "allround" (Bestandsdaten, `DEFAULT_STORY_FORM`); nur das
+  // Label heißt jetzt „Allgemein". Der `hint` bleibt leer – kein Erzählform-Block.
+  { value: "allround", label: "Allgemein", hint: "" },
   {
     value: "liebe",
     label: "Liebesgeschichte",
@@ -967,6 +969,46 @@ export const STORY_FORMS = [
     label: "Thriller",
     hint: "Erzähle einen Thriller: Ins Zentrum gehören eine akute Bedrohung und wachsender Druck – Gefahr, eine tickende Uhr, Verfolgung, hoher Einsatz. Die Figuren müssen handeln, um ein Unheil abzuwenden; die Spannung kommt aus Unmittelbarkeit und der Ungewissheit über Gelingen oder Überleben. Jede Station verschärft die Lage und zieht die Schlinge enger.",
   },
+  {
+    value: "komoedie",
+    label: "Komödie",
+    hint: "Erzähle eine Komödie: Ins Zentrum gehören Verwicklungen, Missverständnisse und schiefe Lagen, die sich zuspitzen, bis sie sich – oft überraschend – auflösen. Die Figuren geraten durch Fehltritte, Verwechslungen und widerstreitende Absichten in immer verzwicktere Situationen; die Spannung kommt aus dem Auseinanderklaffen von Absicht und Wirkung, nicht aus Gefahr. Es steuert auf ein glückliches oder versöhnliches Ende zu, in dem sich die Knoten lösen. Jede Station verschärft die Verwicklung oder bringt eine neue Wendung.",
+  },
+  {
+    value: "tragoedie",
+    label: "Tragödie",
+    hint: "Erzähle eine Tragödie: Ins Zentrum gehört der Fall einer Figur – durch einen eigenen Fehler, eine Schuld, eine Verblendung oder ein unabwendbares Schicksal. Was sie stark oder besonders macht, wird ihr zum Verhängnis; ihre Entscheidungen ziehen unaufhaltsam Unheil nach sich. Die Spannung entsteht aus der Ahnung des Kommenden und der Ohnmacht, es abzuwenden. Es endet in Verlust, Untergang oder Katastrophe – folgerichtig aus dem, was die Figur ist und tut. Jede Station treibt den Fall weiter und verschließt einen Ausweg.",
+  },
+  {
+    value: "mystery",
+    label: "Rätselgeschichte",
+    hint: "Erzähle eine Rätselgeschichte: Ins Zentrum gehört ein Geheimnis – ein Verschwinden, ein unerklärliches Ereignis, eine verborgene Wahrheit –, das nach und nach durchdrungen wird. Anders als bei der Kriminalgeschichte muss kein Verbrechen dahinterstehen; es geht um das Enträtseln selbst. Die Spannung entsteht aus dem Sog des Ungeklärten: Hinweise, falsche Fährten und Teilantworten, die neue Fragen aufwerfen. Die Handlung schreitet als Aufdeckung voran, bis das Rätsel sich klärt – ganz oder in einem bewusst offenen Rest. Jede Station legt ein Stück frei und vertieft das Geheimnis.",
+  },
+  {
+    value: "reifung",
+    label: "Reifungsgeschichte",
+    hint: "Erzähle eine Reifungsgeschichte: Ins Zentrum gehört eine Figur, die an ihren Erfahrungen wächst – vom Aufbruch aus einem unfertigen oder behüteten Zustand über Prüfungen, Irrtümer und Verluste bis zu einem gereiften, veränderten Selbst. Der eigentliche Schauplatz ist die innere Entwicklung; die äußeren Ereignisse sind die Anlässe, an denen sie sich vollzieht. Die Spannung kommt aus dem, was die Figur lernen, loslassen oder überwinden muss. Jede Station stellt sie vor eine Erfahrung, die sie verändert.",
+  },
+  {
+    value: "intrige",
+    label: "Intrige",
+    hint: "Erzähle eine Intrige: Ins Zentrum gehören Machtkämpfe, Ränke und verdeckte Absichten – mehrere Parteien, die einander täuschen, benutzen und hintergehen, um Einfluss, Vorteil oder Herrschaft. Die Spannung entsteht aus verborgenen Plänen, wechselnden Bündnissen und dem Verrat, der jederzeit möglich ist; nichts ist, wie es scheint. Die Handlung schreitet als Zug und Gegenzug voran, bis sich die Fäden entwirren oder jemand triumphiert. Jede Station verschiebt das Kräfteverhältnis oder deckt eine verborgene Absicht auf.",
+  },
+  {
+    value: "rache",
+    label: "Rachegeschichte",
+    hint: "Erzähle eine Rachegeschichte: Ins Zentrum gehören ein erlittenes Unrecht und der Wille zur Vergeltung – die ganze Handlung ist um dieses eine Ziel gebaut. Eine Figur verfolgt, wer ihr Leid zugefügt hat; der Weg dorthin fordert seinen Preis und wirft die Frage auf, ob die Rache befreit oder verzehrt. Die Spannung kommt aus der Annäherung an das Ziel und dem, was sie kostet. Es steuert auf die Vergeltung zu – vollzogen, verweigert oder ins Leere laufend. Jede Station bringt die Figur näher an den, der ihr Unrecht tat, oder stellt ihren Entschluss auf die Probe.",
+  },
+  {
+    value: "survival",
+    label: "Überlebensgeschichte",
+    hint: "Erzähle eine Überlebensgeschichte: Ins Zentrum gehört das nackte Bestehen gegen eine übermächtige Bedrohung – Natur, Katastrophe, Not oder Isolation. Es geht um Hunger, Kälte, Erschöpfung, Gefahr und die Entscheidungen, die das Überleben verlangt, auch die harten. Die Spannung kommt aus der ständigen Bedrängnis und der Ungewissheit, ob und wer durchkommt. Die Handlung schreitet von Prüfung zu Prüfung voran, jede zehrt an Kräften und Mitteln. Jede Station verschärft die Lage oder fordert einen neuen Preis.",
+  },
+  {
+    value: "satire",
+    label: "Satire",
+    hint: "Erzähle eine Satire: Ins Zentrum gehört die überzeichnete Kritik an Verhältnissen, Mächtigen oder menschlichen Torheiten – die Handlung führt Missstände durch Zuspitzung, Ironie und Bloßstellung vor. Figuren und Ereignisse sind bewusst übertrieben, um dahinter das Wahre kenntlich zu machen; der Witz hat eine Spitze. Die Spannung kommt aus dem Aufdecken und Vorführen, nicht aus Gefahr. Es steuert auf die Entlarvung zu. Jede Station treibt die Übertreibung weiter und legt eine Torheit oder ein Unrecht offen.",
+  },
 ] as const;
 
 export type StoryForm = (typeof STORY_FORMS)[number]["value"];
@@ -988,18 +1030,19 @@ export function toneLabel(value: string): string {
 }
 
 /**
- * Das **„Erzählform · Ton"-Badge** einer Variante für die Reiter-Leiste.
+ * Das **„Erzählform · Ton"-Badge** einer Variante für die Reiter-Leiste –
+ * **Erzählform zuerst**, dann Ton.
  *
- * Die **neutralen Vorgaben** (`allround`, `neutral`) und leere Werte
- * (Altbestände) werden **weggelassen** – sie unterscheiden keine Varianten und
- * wären nur Rauschen. Bleibt nichts übrig, ist das Ergebnis `""` (der Reiter
- * zeigt dann nur den Titel).
+ * Beide werden gezeigt, sobald sie gesetzt sind – **auch die Vorgaben**
+ * (`allround` = „Allround", `neutral` = „Neutral"): Die Erzählform gehört sonst
+ * bei den häufigen Standard-Läufen unter den Tisch. Nur **leere** Werte
+ * (Altbestände, von Hand angelegte Varianten) fallen weg; bleibt nichts übrig,
+ * ist das Ergebnis `""` (der Reiter zeigt dann nur den Titel).
  */
 export function variantBadge(meta: { form: string; ton: string }): string {
   const teile: string[] = [];
-  if (meta.form && meta.form !== DEFAULT_STORY_FORM)
-    teile.push(formLabel(meta.form));
-  if (meta.ton && meta.ton !== DEFAULT_STORY_TONE) teile.push(toneLabel(meta.ton));
+  if (meta.form) teile.push(formLabel(meta.form));
+  if (meta.ton) teile.push(toneLabel(meta.ton));
   return teile.join(" · ");
 }
 
