@@ -53,6 +53,11 @@ import {
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
 import {
+  aktiveFiguren,
+  joinFigurenDetail,
+  splitFigurenDetail,
+} from "@/lib/figuren";
+import {
   primaryImage,
   type StoredCharacter,
   type StoredScenario,
@@ -121,11 +126,6 @@ export default function ScenarioDetailPage({
     ton: StoryTone;
     /** Erzählform (Krimi, Liebe, …) – für Arc **und** Kapitel. */
     form: StoryForm;
-    /**
-     * Ob das **Figuren-Textfeld** in den Arc einfließt. Default `false` – ohne
-     * Häkchen wird `details.figuren` beim Ableiten komplett ignoriert.
-     */
-    figurenVerwenden: boolean;
   }>({
     laenge: DEFAULT_ARC_LENGTH,
     format: DEFAULT_ARC_FORMAT,
@@ -135,7 +135,6 @@ export default function ScenarioDetailPage({
     kapitelAnzahl: DEFAULT_KAPITEL_COUNT,
     ton: DEFAULT_STORY_TONE,
     form: DEFAULT_STORY_FORM,
-    figurenVerwenden: false,
   });
   /** Welche Station gerade Kapitel erzeugt, und ein etwaiger Fehler dazu. */
   const [kapitelBusy, setKapitelBusy] = useState<number | null>(null);
@@ -252,13 +251,30 @@ export default function ScenarioDetailPage({
     useState("");
 
   /**
-   * Ob das **Figuren-Textfeld** des Szenarios in den nächsten Handlungsentwurf
-   * einfließt. **Default `false`** – ohne Häkchen wird `details.figuren` beim
-   * Erzeugen komplett ignoriert (leer übergeben), der Prompt ist dann
-   * zeichengenau der ohne Figuren-Notizen. Nicht gespeichert (beschreibt einen
-   * Lauf, wie Ton und Weiterspinnen).
+   * Ob eine Figur in Handlungsentwurf/Story Arc einfließt, entscheidet ihr
+   * **eigenes Häkchen** an der Karte (`FigurenListe`) – gespeichert im String
+   * `details.figuren` (inaktive mit `⊘ `-Präfix, s. `lib/figuren.ts`).
+   * `aktiveFiguren(details.figuren)` liefert daraus den reinen Text der aktiven
+   * Figuren, den die Erzeugung bekommt; sind keine aktiv, ist er `""` und der
+   * Prompt zeichengenau der ohne Figuren-Notizen. Eine Seiten-Variable braucht
+   * es dafür nicht mehr.
    */
-  const [handlungFiguren, setHandlungFiguren] = useState(false);
+
+  /**
+   * Aus einer einzelnen Figur einen Charakter ableiten (Knopf je Figur-Karte).
+   * `figurBusy` hält die gerade ausgelesene Figur (sperrt die Knöpfe),
+   * `figurFehler` einen Fehler dazu, `figurKandidat` die ausgelesene Person samt
+   * ihrer Figur – sie öffnet denselben `PlotPersonModal` wie die Plot-Suche.
+   */
+  const [figurBusy, setFigurBusy] = useState<string | null>(null);
+  const [figurFehler, setFigurFehler] = useState<{
+    figur: string;
+    text: string;
+  } | null>(null);
+  const [figurKandidat, setFigurKandidat] = useState<{
+    person: PlotPerson;
+    figur: string;
+  } | null>(null);
 
   // -------------------------------------------------------------------------
   // Weltbild des Szenarios
@@ -501,9 +517,9 @@ export default function ScenarioDetailPage({
         const { handlung } = await generateScenarioPlot(
           id,
           name.trim(),
-          // Figuren-Notizen nur mitgeben, wenn die Checkbox gesetzt ist –
-          // sonst leer, damit das Feld komplett ignoriert wird.
-          handlungFiguren ? details : { ...details, figuren: "" },
+          // Nur die **aktiven** Figuren (reiner Text ohne Markup) fließen ein;
+          // sind keine aktiv, ist das Feld leer und wird komplett ignoriert.
+          { ...details, figuren: aktiveFiguren(details.figuren) },
           zusatz.handlung ?? "",
           basis,
           handlungWeiterspinnen,
@@ -724,43 +740,71 @@ export default function ScenarioDetailPage({
   }
 
   /**
-   * Personensuche im **Figuren-Feld** – dasselbe Muster wie oben, nur auf
-   * `details.figuren` statt `details.handlung`. Das Ergebnis wird an den Text
-   * gebunden, zu dem es gehört: Ändert sich das Feld, ist es hinfällig. Der
-   * gewählte Vorschlag (`gewaehlt`) und die Übergabe (`personAnlegen`) sind mit
-   * der Plot-Suche geteilt – beide führen denselben `PlotPersonModal`.
+   * Aus **einer** Figur einen Charakter ableiten – der Knopf je Figur-Karte.
+   * Er löst dieselbe Extraktion aus wie die frühere „Personen im Figuren-Feld
+   * suchen", nur auf genau diese eine Notiz statt auf das ganze Feld: Die Route
+   * liest daraus Name, Rolle und die weiteren Angaben und schlägt eine Person
+   * vor, die dann `PlotPersonModal` zur Bestätigung zeigt (`figurKandidat`).
+   *
+   * Findet die Route nichts Neues (etwa weil es die Figur schon als Charakter
+   * gibt), erscheint der Hinweis an der Karte statt eines leeren Dialogs.
    */
-  const [figurenErgebnis, setFigurenErgebnis] = useState<{
-    figuren: string;
-    personen: PlotPerson[] | null;
-    fehler: string | null;
-  } | null>(null);
-  const [figurenSuchend, setFigurenSuchend] = useState(false);
-
-  const figurenAktuell =
-    figurenErgebnis && figurenErgebnis.figuren === details.figuren
-      ? figurenErgebnis
-      : null;
-  const figurenPersonen = figurenAktuell?.personen ?? null;
-  const figurenSuchFehler = figurenAktuell?.fehler ?? null;
-
-  async function figurenPersonenSuchen() {
-    const figuren = details.figuren;
-    if (figurenSuchend || !figuren.trim()) return;
-    setFigurenSuchend(true);
-    setFigurenErgebnis(null);
+  async function figurCharakterExtrahieren(figur: string) {
+    if (figurBusy) return;
+    const text = figur.trim();
+    if (!text) return;
+    setFigurBusy(figur);
+    setFigurFehler(null);
     try {
-      const { personen } = await findFigurePersons(id, figuren);
-      setFigurenErgebnis({ figuren, personen, fehler: null });
+      const { personen } = await findFigurePersons(id, text);
+      if (personen.length === 0) {
+        setFigurFehler({
+          figur,
+          text: "Kein neuer Charakter ableitbar – vielleicht gibt es die Figur schon.",
+        });
+      } else {
+        setFigurKandidat({ person: personen[0], figur });
+      }
     } catch (e) {
-      setFigurenErgebnis({
-        figuren,
-        personen: null,
-        fehler: e instanceof Error ? e.message : "Fehler.",
+      setFigurFehler({
+        figur,
+        text: e instanceof Error ? e.message : "Fehler.",
       });
     } finally {
-      setFigurenSuchend(false);
+      setFigurBusy(null);
     }
+  }
+
+  /**
+   * Die aus einer Figur abgeleitete Person ans Erstellen-Formular übergeben –
+   * und **die Figur aus der Liste nehmen**: Sie wird zum Charakter, die Notiz ist
+   * damit erledigt. Damit die Entfernung den Seitenwechsel überlebt (die
+   * Navigation zum Formular verwirft ungespeicherte Änderungen), wird der
+   * bearbeitete Stand mit der entfernten Figur zuvor **gespeichert** – das nimmt
+   * dem „erst speichern"-Hinweis zugleich seinen Grund. Schlägt das Speichern
+   * fehl, bleibt man auf der Seite (mit Fehlermeldung) statt den Charakter ohne
+   * gesicherte Entfernung anzulegen.
+   */
+  async function figurCharakterAnlegen() {
+    if (!figurKandidat) return;
+    const { person, figur } = figurKandidat;
+    // Über die **normalisierte** Form vergleichen: Die Karte kann einen internen
+    // Umbruch tragen, den `details.figuren` längst zu einem Leerzeichen eingeebnet
+    // hat – ein roher `!==`-Vergleich träfe die Figur dann nicht. Die Aktiv-Wahl
+    // der übrigen Figuren bleibt dabei erhalten (`splitFigurenDetail`).
+    const ziel = figur.replace(/\s*\n\s*/g, " ").trim();
+    const rest = splitFigurenDetail(details.figuren).filter(
+      (f) => f.text !== ziel,
+    );
+    const neueDetails = { ...details, figuren: joinFigurenDetail(rest) };
+    setDetails(neueDetails);
+    setFigurKandidat(null);
+    if (nameValid) {
+      const ok = await speichern(neueDetails);
+      if (!ok) return;
+    }
+    stashPlotPerson(person);
+    router.push(`/?scenario=${id}`);
   }
 
   /**
@@ -795,8 +839,8 @@ export default function ScenarioDetailPage({
         weiterspinnen: arcParams.weiterspinnen,
         ton: arcParams.ton,
         form: arcParams.form,
-        // Nur mit Häkchen; sonst leer, damit das Figuren-Feld ignoriert wird.
-        figuren: arcParams.figurenVerwenden ? details.figuren : "",
+        // Nur die **aktiven** Figuren (reiner Text); sind keine aktiv, leer.
+        figuren: aktiveFiguren(details.figuren),
       });
       const items = [...aktuelleArcs(), neu];
       setArcVarianten(items);
@@ -907,14 +951,22 @@ export default function ScenarioDetailPage({
     }
   }
 
-  async function save() {
-    if (!dirty || !nameValid || saving) return;
+  /**
+   * Den bearbeiteten Stand persistieren und die „gespeichert"-Grundlinie neu
+   * setzen. `overrideDetails` erlaubt es, mit einem bereits berechneten
+   * `details` zu speichern, ohne auf das (asynchrone) `setState` zu warten –
+   * genutzt beim Ableiten eines Charakters aus einer Figur, wo die Entfernung
+   * der Figur den Seitenwechsel überleben muss. Gibt zurück, ob es geklappt hat.
+   */
+  async function speichern(overrideDetails?: ScenarioDetails): Promise<boolean> {
+    if (!nameValid || saving) return false;
+    const zuSpeichern = overrideDetails ?? details;
     setSaving(true);
     setSaveError(null);
     try {
       const aktualisiert = await updateScenario(id, {
         name: name.trim(),
-        details,
+        details: zuSpeichern,
         plotVariants: { items: aktuelleVarianten(), aktiv },
         storyArcVariants: { items: aktuelleArcs(), aktiv: arcAktiv },
       });
@@ -933,11 +985,18 @@ export default function ScenarioDetailPage({
           arc: aktualisiert.storyArcVariants,
         }),
       );
+      return true;
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Fehler.");
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  async function save() {
+    if (!dirty) return;
+    await speichern();
   }
 
   /**
@@ -1163,91 +1222,186 @@ export default function ScenarioDetailPage({
       </section>
 
       {/*
-        Die Besetzung – Notizen zu wichtigen Figuren. Eigene Karte zwischen der
-        Welt (Festlegungen) und dem Handlungsentwurf, weil sie beides verbindet:
-        aus ihr (und den zugeordneten Charakteren) entsteht die Handlung. Kein
-        Erzeugen-Knopf (nicht in ERZEUGBAR) – gefüllt wird von Hand oder vom
-        „Zufälligen Szenario".
+        Die **Besetzung** in einer Karte: oben die schon angelegten
+        **Charaktere** samt den Knöpfen zum Zuordnen und Erstellen, darunter die
+        **Figuren**-Notizen zu wichtigen Personen, aus denen erst Charaktere
+        werden sollen (ein Saatbeet). Beides gehört zusammen – aus den Charakteren
+        und den aktiven Figuren entstehen Handlungsentwurf und Story Arc. Früher
+        standen die Charaktere ganz unten; hier stehen sie bei den Figuren, aus
+        denen sie hervorgehen.
       */}
       <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
-        <h2 className="mb-4 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
-          Figuren
-        </h2>
-        <ScenarioFields
-          details={details}
-          onChange={setDetails}
-          disabled={saving}
-          fields={["figuren"]}
-          generatable={ERZEUGBAR}
-          onGenerate={handleGenerate}
-          generatingField={generatingField}
-          zusatz={zusatz}
-          onZusatzChange={(key, value) =>
-            setZusatz((z) => ({ ...z, [key]: value }))
-          }
-        />
-
-        {/*
-          Personen aus dem Figuren-Feld – wie „Personen im Entwurf suchen" beim
-          Handlungsentwurf, nur mit den Notizen als Quelle. Auf Knopfdruck (KI-
-          Aufruf). Anklickbare Tabs legen daraus Charaktere fürs Szenario an –
-          über denselben Modal und dieselbe Übergabe wie beim Entwurf.
-        */}
-        {details.figuren.trim() && (
-          <div className="mt-4 border-t border-black/10 pt-4 dark:border-white/10">
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={figurenPersonenSuchen}
-                disabled={figurenSuchend}
-                title="Sucht im Figuren-Feld nach Personen (Namen und Bezeichnungen), die dem Szenario noch nicht zugeordnet sind"
-                className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
-              >
-                {figurenSuchend ? "Sucht …" : "🔍 Personen im Figuren-Feld suchen"}
-              </button>
-              {figurenPersonen === null && !figurenSuchend && (
-                <span className="text-xs text-foreground/50">
-                  Findet Namen und Bezeichnungen, für die es noch keinen
-                  Charakter gibt.
-                </span>
-              )}
-            </div>
-
-            {figurenSuchFehler && (
-              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
-                {figurenSuchFehler}
-              </p>
-            )}
-
-            {figurenPersonen !== null &&
-              (figurenPersonen.length === 0 ? (
-                <p className="mt-2 text-xs text-foreground/50">
-                  Keine neuen Personen – das Feld nennt nur Figuren, die dem
-                  Szenario schon zugeordnet sind.
-                </p>
-              ) : (
-                <div className="mt-3">
-                  <p className="mb-2 text-xs text-foreground/60">
-                    Noch nicht im Szenario – anklicken, um daraus einen Charakter
-                    anzulegen:
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {figurenPersonen.map((p, i) => (
-                      <button
-                        key={`${p.name}-${i}`}
-                        type="button"
-                        onClick={() => setGewaehlt(p)}
-                        title={`Charakter für „${p.name}" anlegen`}
-                        className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-500/20 dark:text-amber-300"
-                      >
-                        + {p.name}
-                      </button>
-                    ))}
-                  </div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+            Charaktere ({characters.length})
+          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            {/*
+              Bestehenden Charakter zuordnen: zeigt nur Figuren, die noch nicht
+              hier sind. Gehört eine schon zu einem anderen Szenario, wird auf
+              Wunsch eine Kopie angelegt. Ein Knopf und kein Link – es öffnet ein
+              Modal, keine Navigation.
+            */}
+            <button
+              type="button"
+              onClick={() => setAddOffen(true)}
+              title="Einen bereits vorhandenen Charakter diesem Szenario zuordnen"
+              className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              + Vorhandenen hinzufügen
+            </button>
+            {/*
+              Führt aufs Erstellen-Formular, mit dem Szenario im Parameter: es
+              belegt Genre, Setting und Weltkontext vor und ist als Zuordnung
+              ausgewählt. Bewusst ein Link und kein Knopf – es ist eine
+              Navigation, und man soll ihn in einem neuen Tab öffnen können.
+            */}
+            <Link
+              href={`/?scenario=${id}`}
+              className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition hover:opacity-90"
+            >
+              + Neuen erstellen
+            </Link>
+          </div>
+        </div>
+        {characters.length > 0 && (
+          <p className="mb-3 text-xs text-foreground/50">
+            Mit dem ⭐ markierst du <strong>Protagonisten</strong> – der
+            Handlungsentwurf dreht sich dann um sie, die übrigen sind
+            Nebenfiguren. Ohne Markierung bleibt alles wie bisher.
+          </p>
+        )}
+        {dirty && (
+          <p className="mb-3 text-xs text-amber-700 dark:text-amber-400">
+            Ungespeicherte Änderungen werden nicht übernommen – erst speichern,
+            dann den Charakter anlegen.
+          </p>
+        )}
+        {characters.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-black/15 p-8 text-center text-sm text-foreground/60 dark:border-white/15">
+            Diesem Szenario ist noch niemand zugeordnet. Füge über die Knöpfe
+            oben einen vorhandenen Charakter hinzu, erstelle einen neuen – oder
+            lege unten aus einer Figur einen an.
+          </div>
+        ) : (
+          // Rund halb so große Kacheln wie in der Galerie: doppelt so viele
+          // Spalten, engere Abstände. Weil eine kleine Kachel keinen Platz für
+          // zwei Zeilen Beschreibung hat, steht hier nur der Name – die
+          // Kurzbeschreibung wandert in den `title` (Tooltip beim Überfahren).
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
+            {characters.map((c) => {
+              const preview = primaryImage(c)?.thumbnail;
+              // Wrapper, damit der Stern ein **Geschwister** des Kachel-Knopfes
+              // ist – verschachtelte Buttons sind ungültiges HTML.
+              return (
+                <div key={c.id} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedChar(c)}
+                    title={c.character.kurzbeschreibung}
+                    className={`flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border bg-white text-left transition hover:shadow-md dark:bg-white/[0.03] ${
+                      c.isProtagonist
+                        ? "border-amber-400 ring-1 ring-amber-400/60 dark:border-amber-400/70"
+                        : "border-black/10 dark:border-white/10"
+                    }`}
+                  >
+                    <div className="relative aspect-square w-full bg-black/[0.03] dark:bg-white/[0.03]">
+                      {preview ? (
+                        <Image
+                          src={preview}
+                          alt={c.character.name}
+                          fill
+                          sizes="(max-width: 640px) 50vw, 16vw"
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-2xl opacity-30">
+                          🧑
+                        </div>
+                      )}
+                    </div>
+                    <span className="block truncate p-1.5 text-xs font-medium">
+                      {c.character.name}
+                    </span>
+                  </button>
+                  {/*
+                    Protagonisten-Stern, oben rechts über dem Bild. Eigener
+                    Button (nicht im Kachel-Knopf), mit gut lesbarem Chip über
+                    dem Thumbnail. Sofort persistiert.
+                  */}
+                  <button
+                    type="button"
+                    onClick={() => protagonistUmschalten(c)}
+                    disabled={protagonistBusy === c.id}
+                    aria-pressed={c.isProtagonist}
+                    aria-label={
+                      c.isProtagonist
+                        ? `${c.character.name} als Protagonist aufheben`
+                        : `${c.character.name} als Protagonist markieren`
+                    }
+                    title={
+                      c.isProtagonist
+                        ? "Protagonist – klicken zum Aufheben"
+                        : "Als Protagonist markieren (der Handlungsentwurf dreht sich dann um die Protagonisten)"
+                    }
+                    className={`absolute right-1 top-1 rounded-full bg-black/45 px-1.5 py-0.5 text-sm leading-none backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-50 ${
+                      c.isProtagonist
+                        ? "text-amber-300"
+                        : "text-white/75 hover:text-amber-200"
+                    }`}
+                  >
+                    {c.isProtagonist ? "⭐" : "☆"}
+                  </button>
                 </div>
-              ))}
+              );
+            })}
           </div>
         )}
+
+        {/*
+          Die **Figuren**-Notizen unter den fertigen Charakteren, in derselben
+          Karte: wichtige Personen, aus denen noch Charaktere werden sollen.
+          „✨ Charakter" an einer Figur legt sie an; das Häkchen je Figur
+          entscheidet, ob sie in Handlungsentwurf und Story Arc einfließt (Default
+          an). Kein Erzeugen-Knopf für das Feld selbst (nicht in ERZEUGBAR) –
+          gefüllt wird von Hand, per Würfel/KI-Ergänzen oder vom „Zufälligen
+          Szenario".
+        */}
+        <div className="mt-6 border-t border-black/10 pt-5 dark:border-white/10">
+          <h3 className="mb-1 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+            Figuren
+          </h3>
+          <p className="mb-3 text-xs text-foreground/50">
+            Notizen zu wichtigen Personen, aus denen noch kein Charakter angelegt
+            ist. „✨ Charakter“ macht aus einer Figur einen Charakter für dieses
+            Szenario.
+          </p>
+          <ScenarioFields
+            details={details}
+            onChange={setDetails}
+            disabled={saving}
+            fields={["figuren"]}
+            generatable={ERZEUGBAR}
+            onGenerate={handleGenerate}
+            generatingField={generatingField}
+            zusatz={zusatz}
+            onZusatzChange={(key, value) =>
+              setZusatz((z) => ({ ...z, [key]: value }))
+            }
+            onFigurCharakter={figurCharakterExtrahieren}
+            figurBusy={figurBusy}
+            figurFehler={figurFehler}
+          />
+
+          {details.figuren.trim() && (
+            <p className="mt-3 border-t border-black/10 pt-3 text-xs text-foreground/50 dark:border-white/10">
+              Das Häkchen je Figur entscheidet, ob sie in Handlungsentwurf und
+              Story Arc einfließt. Abgehakte Figuren bleiben in der Liste, werden
+              dort aber übergangen.
+            </p>
+          )}
+        </div>
       </section>
 
       {/*
@@ -1425,27 +1579,10 @@ export default function ScenarioDetailPage({
           </label>
 
           {/*
-            Figuren-Textfeld berücksichtigen – **Default aus**. Ohne Häkchen
-            wird `details.figuren` beim Erzeugen komplett ignoriert. Immer
-            sichtbar (wie „weiterspinnen"); ist das Feld leer, sagt ein Zusatz,
-            dass das Häkchen dann nichts bewirkt.
+            Ob eine Figur einfließt, steuert ihr eigenes Häkchen an der Karte in
+            der Figuren-Sektion oben – es gilt für Handlungsentwurf und Story Arc
+            zugleich. Deshalb sitzt hier keine Figuren-Checkbox mehr.
           */}
-          <label
-            className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
-            title="Angehakt fließen die Notizen aus dem Figuren-Textfeld des Szenarios als zusätzliche Besetzung in den Handlungsentwurf ein. Ohne Häkchen wird das Feld vollständig ignoriert."
-          >
-            <input
-              type="checkbox"
-              checked={handlungFiguren}
-              onChange={(e) => setHandlungFiguren(e.target.checked)}
-              disabled={saving || generatingField !== null}
-              className="size-4 accent-foreground"
-            />
-            👥 Figuren-Textfeld berücksichtigen
-            {!details.figuren.trim() && (
-              <span className="text-foreground/40">(Feld ist leer)</span>
-            )}
-          </label>
 
           {/*
             Nächsten Entwurf auf dem aktuellen aufbauen. Erscheint nur, wenn es
@@ -1623,135 +1760,6 @@ export default function ScenarioDetailPage({
         onAlleArcsLoeschen={alleArcsLoeschen}
       />
 
-      <section>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
-            Charaktere ({characters.length})
-          </h2>
-          <div className="flex flex-wrap items-center gap-2">
-            {/*
-              Bestehenden Charakter zuordnen: zeigt nur Figuren, die noch nicht
-              hier sind. Gehört eine schon zu einem anderen Szenario, wird auf
-              Wunsch eine Kopie angelegt. Ein Knopf und kein Link – es öffnet ein
-              Modal, keine Navigation.
-            */}
-            <button
-              type="button"
-              onClick={() => setAddOffen(true)}
-              title="Einen bereits vorhandenen Charakter diesem Szenario zuordnen"
-              className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
-            >
-              + Vorhandenen hinzufügen
-            </button>
-            {/*
-              Führt aufs Erstellen-Formular, mit dem Szenario im Parameter: es
-              belegt Genre, Setting und Weltkontext vor und ist als Zuordnung
-              ausgewählt. Bewusst ein Link und kein Knopf – es ist eine
-              Navigation, und man soll ihn in einem neuen Tab öffnen können.
-            */}
-            <Link
-              href={`/?scenario=${id}`}
-              className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition hover:opacity-90"
-            >
-              + Neuen erstellen
-            </Link>
-          </div>
-        </div>
-        {characters.length > 0 && (
-          <p className="mb-3 text-xs text-foreground/50">
-            Mit dem ⭐ markierst du <strong>Protagonisten</strong> – der
-            Handlungsentwurf dreht sich dann um sie, die übrigen sind
-            Nebenfiguren. Ohne Markierung bleibt alles wie bisher.
-          </p>
-        )}
-        {dirty && (
-          <p className="mb-3 text-xs text-amber-700 dark:text-amber-400">
-            Ungespeicherte Änderungen werden nicht übernommen – erst speichern,
-            dann den Charakter anlegen.
-          </p>
-        )}
-        {characters.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-black/15 p-8 text-center text-sm text-foreground/60 dark:border-white/15">
-            Diesem Szenario ist noch niemand zugeordnet. Füge über die Knöpfe
-            oben einen vorhandenen Charakter hinzu oder erstelle einen neuen.
-          </div>
-        ) : (
-          // Rund halb so große Kacheln wie in der Galerie: doppelt so viele
-          // Spalten, engere Abstände. Weil eine kleine Kachel keinen Platz für
-          // zwei Zeilen Beschreibung hat, steht hier nur der Name – die
-          // Kurzbeschreibung wandert in den `title` (Tooltip beim Überfahren).
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
-            {characters.map((c) => {
-              const preview = primaryImage(c)?.thumbnail;
-              // Wrapper, damit der Stern ein **Geschwister** des Kachel-Knopfes
-              // ist – verschachtelte Buttons sind ungültiges HTML.
-              return (
-                <div key={c.id} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedChar(c)}
-                    title={c.character.kurzbeschreibung}
-                    className={`flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border bg-white text-left transition hover:shadow-md dark:bg-white/[0.03] ${
-                      c.isProtagonist
-                        ? "border-amber-400 ring-1 ring-amber-400/60 dark:border-amber-400/70"
-                        : "border-black/10 dark:border-white/10"
-                    }`}
-                  >
-                    <div className="relative aspect-square w-full bg-black/[0.03] dark:bg-white/[0.03]">
-                      {preview ? (
-                        <Image
-                          src={preview}
-                          alt={c.character.name}
-                          fill
-                          sizes="(max-width: 640px) 50vw, 16vw"
-                          className="object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-2xl opacity-30">
-                          🧑
-                        </div>
-                      )}
-                    </div>
-                    <span className="block truncate p-1.5 text-xs font-medium">
-                      {c.character.name}
-                    </span>
-                  </button>
-                  {/*
-                    Protagonisten-Stern, oben rechts über dem Bild. Eigener
-                    Button (nicht im Kachel-Knopf), mit gut lesbarem Chip über
-                    dem Thumbnail. Sofort persistiert.
-                  */}
-                  <button
-                    type="button"
-                    onClick={() => protagonistUmschalten(c)}
-                    disabled={protagonistBusy === c.id}
-                    aria-pressed={c.isProtagonist}
-                    aria-label={
-                      c.isProtagonist
-                        ? `${c.character.name} als Protagonist aufheben`
-                        : `${c.character.name} als Protagonist markieren`
-                    }
-                    title={
-                      c.isProtagonist
-                        ? "Protagonist – klicken zum Aufheben"
-                        : "Als Protagonist markieren (der Handlungsentwurf dreht sich dann um die Protagonisten)"
-                    }
-                    className={`absolute right-1 top-1 rounded-full bg-black/45 px-1.5 py-0.5 text-sm leading-none backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-50 ${
-                      c.isProtagonist
-                        ? "text-amber-300"
-                        : "text-white/75 hover:text-amber-200"
-                    }`}
-                  >
-                    {c.isProtagonist ? "⭐" : "☆"}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
       <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-4 dark:border-white/10">
         <button
           onClick={exportieren}
@@ -1810,6 +1818,20 @@ export default function ScenarioDetailPage({
           dirty={dirty}
           onConfirm={() => personAnlegen(gewaehlt)}
           onClose={() => setGewaehlt(null)}
+        />
+      )}
+
+      {/*
+        Bestätigung fürs Ableiten aus einer Figur-Karte. `dirty={false}`, weil
+        dieser Weg vor der Navigation **speichert** (`figurCharakterAnlegen`) –
+        der „erst speichern"-Hinweis der Plot-Suche gilt hier also nicht.
+      */}
+      {figurKandidat && (
+        <PlotPersonModal
+          person={figurKandidat.person}
+          dirty={false}
+          onConfirm={figurCharakterAnlegen}
+          onClose={() => setFigurKandidat(null)}
         />
       )}
 

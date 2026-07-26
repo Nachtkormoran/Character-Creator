@@ -503,23 +503,74 @@ soll – **noch keine ausgearbeiteten Charaktere**, sondern ein Saatbeet. Ein
 weiteres `details`-Feld (kein eigenes Column), gefüllt entweder von Hand oder
 vom **„Zufälligen Szenario"** (`random-scenario` erzeugt es jetzt mit –
 `randomScenarioSchema.figuren`, Format „Name: ein bis zwei Sätze mit einem
-Riss"). In der Detailansicht steht es in einer **eigenen Karte „Figuren"**
-zwischen Festlegungen und Handlungsentwurf; im Anlege-Formular zieht es
-automatisch mit (rendert ohne `fields`-Einschränkung alle Felder). **Kein
-Erzeugen-Knopf je Feld** (nicht in `ERZEUGBAR`), aus der
-Übersichts-Zusammenfassung ausgeschlossen (mehrzeilig, wie `beschreibung`).
+Riss"). In der Detailansicht steht es in der **Karte „Charaktere"** zwischen
+Festlegungen und Handlungsentwurf – **unter** den bereits angelegten Charakteren
+(samt deren „+ Vorhandenen hinzufügen"/„+ Neuen erstellen"-Knöpfen und dem
+Protagonisten-Stern), unter einer eigenen `<h3>`-Überschrift „Figuren". Beides
+gehört in **eine** Karte: aus den Charakteren und den aktiven Figuren-Notizen
+entstehen Handlungsentwurf und Story Arc, und die Figuren sind das Saatbeet, aus
+dem Charaktere hervorgehen (der Charakter-Block stand früher als eigene Sektion
+ganz unten). Im Anlege-Formular zieht das Feld automatisch mit (rendert ohne
+`fields`-Einschränkung alle Felder). **Kein Erzeugen-Knopf je Feld** (nicht in
+`ERZEUGBAR`), aus der Übersichts-Zusammenfassung ausgeschlossen (mehrzeilig, wie
+`beschreibung`).
+
+**Die Karte zeigt jede Figur als eigenen Abschnitt** (`FigurenListe` in
+`ScenarioFields.tsx`), wie die Ansatzpunkte in der Charakter-Detailansicht –
+editierbar, mit **Aktiv-Häkchen**, ✕ zum Löschen und „➕ Figur hinzufügen".
+Gespeichert bleibt es **ein String** (`details.figuren`, je Figur eine Zeile);
+zerlegt/zusammengesetzt wird in `lib/figuren.ts` (`splitFigurenDetail` /
+`joinFigurenDetail`, Zwilling von `storyHooks.ts`). Kein JSON-Array, aus
+demselben Grund wie dort: die Prompts und die Exportdatei wollen den Fließtext.
+`joinFigurenDetail` ebnet Umbrüche **innerhalb** einer Karte zu Leerzeichen ein
+(sonst zerfiele eine Figur in zwei); der Round-Trip bestehender Notizen ist
+**byte-identisch**, die Prompts bleiben also unberührt. Die Liste lebt als
+**lokaler State** in `FigurenListe` (ein Ref merkt den zuletzt gemeldeten Wert),
+damit eine frisch angelegte **leere** Karte nicht sofort wieder wegfällt und
+Würfel/KI/„Verwerfen" per Außen-Änderung neu zerlegen – dieselbe Mechanik wie bei
+den Ansatzpunkten.
+
+**Ob eine Figur aktiv ist, steht im String** – als Präfix `⊘ ` vor den
+**inaktiven** Zeilen (`INAKTIV_PRAEFIX`). So ist die Wahl eine Eigenschaft der
+Figur, die über „Änderungen speichern", Export und Import mitreist, ohne zweite
+Datenquelle oder Schemaänderung. Aktive Figuren tragen **kein** Präfix: Ein
+Altbestand ist damit durchweg aktiv, und ein Szenario mit lauter aktiven Figuren
+ist zeichengleich mit dem von vorher. `aktiveFiguren(text)` liefert den reinen
+Text der aktiven Figuren (für Plot/Arc, `""` wenn keine aktiv – dann Prompt
+zeichengenau der ohne Notizen), `figurenText(text)` alle ohne Markup (fürs
+KI-Ergänzen und die Personensuche). Das `⊘ ` bleibt also **nur** in Oberfläche
+und Speicher; keine Erzeugung sieht es. (Nebenwirkung: „✨ Ergänzen" gibt das
+ganze Feld frisch zurück und setzt alle Figuren wieder auf aktiv.)
+
+Jede Karte trägt in der Detailansicht einen Knopf **„✨ Charakter"**
+(`onFigurCharakter`; im Anlege-Formular fehlt er – dort gibt es noch kein
+Szenario). Er liest **genau diese eine Figur** über `POST
+/api/scenario-figure-persons` (`findFigurePersons` mit der einzelnen Zeile) aus,
+zeigt den Vorschlag im geteilten `PlotPersonModal` und legt bei Bestätigung
+einen Charakter fürs Szenario an – über dieselbe `sessionStorage`-Übergabe wie
+die frühere „Personen im Figuren-Feld suchen"-Liste, die er **ersetzt**. Beim
+Anlegen wird die Figur **aus der Liste genommen** (sie ist jetzt ein Charakter)
+und der bearbeitete Stand zuvor **gespeichert** (`speichern(neueDetails)`),
+damit die Entfernung den Seitenwechsel ins Formular überlebt – das nimmt dem
+„erst speichern"-Hinweis zugleich den Grund (`dirty={false}` an diesem Modal).
 
 Der Zweck ist die **Erzeugung von Handlungsentwurf und Story Arc**: Ist das Feld
 gefüllt, treten seine Notizen als zusätzliche Besetzung in den Prompt
 (`buildScenarioPlotPrompt` / `buildStoryArcPrompt`), neben den zugeordneten
-Charakteren. Es räumt zugleich eine Hürde weg: `scenario-plot` und `scenario-arc`
-antworteten mit **400**, wenn dem Szenario kein Charakter zugeordnet war; jetzt
-genügt **ein Charakter *oder* ein nicht-leeres Figuren-Feld**. So entsteht ein
-Entwurf **direkt aus einem zufällig erzeugten Szenario**, bevor Charaktere
-angelegt sind (der übliche Weg zu echten Charakteren bleibt „Personen im Entwurf
-suchen"). Beim Arc wird zusätzlich der Namensfilter der Stationen ausgesetzt,
-solange Notizen vorliegen – die notierten Figuren gehören nicht zur
-Charakter-Besetzung und würden sonst herausgefiltert.
+Charakteren. Ob eine Figur einfließt, steuert ihr **eigenes Häkchen** an der
+Karte (**Default an** – eine notierte Figur wird genutzt, außer man hakt sie ab);
+es gilt für Handlungsentwurf **und** Story Arc zugleich und ersetzt die vormals
+**zwei** getrennten „Figuren-Textfeld berücksichtigen"-Häkchen (je Sektion, sowie
+den kurzzeitigen globalen `figurenAktiv`-Schalter). Sind alle Figuren abgehakt,
+geht `aktiveFiguren(details.figuren)` leer in beide Erzeugungen, der Prompt ist
+dann zeichengenau der ohne Figuren-Notizen. Das Feld räumt zugleich eine Hürde
+weg: `scenario-plot` und `scenario-arc` antworteten mit **400**, wenn
+dem Szenario kein Charakter zugeordnet war; jetzt genügt **ein Charakter *oder*
+ein nicht-leeres Figuren-Feld**. So entsteht ein Entwurf **direkt aus einem
+zufällig erzeugten Szenario**, bevor Charaktere angelegt sind. Beim Arc wird
+zusätzlich der Namensfilter der Stationen ausgesetzt, solange Notizen vorliegen –
+die notierten Figuren gehören nicht zur Charakter-Besetzung und würden sonst
+herausgefiltert.
 
 **Härteste Regel dabei: Bei leerem `figuren`-Feld ist der Prompt
 zeichengenau der von vorher** – für Plot **und** Arc. Alle figuren-abhängigen

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTextClient } from "@/lib/openai";
+import { figurenText } from "@/lib/figuren";
 import { buildScenarioFiguresPrompt } from "@/lib/prompts";
 import {
   SCENARIO_MAXLENGTHS,
@@ -74,7 +75,9 @@ export async function POST(request: Request) {
           content: buildScenarioFiguresPrompt(
             name,
             umfeld,
-            details.figuren,
+            // Ohne Aktiv-Markup: Das Modell soll die Figuren als reinen Text
+            // sehen und fortschreiben, nicht das `⊘ `-Präfix mitschleppen.
+            figurenText(details.figuren),
             zusatz,
             maxLen,
             anzahl,

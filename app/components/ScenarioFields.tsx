@@ -12,8 +12,14 @@ import { randomPlace } from "@/lib/scenarioPlaces";
 import { randomTime } from "@/lib/scenarioTimes";
 import { randomRules } from "@/lib/scenarioRules";
 import { randomFigure, randomFigures } from "@/lib/scenarioFigures";
-import { useRef, useState } from "react";
+import {
+  joinFigurenDetail,
+  splitFigurenDetail,
+  type FigurEintrag,
+} from "@/lib/figuren";
+import { useEffect, useRef, useState } from "react";
 import { useAutoGrow } from "./useAutoGrow";
+import { AutoTextarea } from "./AutoTextarea";
 
 /**
  * Welche Felder einen Würfel haben und woher er zieht.
@@ -124,6 +130,171 @@ function AutoGrowTextarea({
 }
 
 /**
+ * Das Figuren-Feld als **Kartenliste** statt eines einzigen Textfeldes – jede
+ * Figur ein eigener, editierbarer Abschnitt mit Aktiv-Häkchen und Löschknopf,
+ * wie die Ansatzpunkte in der Charakter-Detailansicht. Unten bleibt es **ein
+ * String** (`details.figuren`, je Figur eine Zeile, inaktive mit `⊘ `-Präfix);
+ * zerlegt/zusammengesetzt wird über `lib/figuren.ts`, damit die Prompts
+ * unverändert reinen Fließtext bekommen.
+ *
+ * Eigener lokaler Zustand `list`, nicht bei jedem Rendern aus `value` neu
+ * abgeleitet: Sonst verschwände eine gerade angelegte **leere** Karte sofort
+ * wieder (`joinFigurenDetail` filtert Leeres). Ein Ref merkt sich den zuletzt
+ * nach oben gemeldeten Wert; ändert sich `value` von **außen** (Würfel,
+ * KI-Ergänzen, „Verwerfen"), wird neu zerlegt – dieselbe Mechanik wie bei den
+ * Ansatzpunkten, nur dass das Feld hier Teil des geteilten `details`-Objekts ist.
+ *
+ * Das **Häkchen je Figur** entscheidet, ob sie in Handlungsentwurf und Story Arc
+ * einfließt (Default an – eine notierte Figur wird genutzt, außer man hakt sie
+ * ab). Es ist Teil der gespeicherten Zeile, reist also über „Änderungen
+ * speichern", Export und Import mit.
+ *
+ * Der Knopf **„✨ Charakter"** je Karte erscheint nur, wenn die aufrufende Seite
+ * `onFigurCharakter` reicht (die Detailseite, die eine `scenarioId` hat) – im
+ * Anlege-Formular gibt es noch kein Szenario, dem man einen Charakter zuordnen
+ * könnte.
+ */
+function FigurenListe({
+  value,
+  onChange,
+  disabled,
+  onFigurCharakter,
+  figurBusy = null,
+  figurFehler = null,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+  /** Aus der Figur einen Charakter fürs Szenario anlegen. Nur die Detailseite. */
+  onFigurCharakter?: (figurText: string) => void;
+  /** Welche Figur gerade ihre Angaben ausliest (KI-Aufruf) – sperrt die Knöpfe. */
+  figurBusy?: string | null;
+  /** Fehler beim Ableiten, samt betroffener Figur. */
+  figurFehler?: { figur: string; text: string } | null;
+}) {
+  const [list, setList] = useState<FigurEintrag[]>(() =>
+    splitFigurenDetail(value),
+  );
+  const lastEmitted = useRef(value);
+
+  useEffect(() => {
+    if (value !== lastEmitted.current) {
+      setList(splitFigurenDetail(value));
+      lastEmitted.current = value;
+    }
+  }, [value]);
+
+  const emit = (next: FigurEintrag[]) => {
+    setList(next);
+    const joined = joinFigurenDetail(next);
+    lastEmitted.current = joined;
+    onChange(joined);
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      {list.length === 0 ? (
+        <p className="rounded-md border border-dashed border-black/15 px-3 py-6 text-center text-sm text-foreground/50 dark:border-white/15">
+          Noch keine Figuren – würfeln, per KI ergänzen oder von Hand hinzufügen.
+          Jede Figur wird ein eigener Abschnitt.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {list.map((figur, i) => (
+            <li
+              // Index als Key wie bei den Ansatzpunkten: kein stabiler
+              // Schlüssel vorhanden, und die Liste ändert sich nur am Ende
+              // (Anhängen) oder durch Löschen.
+              key={i}
+              className={`flex items-start gap-2 rounded-md border px-3 py-1 transition ${
+                figur.aktiv
+                  ? "border-black/10 bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03]"
+                  : "border-dashed border-black/10 bg-transparent opacity-60 dark:border-white/10"
+              }`}
+            >
+              {/*
+                Aktiv-Häkchen: entscheidet, ob die Figur in Handlungsentwurf und
+                Story Arc einfließt. Steht vorne, weil es die Zeile einordnet
+                (wie das ✕ sie beendet). Die Nummer sitzt daneben.
+              */}
+              <input
+                type="checkbox"
+                checked={figur.aktiv}
+                onChange={(e) =>
+                  emit(
+                    list.map((x, j) =>
+                      j === i ? { ...x, aktiv: e.target.checked } : x,
+                    ),
+                  )
+                }
+                disabled={disabled}
+                title={
+                  figur.aktiv
+                    ? "Aktiv – fließt in Handlungsentwurf und Story Arc ein. Abhaken, um sie auszuschließen."
+                    : "Inaktiv – wird bei Handlungsentwurf und Story Arc übergangen."
+                }
+                aria-label={`Figur ${i + 1} bei Handlungsentwurf und Story Arc berücksichtigen`}
+                className="mt-1.5 size-4 shrink-0 accent-foreground"
+              />
+              <span className="mt-1 w-4 shrink-0 text-right text-xs text-foreground/40 tabular-nums">
+                {i + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <AutoTextarea
+                  value={figur.text}
+                  onChange={(v) =>
+                    emit(list.map((x, j) => (j === i ? { ...x, text: v } : x)))
+                  }
+                  ariaLabel={`Figur ${i + 1}`}
+                  className="text-sm"
+                />
+                {figurFehler && figurFehler.figur === figur.text && (
+                  <p className="mt-0.5 text-xs text-red-600 dark:text-red-400">
+                    {figurFehler.text}
+                  </p>
+                )}
+              </div>
+              {onFigurCharakter && (
+                <button
+                  type="button"
+                  onClick={() => onFigurCharakter(figur.text)}
+                  disabled={disabled || figurBusy !== null || !figur.text.trim()}
+                  title="Aus dieser Figur einen Charakter für das Szenario anlegen"
+                  className="mt-0.5 shrink-0 rounded-md border border-black/15 px-2 py-0.5 text-xs font-medium whitespace-nowrap transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                >
+                  {figurBusy === figur.text ? "Liest …" : "✨ Charakter"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => emit(list.filter((_, j) => j !== i))}
+                disabled={disabled}
+                title="Diese Figur entfernen"
+                aria-label={`Figur ${i + 1} entfernen`}
+                className="mt-0.5 shrink-0 rounded-md border border-transparent px-2 py-0.5 text-sm text-foreground/40 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div>
+        <button
+          type="button"
+          onClick={() => emit([...list, { text: "", aktiv: true }])}
+          disabled={disabled}
+          title="Eine leere Figur zum Selbstschreiben anlegen"
+          className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium text-foreground/70 transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+        >
+          ➕ Figur hinzufügen
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Beschriftung des Stichwort-Feldes je Feld.
  *
  * Nur wo die aufrufende Seite einen Wunsch entgegennimmt, erscheint eins –
@@ -195,6 +366,9 @@ export function ScenarioFields({
   zusatz,
   onZusatzChange,
   hideLabel = false,
+  onFigurCharakter,
+  figurBusy = null,
+  figurFehler = null,
 }: {
   details: ScenarioDetails;
   onChange: (details: ScenarioDetails) => void;
@@ -242,6 +416,16 @@ export function ScenarioFields({
    * erhalten; nur die doppelte sichtbare Beschriftung entfällt.
    */
   hideLabel?: boolean;
+  /**
+   * Nur fürs Figuren-Feld: aus einer einzelnen Figur einen Charakter fürs
+   * Szenario anlegen. Reicht die aufrufende Seite es nicht (Anlege-Formular ohne
+   * `scenarioId`), tragen die Figur-Karten keinen „Charakter"-Knopf.
+   */
+  onFigurCharakter?: (figurText: string) => void;
+  /** Welche Figur gerade ihre Angaben ausliest (KI) – für Sperre/Spinner. */
+  figurBusy?: string | null;
+  /** Fehler beim Ableiten einer Figur, samt betroffener Figur. */
+  figurFehler?: { figur: string; text: string } | null;
 }) {
   const set = (key: keyof ScenarioDetails, value: string) =>
     onChange({ ...details, [key]: value });
@@ -444,6 +628,15 @@ export function ScenarioFields({
                     </option>
                   ))}
                 </select>
+              ) : key === "figuren" ? (
+                <FigurenListe
+                  value={details.figuren}
+                  onChange={(v) => set("figuren", v)}
+                  disabled={disabled}
+                  onFigurCharakter={onFigurCharakter}
+                  figurBusy={figurBusy}
+                  figurFehler={figurFehler}
+                />
               ) : SCENARIO_MULTILINE.has(key) ? (
                 <AutoGrowTextarea
                   id={feldId}

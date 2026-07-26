@@ -77,9 +77,8 @@ export function PlotPersonModal({
           Charakter für {person.name} anlegen?
         </h2>
         <p className="mt-1 text-sm text-foreground/60">
-          Diese Angaben stammen aus dem Handlungsentwurf und belegen das
-          Erstellen-Formular vor. Dort lassen sie sich vor dem Erzeugen noch
-          ändern.
+          Diese Angaben belegen das Erstellen-Formular vor. Dort lassen sie sich
+          vor dem Erzeugen noch ändern.
         </p>
 
         {felder.length > 0 ? (
