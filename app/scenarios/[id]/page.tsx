@@ -360,6 +360,26 @@ export default function ScenarioDetailPage({
   }
 
   /**
+   * Den Titel eines Entwurfs ändern (✎ am Reiter). Der Titel gehört zu den
+   * Metadaten und wird wie alles über „Änderungen speichern" abgelegt; leer
+   * lassen holt den Rückfall „Entwurf N" zurück. `prompt` bewusst schlicht – wie
+   * das `confirm` beim Löschen.
+   */
+  function titelAendern(i: number) {
+    if (generatingField || saving) return;
+    const items = aktuelleVarianten();
+    if (i < 0 || i >= items.length) return;
+    const meta = ausgerichtet(variantenMeta, items.length);
+    const neu = window.prompt(`Titel für Entwurf ${i + 1}:`, meta[i].titel);
+    if (neu === null) return;
+    setVariantenMeta(
+      meta.map((m, k) =>
+        k === i ? { ...m, titel: neu.trim().slice(0, 120) } : m,
+      ),
+    );
+  }
+
+  /**
    * Einen Entwurf löschen. Anders als beim einzelnen Ansatzpunkt fragt es hier
    * nach – ein Handlungsentwurf ist ein großer, teuer erzeugter Text. Der letzte
    * verbliebene lässt sich nicht über die Leiste löschen (dann verschwände die
@@ -443,6 +463,21 @@ export default function ScenarioDetailPage({
     setArcVarianten(items);
     setArcAktiv(i);
     setStoryArc(items[i]);
+  }
+
+  /** Den Titel eines Story Arcs ändern (✎ am Reiter) – analog zu `titelAendern`. */
+  function arcTitelAendern(i: number) {
+    if (arcBusy || saving) return;
+    const items = aktuelleArcs();
+    if (i < 0 || i >= items.length) return;
+    const meta = ausgerichtet(arcMeta, items.length);
+    const neu = window.prompt(`Titel für Story Arc ${i + 1}:`, meta[i].titel);
+    if (neu === null) return;
+    setArcMeta(
+      meta.map((m, k) =>
+        k === i ? { ...m, titel: neu.trim().slice(0, 120) } : m,
+      ),
+    );
   }
 
   /**
@@ -1557,7 +1592,7 @@ export default function ScenarioDetailPage({
               return (
                 <span
                   key={i}
-                  className={`inline-flex items-stretch gap-1 rounded-lg border text-xs transition ${
+                  className={`inline-flex items-stretch gap-1 overflow-hidden rounded-lg border text-xs transition ${
                     i === aktiv
                       ? "border-foreground bg-foreground text-background"
                       : "border-black/15 hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
@@ -1569,7 +1604,7 @@ export default function ScenarioDetailPage({
                     disabled={saving || generatingField !== null}
                     title={text.trim().slice(0, 200) || "(leerer Entwurf)"}
                     className={`flex flex-col items-start gap-0.5 py-1 pl-2.5 text-left disabled:opacity-50 ${
-                      loeschbar ? "pr-1" : "pr-2.5"
+                      loeschbar || i === aktiv ? "pr-1" : "pr-2.5"
                     }`}
                   >
                     <span className="max-w-[15rem] truncate font-medium">
@@ -1587,6 +1622,19 @@ export default function ScenarioDetailPage({
                       </span>
                     )}
                   </button>
+                  {/* Titel ändern – nur am aktiven Reiter, um die Leiste ruhig zu halten. */}
+                  {i === aktiv && (
+                    <button
+                      type="button"
+                      onClick={() => titelAendern(i)}
+                      disabled={saving || generatingField !== null}
+                      title={`Titel von Entwurf ${i + 1} ändern`}
+                      aria-label={`Titel von Entwurf ${i + 1} ändern`}
+                      className="flex items-center px-1 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40"
+                    >
+                      ✎
+                    </button>
+                  )}
                   {loeschbar && (
                     <button
                       type="button"
@@ -1594,7 +1642,7 @@ export default function ScenarioDetailPage({
                       disabled={saving || generatingField !== null}
                       title={`Entwurf ${i + 1} löschen`}
                       aria-label={`Entwurf ${i + 1} löschen`}
-                      className={`flex items-center rounded-r-lg pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
+                      className={`flex items-center pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
                         i === aktiv
                           ? "hover:text-red-300"
                           : "hover:text-red-600 dark:hover:text-red-400"
@@ -1894,6 +1942,7 @@ export default function ScenarioDetailPage({
         arcAktiv={arcAktiv}
         arcMeta={ausgerichtet(arcMeta, aktuelleArcs().length)}
         onArcWaehlen={arcWaehlen}
+        onArcTitelAendern={arcTitelAendern}
         onArcLoeschen={arcLoeschen}
         onAlleArcsLoeschen={alleArcsLoeschen}
       />

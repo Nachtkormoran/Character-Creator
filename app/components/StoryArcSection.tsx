@@ -91,6 +91,7 @@ export function StoryArcSection({
   arcAktiv,
   arcMeta,
   onArcWaehlen,
+  onArcTitelAendern,
   onArcLoeschen,
   onAlleArcsLoeschen,
 }: {
@@ -149,6 +150,8 @@ export function StoryArcSection({
   arcMeta: VariantMeta[];
   /** Auf einen anderen Arc umschalten. */
   onArcWaehlen: (i: number) => void;
+  /** Den Titel eines Arcs ändern (✎ am aktiven Reiter). */
+  onArcTitelAendern: (i: number) => void;
   /** Einen Arc löschen (nur ab zwei möglich). */
   onArcLoeschen: (i: number) => void;
   /** Alle Arcs auf einmal löschen. */
@@ -384,7 +387,7 @@ export function StoryArcSection({
             return (
               <span
                 key={i}
-                className={`inline-flex items-stretch gap-1 rounded-lg border text-xs transition ${
+                className={`inline-flex items-stretch gap-1 overflow-hidden rounded-lg border text-xs transition ${
                   i === arcAktiv
                     ? "border-foreground bg-foreground text-background"
                     : "border-black/15 hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
@@ -396,7 +399,7 @@ export function StoryArcSection({
                   disabled={disabled || busy}
                   title={stationen}
                   className={`flex flex-col items-start gap-0.5 py-1 pl-2.5 text-left disabled:opacity-50 ${
-                    loeschbar ? "pr-1" : "pr-2.5"
+                    loeschbar || i === arcAktiv ? "pr-1" : "pr-2.5"
                   }`}
                 >
                   <span className="max-w-[15rem] truncate font-medium">
@@ -410,6 +413,19 @@ export function StoryArcSection({
                     {badge ? `${badge} · ${stationen}` : stationen}
                   </span>
                 </button>
+                {/* Titel ändern – nur am aktiven Reiter. */}
+                {i === arcAktiv && (
+                  <button
+                    type="button"
+                    onClick={() => onArcTitelAendern(i)}
+                    disabled={disabled || busy}
+                    title={`Titel von Story Arc ${i + 1} ändern`}
+                    aria-label={`Titel von Story Arc ${i + 1} ändern`}
+                    className="flex items-center px-1 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40"
+                  >
+                    ✎
+                  </button>
+                )}
                 {loeschbar && (
                   <button
                     type="button"
@@ -417,7 +433,7 @@ export function StoryArcSection({
                     disabled={disabled || busy}
                     title={`Story Arc ${i + 1} löschen`}
                     aria-label={`Story Arc ${i + 1} löschen`}
-                    className={`flex items-center rounded-r-lg pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
+                    className={`flex items-center pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
                       i === arcAktiv
                         ? "hover:text-red-300"
                         : "hover:text-red-600 dark:hover:text-red-400"

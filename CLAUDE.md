@@ -821,7 +821,16 @@ kleines `max_tokens`, kein Structured Output) **nach** dem Entwurf/Arc: Der Text
 kommt zurück und wird als `meta[…].titel` an die neue Variante gehängt. Schlägt
 der Aufruf fehl, bleibt der Titel leer und der Reiter zeigt den Rückfall
 „Entwurf N"/„Arc N" – der Entwurf entsteht trotzdem (der Titel ist Beiwerk).
-Alte/leere/von Hand angelegte Varianten tragen keinen Titel und kein Badge. Das
+Alte/leere/von Hand angelegte Varianten tragen keinen Titel und kein Badge.
+
+**Der Titel lässt sich ändern** (✎ am **aktiven** Reiter, `titelAendern` bzw.
+`arcTitelAendern`/`onArcTitelAendern`): ein schlichtes `window.prompt` wie das
+`confirm` beim Löschen, leer lassen holt den Rückfall „Entwurf N" zurück. Die
+Änderung landet in `meta[…].titel`, geht also in `dirty` ein und wird über
+„Änderungen speichern" abgelegt – so bekommen auch alte, titel-lose Varianten
+nachträglich einen Namen. Der ✎ sitzt nur am aktiven Reiter (die Leiste ruhig
+halten); die Pille trägt dafür `overflow-hidden`, damit die runden Ecken
+unabhängig von der Zahl der Endknöpfe (✎/✕) sitzen. Das
 Badge (`variantBadge`) zeigt **Erzählform zuerst, dann Ton**, und zwar **auch die
 Vorgaben** (`allround`/`neutral`) – nur **leere** Werte (Altbestände, von Hand
 angelegt) fallen weg. (Anfangs waren die Vorgaben ausgeblendet; das ließ die
