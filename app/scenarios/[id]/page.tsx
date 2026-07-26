@@ -31,8 +31,10 @@ import {
   DEFAULT_ARC_FORMAT,
   DEFAULT_ARC_LENGTH,
   DEFAULT_KAPITEL_COUNT,
+  DEFAULT_KAPITEL_LAENGE,
   DEFAULT_STORY_FORM,
   DEFAULT_STORY_TONE,
+  DEFAULT_WERKFORM,
   MAX_NEUE_PLOT_PERSONEN,
   MAX_PLOT_VARIANTS,
   MAX_STORY_ARCS,
@@ -44,8 +46,10 @@ import {
   type ArcFormat,
   type ArcLength,
   type KapitelCount,
+  type KapitelLaenge,
   type StoryForm,
   type StoryTone,
+  type Werkform,
   type GeneratedCharacter,
   type PlotPerson,
   type PlotVariants,
@@ -74,7 +78,7 @@ import { ScenarioImageModal } from "../../components/ScenarioImageModal";
 import { StoryArcSection } from "../../components/StoryArcSection";
 
 /** Leere Metadaten – für neue leere/von Hand angelegte Varianten und als Rückfall. */
-const LEER_META: VariantMeta = { titel: "", form: "", ton: "" };
+const LEER_META: VariantMeta = { titel: "", form: "", ton: "", favorit: false };
 
 /**
  * Bringt eine Metadaten-Liste auf genau `laenge` Einträge (fehlende leer,
@@ -140,6 +144,12 @@ export default function ScenarioDetailPage({
    * den Arc.
    */
   const [arcParams, setArcParams] = useState<{
+    /**
+     * **Werkform** (Kurzgeschichte/Novelle/Roman/frei) – die führende Einstellung.
+     * Belegt beim Wählen `laenge`/`kapitelAnzahl`/`kapitelLaenge` vor (in der UI)
+     * und prägt live den Prosastil der Kapitel. `frei` = keine Vorgabe.
+     */
+    werkform: Werkform;
     laenge: ArcLength;
     format: ArcFormat;
     zusatz: string;
@@ -149,17 +159,21 @@ export default function ScenarioDetailPage({
     weiterspinnen: boolean;
     /** Wie viele Kapitel ein „Kapitel ableiten" erzeugt. */
     kapitelAnzahl: KapitelCount;
+    /** **Kapitellänge** – wie viel Prosa je Kapitel (entkoppelt von „kreativ"). */
+    kapitelLaenge: KapitelLaenge;
     /** Ton und Sprache – für Arc **und** Kapitel. */
     ton: StoryTone;
     /** Erzählform (Krimi, Liebe, …) – für Arc **und** Kapitel. */
     form: StoryForm;
   }>({
+    werkform: DEFAULT_WERKFORM,
     laenge: DEFAULT_ARC_LENGTH,
     format: DEFAULT_ARC_FORMAT,
     zusatz: "",
     kreativ: false,
     weiterspinnen: false,
     kapitelAnzahl: DEFAULT_KAPITEL_COUNT,
+    kapitelLaenge: DEFAULT_KAPITEL_LAENGE,
     ton: DEFAULT_STORY_TONE,
     form: DEFAULT_STORY_FORM,
   });
@@ -214,6 +228,11 @@ export default function ScenarioDetailPage({
    * sonst von Hand über je einen Charakter-Export nachbauen müsste.
    */
   const [mitCharakteren, setMitCharakteren] = useState(true);
+  /**
+   * Bilder (Weltbild + Charakter-Bilder) mit exportieren. Default **an** – ohne
+   * Häkchen entsteht eine schlanke Datei nur aus Texten/Festlegungen.
+   */
+  const [mitBildern, setMitBildern] = useState(true);
   const [exportiert, setExportiert] = useState(false);
   const [exportFehler, setExportFehler] = useState<string | null>(null);
   const [generatingField, setGeneratingField] = useState<
@@ -380,6 +399,20 @@ export default function ScenarioDetailPage({
   }
 
   /**
+   * Einen Entwurf als **Favorit** markieren/entmarken (Stern am Reiter). Wie der
+   * Titel Teil der Metadaten – geht über „Änderungen speichern" (dirty).
+   */
+  function favoritUmschalten(i: number) {
+    if (generatingField || saving) return;
+    const items = aktuelleVarianten();
+    if (i < 0 || i >= items.length) return;
+    const meta = ausgerichtet(variantenMeta, items.length);
+    setVariantenMeta(
+      meta.map((m, k) => (k === i ? { ...m, favorit: !m.favorit } : m)),
+    );
+  }
+
+  /**
    * Einen Entwurf löschen. Anders als beim einzelnen Ansatzpunkt fragt es hier
    * nach – ein Handlungsentwurf ist ein großer, teuer erzeugter Text. Der letzte
    * verbliebene lässt sich nicht über die Leiste löschen (dann verschwände die
@@ -478,6 +511,15 @@ export default function ScenarioDetailPage({
         k === i ? { ...m, titel: neu.trim().slice(0, 120) } : m,
       ),
     );
+  }
+
+  /** Einen Story Arc als **Favorit** markieren/entmarken – analog zu `favoritUmschalten`. */
+  function arcFavoritUmschalten(i: number) {
+    if (arcBusy || saving) return;
+    const items = aktuelleArcs();
+    if (i < 0 || i >= items.length) return;
+    const meta = ausgerichtet(arcMeta, items.length);
+    setArcMeta(meta.map((m, k) => (k === i ? { ...m, favorit: !m.favorit } : m)));
   }
 
   /**
@@ -614,7 +656,7 @@ export default function ScenarioDetailPage({
         setDetails((d) => ({ ...d, handlung }));
         setVariantenMeta([
           ...ausgerichtet(variantenMeta, alt.length),
-          { titel, form: handlungForm, ton: handlungTon },
+          { titel, form: handlungForm, ton: handlungTon, favorit: false },
         ]);
       } else {
         const { beschreibung } = await generateScenarioDescription(
@@ -956,7 +998,7 @@ export default function ScenarioDetailPage({
       setStoryArc(neu);
       setArcMeta([
         ...ausgerichtet(arcMeta, alt.length),
-        { titel, form: arcParams.form, ton: arcParams.ton },
+        { titel, form: arcParams.form, ton: arcParams.ton, favorit: false },
       ]);
     } catch (e) {
       setArcFehler(e instanceof Error ? e.message : "Fehler.");
@@ -1038,7 +1080,13 @@ export default function ScenarioDetailPage({
         // Route nur dieses eine Kapitel aus, nicht die ganze Station.
         stufe.kapitel.map((c) => ({ titel: c.titel, inhalt: c.inhalt })),
         kapitelIndex,
-        { ton: arcParams.ton, kreativ: arcParams.kreativ, form: arcParams.form },
+        {
+          ton: arcParams.ton,
+          kreativ: arcParams.kreativ,
+          form: arcParams.form,
+          kapitelLaenge: arcParams.kapitelLaenge,
+          werkform: arcParams.werkform,
+        },
       );
       setStoryArc((arc) => ({
         stufen: arc.stufen.map((s, si) =>
@@ -1164,6 +1212,8 @@ export default function ScenarioDetailPage({
         // Das Weltbild ist unabhängig vom bearbeiteten Stand (eigene Route,
         // sofort gespeichert) – gibt es ein Thumbnail, gibt es ein Original.
         { scenarioId: id, vorhanden: !!thumbnail },
+        // Ohne Häkchen „mit Bildern" bleibt Weltbild + Charakter-Bilder weg.
+        !mitBildern,
       );
       const blob = new Blob([JSON.stringify(datei, null, 2)], {
         type: "application/json",
@@ -1603,9 +1653,7 @@ export default function ScenarioDetailPage({
                     onClick={() => varianteWaehlen(i)}
                     disabled={saving || generatingField !== null}
                     title={text.trim().slice(0, 200) || "(leerer Entwurf)"}
-                    className={`flex flex-col items-start gap-0.5 py-1 pl-2.5 text-left disabled:opacity-50 ${
-                      loeschbar || i === aktiv ? "pr-1" : "pr-2.5"
-                    }`}
+                    className="flex flex-col items-start gap-0.5 py-1 pr-1 pl-2.5 text-left disabled:opacity-50"
                   >
                     <span className="max-w-[15rem] truncate font-medium">
                       {titel}
@@ -1621,6 +1669,37 @@ export default function ScenarioDetailPage({
                         {badge}
                       </span>
                     )}
+                  </button>
+                  {/*
+                    Favorit-Stern – auf **jedem** Reiter: markiert und schaltet mit
+                    einem Klick um, ohne die aktive Variante zu wechseln. Bewusst
+                    ein Stern, kein Herz. ⭐ (Emoji, farbig) = Favorit, ☆ (gedämpft)
+                    = nicht.
+                  */}
+                  <button
+                    type="button"
+                    onClick={() => favoritUmschalten(i)}
+                    disabled={saving || generatingField !== null}
+                    aria-pressed={meta.favorit}
+                    title={
+                      meta.favorit
+                        ? `Entwurf ${i + 1} ist Favorit – klicken zum Aufheben`
+                        : `Entwurf ${i + 1} als Favorit markieren`
+                    }
+                    aria-label={
+                      meta.favorit
+                        ? `Favorit-Markierung von Entwurf ${i + 1} aufheben`
+                        : `Entwurf ${i + 1} als Favorit markieren`
+                    }
+                    className={`flex items-center px-1 leading-none transition disabled:opacity-40 ${
+                      meta.favorit
+                        ? ""
+                        : i === aktiv
+                          ? "text-background/45 hover:text-background/80"
+                          : "text-foreground/30 hover:text-amber-500"
+                    }`}
+                  >
+                    {meta.favorit ? "⭐" : "☆"}
                   </button>
                   {/* Titel ändern – nur am aktiven Reiter, um die Leiste ruhig zu halten. */}
                   {i === aktiv && (
@@ -1943,6 +2022,7 @@ export default function ScenarioDetailPage({
         arcMeta={ausgerichtet(arcMeta, aktuelleArcs().length)}
         onArcWaehlen={arcWaehlen}
         onArcTitelAendern={arcTitelAendern}
+        onArcFavorit={arcFavoritUmschalten}
         onArcLoeschen={arcLoeschen}
         onAlleArcsLoeschen={alleArcsLoeschen}
       />
@@ -1983,6 +2063,21 @@ export default function ScenarioDetailPage({
           {characters.length === 0
             ? "Keine Charaktere zugeordnet"
             : `Charaktere mitexportieren (${characters.length})`}
+        </label>
+
+        {/*
+          Bilder mitexportieren – Default an. Ohne Häkchen bleiben Weltbild und
+          Charakter-Bilder weg: eine schlanke Datei nur aus Texten/Festlegungen.
+        */}
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground/70">
+          <input
+            type="checkbox"
+            checked={mitBildern}
+            onChange={(e) => setMitBildern(e.target.checked)}
+            disabled={exportiert}
+            className="size-4 accent-foreground"
+          />
+          Bilder mitexportieren
         </label>
 
         {exportFehler && (

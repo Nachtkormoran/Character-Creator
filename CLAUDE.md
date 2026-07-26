@@ -160,7 +160,12 @@ in `lib/characterFile.ts` (`kind` + `version` im Kopf, damit nicht irgendein
 JSON eingelesen wird). Der **Export braucht keine Route** – Texte und Merkmale
 liegen im Client, nur die Bild-Originale holt `buildCharacterFile` einzeln über
 `getImage` nach (Thumbnail geht mit, weil der Server keines erzeugen kann:
-Canvas gibt es nur im Browser). Der **Import** ist eine eigene Route, weil
+Canvas gibt es nur im Browser). Eine Checkbox **„mit Bild" (Default an)** neben
+dem Export-Knopf erlaubt den Export **ohne Bilder** (`buildCharacterFile(…,
+ohneBilder)` → `images: []`): eine schlanke Datei nur aus Texten/Merkmalen/
+Vorgaben, ohne die teuren `getImage`-Aufrufe. Der Import verträgt das
+(`images: []` ist schema-gültig, `Math.max(0, findIndex)` bleibt harmlos, der
+Charakter kommt bildlos an – ein gültiger Zustand). Der **Import** ist eine eigene Route, weil
 Charakter und alle Bilder in **einer Transaktion** entstehen müssen; der Weg
 über `POST /api/characters` plus je Bild `POST …/images` ließe bei einem Fehler
 im dritten Bild einen halben Charakter stehen. Die Datei trägt bewusst **keine**
@@ -227,6 +232,13 @@ zwar **nacheinander**, nicht über `Promise.all`: Mehrere Figuren mit mehreren
 Bildern legten sonst Dutzende Megabyte gleichzeitig in den Speicher. Deshalb
 nennt die Checkbox die Zahl der Figuren: Sie ist der Unterschied zwischen einer
 kleinen und einer sehr großen Datei.
+
+Eine zweite Checkbox **„Bilder mitexportieren" (Default an)** steuert – wie beim
+Charakter – den Export **ohne Bilder** (`buildScenarioFile(…, ohneBilder)`):
+dann bleibt das **Weltbild** weg **und** jeder Charakter kommt bildlos in die
+Datei (der `ohneBilder`-Wert reicht bis in `buildCharacterPayload` durch). Die
+beiden Checkboxen sind unabhängig: „mit Bildern, ohne Charaktere" und „mit
+Charakteren, ohne Bilder" sind beide möglich.
 
 **Der Import** (`POST /api/scenarios/import`, Knopf „Szenario importieren" auf
 `/scenarios`) ist die Gegenrichtung und wie der Charakter-Import **additiv**:
@@ -805,7 +817,7 @@ statt bloß „Entwurf 1/2/3", die einander nicht unterscheidbar waren. Das gilt
 **für Handlungsentwurf und Story Arc** gleich (`StoryArcSection` bekommt die
 Arc-Metadaten als Prop). Die Daten liegen in einer **parallelen `meta`-Liste**
 je Variantensatz: `plotVariants`/`storyArcVariants` heißen jetzt
-`{ items, aktiv, meta }` mit `meta[i] = VariantMeta { titel, form, ton }`,
+`{ items, aktiv, meta }` mit `meta[i] = VariantMeta { titel, form, ton, favorit }`,
 **index-gleich** zu `items`. Bewusst parallel und **nicht** in die Einträge
 eingebettet: So bleiben `plotVariants.items` ein `string[]` und
 `storyArcVariants.items` ein `StoryArc[]` – Altbestände **und alte
@@ -830,7 +842,15 @@ Alte/leere/von Hand angelegte Varianten tragen keinen Titel und kein Badge.
 „Änderungen speichern" abgelegt – so bekommen auch alte, titel-lose Varianten
 nachträglich einen Namen. Der ✎ sitzt nur am aktiven Reiter (die Leiste ruhig
 halten); die Pille trägt dafür `overflow-hidden`, damit die runden Ecken
-unabhängig von der Zahl der Endknöpfe (✎/✕) sitzen. Das
+unabhängig von der Zahl der Endknöpfe (Favorit-Stern/✎/✕) sitzen.
+
+**Favoriten** (`meta[…].favorit`, `favoritUmschalten` / `arcFavoritUmschalten` +
+`onArcFavorit`): ein **Stern** – bewusst **kein Herz** – auf **jedem** Reiter,
+sowohl bei den **Handlungsentwürfen als auch den Story Arcs** (⭐ = Favorit farbig,
+☆ = nicht, gedämpft), der mit einem Klick umschaltet, **ohne** die aktive Variante
+zu wechseln. Reine Kennzeichnung, keine Sortier-/Filterfunktion. Liegt in den
+Metadaten, geht also in `dirty` und über „Änderungen speichern" (wie der Titel).
+Das
 Badge (`variantBadge`) zeigt **Erzählform zuerst, dann Ton**, und zwar **auch die
 Vorgaben** (`allround`/`neutral`) – nur **leere** Werte (Altbestände, von Hand
 angelegt) fallen weg. (Anfangs waren die Vorgaben ausgeblendet; das ließ die
@@ -982,10 +1002,43 @@ zugleich die Spalte `storyArc` (dort lesen Export und Anzeige sie unverändert),
 Leiste zum Umschalten. Kapitel liegen **in** der Station (`kapitel[]` mit
 `titel`/`inhalt`/`text`), gehen also über denselben `storyArcVariants`-PATCH mit.
 
-Die **Arc-Parameter** (Länge, Format buch/spiel, Ton, Erzählform, kreativ,
-weiterspinnen, Kapitelzahl) liegen als `arcParams` **in der Seite** und sind
-**nicht gespeichert** (Lauf-Parameter). Ton, Erzählform und „kreativ" gelten für
-Arc **und** Kapitel **und** Prosa gemeinsam.
+Die **Arc-Parameter** (Werkform, Länge, Format buch/spiel, Ton, Erzählform,
+Kapitellänge, kreativ, weiterspinnen, Kapitelzahl) liegen als `arcParams` **in
+der Seite** und sind **nicht gespeichert** (Lauf-Parameter). Ton, Erzählform und
+„kreativ" gelten für Arc **und** Kapitel **und** Prosa gemeinsam.
+
+**Werkform & Kapitellänge – Kurzgeschichte bis Roman.** Zwei zusammenspielende
+Regler steuern, *wie umfangreich und in welchem Stil* aus einem Handlungsentwurf
+Text wird:
+
+- **Werkform** (`WERKFORMEN`/`werkformStil`/`werkformPresets` in `schema.ts`:
+  `frei` (Default) / `kurzgeschichte` / `novelle` / `roman`) ist die **führende**
+  Einstellung. Sie tut zwei Dinge: (1) **belegt beim Wählen** Arc-Länge,
+  Kapitel je Station und Kapitellänge vor (reine UI-Vorbelegung im `onChange` des
+  Selektors über `werkformPresets` – die drei bleiben danach frei justierbar, die
+  Werkform bleibt gewählt); (2) **prägt live den Prosastil** (`stil`) – verdichtet
+  (Kurzgeschichte) bis ausladend (Roman) –, der als eigener Bullet in
+  `buildChapterTextPrompt` steht. `frei` trägt **keinen** Stil und **keine**
+  Presets: dann ist der Prosa-Prompt zeichengleich mit dem von vorher.
+- **Kapitellänge** (`KAPITEL_LAENGEN`/`kapitelLaengeHint`/`kapitelLaengeMaxTokens`:
+  kurz/mittel/lang/sehr_lang) steuert die **Prosalänge je Kapitel** – **entkoppelt
+  vom „kreativ"-Haken**. `mittel` ist die frühere „kreativ aus"-Länge, `lang` die
+  frühere „kreativ an"-Länge, daher bleibt der Standard (`mittel`) zeichengleich.
+  Die Route (`story-chapter-text`) nimmt das `max_tokens`-Budget jetzt aus der
+  Kapitellänge, nicht mehr aus `kreativ`.
+
+`kreativ` regelt seither **nur noch** Impulse (`sparks`), die ausführlicheren
+Kapitel-**Gerüste** (`buildStoryArcChaptersPrompt`) und die **Temperatur** – nicht
+mehr die Prosalänge (das ist die Entkopplung). *Verifiziert* (tsx): Default
+(`frei` + `mittel`) liefert die alte Längenzeile ohne Stil-Bullet; `roman`/`lang`
+bringt die lange Zeile + „ausladend"-Stil, `kurzgeschichte`/`kurz` „verdichtet" +
+kurze Zeile; `werkformPresets` belegt korrekt vor, `frei` → `null`.
+
+Bewusst **noch nicht** dabei (möglicher Folgeschritt): ein eigener
+Kurzgeschichten-Weg, der den ganzen Stoff **in einem Zug** als **einen**
+zusammenhängenden Text schreibt statt als einzeln erzeugte Kapitel. Die Werkform
+`kurzgeschichte` verdichtet bisher nur Stil und Länge der (weiterhin
+kapitelweisen) Erzeugung.
 
 **Erzählform** (`STORY_FORMS` + `formHint` in `schema.ts`, Zwilling von
 `STORY_TONES`/`toneHint`): die **dritte Achse** neben Genre (der Welt) und Ton

@@ -3,7 +3,9 @@ import {
   MAX_NEUE_PLOT_PERSONEN,
   TRAIT_LABELS,
   formHint,
+  kapitelLaengeHint,
   toneHint,
+  werkformStil,
 } from "./schema";
 import { DEFAULT_GENRE, GENRE_TEMPLATES, genreLabel } from "./templates";
 import type { ScenarioSamples } from "./scenarioSamples";
@@ -1012,7 +1014,17 @@ export function buildChapterTextPrompt(
   /** Welches Kapitel aus `kapitelListe` ausgeschrieben wird. */
   kapitelIndex: number,
   figuren: ChapterCharacter[],
-  options: { ton?: string; kreativ?: boolean; form?: string } = {},
+  options: {
+    ton?: string;
+    form?: string;
+    /** **Kapitellänge** (`KAPITEL_LAENGEN`-Wert) – steuert die Prosalänge. */
+    kapitelLaenge?: string;
+    /**
+     * **Werkform** (`WERKFORMEN`-Wert) – prägt den Prosastil (verdichtet ↔
+     * ausladend). Leer/`frei` = kein Stil-Block, der Prompt bleibt wie zuvor.
+     */
+    werkform?: string;
+  } = {},
 ): string {
   const ziel = kapitelListe[kapitelIndex] ?? { titel: "", inhalt: "" };
   const mehrere = kapitelListe.length > 1;
@@ -1069,9 +1081,13 @@ export function buildChapterTextPrompt(
     ? `\nBekannte Figuren (schildere sie stimmig zu diesen Angaben):\n${figurenBlock}\n`
     : "";
 
-  const laenge = options.kreativ
-    ? "Fünf bis acht Absätze (insgesamt ca. 3000–5000 Zeichen)."
-    : "Drei bis fünf Absätze (insgesamt ca. 1800–3200 Zeichen).";
+  // Länge aus der **Kapitellänge** (entkoppelt vom „kreativ"-Haken). `mittel`
+  // liefert exakt die frühere Vorgabe – der Standardfall bleibt zeichengleich.
+  const laenge = kapitelLaengeHint(options.kapitelLaenge ?? "");
+
+  // Werkform-Stil (verdichtet ↔ ausladend) – als eigener Bullet nach der Länge.
+  // Leer bei `frei`/unbekannt, dann bleibt der Prompt wie zuvor.
+  const werkformBlock = werkformStil(options.werkform ?? "");
 
   // Ton – nur bei nicht-neutralem Ton. `neutral`/leer liefert `""`, dann bleibt
   // der Prompt exakt wie zuvor (auch das „ohne Kitsch" unten). Bei gesetztem Ton
@@ -1135,7 +1151,7 @@ ${ziel.inhalt.trim() || "(keine Angabe – halte dich an die Station und die Wel
 ${figurenTeil}
 Anforderungen:
 ${grenzAnforderung}${anschlussAnforderung ? "\n" + anschlussAnforderung : ""}
-- ${laenge}
+- ${laenge}${werkformBlock ? "\n- " + werkformBlock : ""}
 - **Beschreibe die Personen genau** – ihr Aussehen und Auftreten – und schildere ihre **Tätigkeiten** Schritt für Schritt, konkret und sichtbar.
 ${atmosphaereBullet}
 - **Baue Dialog in wörtlicher Rede ein** (mit Anführungszeichen), der die Figuren charakterisiert und die Handlung trägt. Nicht nur berichten, was gesagt wird – lass sie sprechen.

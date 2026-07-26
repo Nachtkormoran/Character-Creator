@@ -167,6 +167,8 @@ export function CharacterDetailModal({
   const [assigningScenario, setAssigningScenario] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportingJson, setExportingJson] = useState(false);
+  /** Bild(er) in die Export-Datei aufnehmen. Default **an** (mit Bild). */
+  const [exportMitBild, setExportMitBild] = useState(true);
   const [exportError, setExportError] = useState<string | null>(null);
   const [namingAI, setNamingAI] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -289,7 +291,12 @@ export function CharacterDetailModal({
     setExportingJson(true);
     setExportError(null);
     try {
-      const datei = await buildCharacterFile(c, edited, hooksText);
+      const datei = await buildCharacterFile(
+        c,
+        edited,
+        hooksText,
+        !exportMitBild,
+      );
       const blob = new Blob([JSON.stringify(datei, null, 2)], {
         type: "application/json",
       });
@@ -797,13 +804,35 @@ export function CharacterDetailModal({
             >
               {exporting ? "Erstelle PDF …" : "Als PDF exportieren"}
             </button>
+            {/*
+              „mit Bild" (Default an) direkt vor dem Datei-Export: Ohne Häkchen
+              geht der Charakter **ohne Bilder** in die Datei – kleiner und
+              schneller. Betrifft nur den Datei-Export, nicht das PDF.
+            */}
+            <label
+              className="flex items-center gap-1.5 text-xs text-foreground/60"
+              title="Bild(er) in die Export-Datei aufnehmen. Ohne Häkchen wird der Charakter ohne Bilder exportiert – deutlich kleinere Datei."
+            >
+              <input
+                type="checkbox"
+                checked={exportMitBild}
+                onChange={(e) => setExportMitBild(e.target.checked)}
+                disabled={exportingJson}
+                className="size-3.5 accent-foreground"
+              />
+              mit Bild
+            </label>
             <button
               onClick={exportJson}
               disabled={exportingJson}
-              title="Charakter samt Bildern als Datei – lässt sich anderswo wieder importieren"
+              title="Charakter als Datei – lässt sich anderswo wieder importieren. Mit oder ohne Bild je nach Häkchen."
               className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
             >
-              {exportingJson ? "Sammle Bilder …" : "Als Datei exportieren"}
+              {exportingJson
+                ? exportMitBild
+                  ? "Sammle Bilder …"
+                  : "Exportiere …"
+                : "Als Datei exportieren"}
             </button>
             <button
               onClick={onDelete}

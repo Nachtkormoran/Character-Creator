@@ -65,7 +65,11 @@ export async function GET(_request: Request, { params }: Context) {
 
   const characters = await prisma.character.findMany({
     where: { scenarioId: id },
-    orderBy: { createdAt: "desc" },
+    // Aufsteigend: In der Szenario-Ansicht steht der **zuerst** angehängte
+    // Charakter links, der neueste rechts (anders als die Galerie, die absteigend
+    // sortiert). Neu hinzugefügte Charaktere hängt die Seite hinten an – so
+    // bleibt die Reihenfolge konsistent.
+    orderBy: { createdAt: "asc" },
     include: {
       images: {
         orderBy: { createdAt: "desc" },

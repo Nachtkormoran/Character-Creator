@@ -357,14 +357,23 @@ export async function buildCharacterPayload(
   c: StoredCharacter,
   character: GeneratedCharacter = c.character,
   storyHooks: string = c.storyHooks,
+  /**
+   * **Ohne Bilder** exportieren (Default `false` = mit Bildern). Dann bleibt die
+   * Bild-Liste leer und die teuren `getImage`-Aufrufe entfallen – die Datei
+   * trägt nur Texte, Merkmale und Vorgaben. Beim Import kommt der Charakter ohne
+   * Bild an (ein gültiger Zustand; das Schema erlaubt `images: []`).
+   */
+  ohneBilder = false,
 ): Promise<CharacterPayload> {
-  const images = await Promise.all(
-    c.images.map(async (bild) => ({
-      imageData: await getImage(c.id, bild.id),
-      thumbnail: bild.thumbnail,
-      isPrimary: bild.isPrimary,
-    })),
-  );
+  const images = ohneBilder
+    ? []
+    : await Promise.all(
+        c.images.map(async (bild) => ({
+          imageData: await getImage(c.id, bild.id),
+          thumbnail: bild.thumbnail,
+          isPrimary: bild.isPrimary,
+        })),
+      );
 
   return {
     input: c.input,
@@ -383,12 +392,14 @@ export async function buildCharacterFile(
   c: StoredCharacter,
   character: GeneratedCharacter = c.character,
   storyHooks: string = c.storyHooks,
+  /** Ohne Bilder exportieren (Default `false` = mit Bildern). */
+  ohneBilder = false,
 ): Promise<CharacterFile> {
   return {
     kind: CHARACTER_FILE_KIND,
     version: CHARACTER_FILE_VERSION,
     exportedAt: new Date().toISOString(),
-    ...(await buildCharacterPayload(c, character, storyHooks)),
+    ...(await buildCharacterPayload(c, character, storyHooks, ohneBilder)),
   };
 }
 
@@ -429,11 +440,17 @@ export async function buildScenarioFile(
    * (`getScenarioImage`), damit die Seite es nicht vorhalten muss.
    */
   bild?: { scenarioId: string; vorhanden: boolean },
+  /**
+   * **Ohne Bilder** exportieren (Default `false` = mit Bildern): dann bleibt das
+   * **Weltbild** weg **und** jeder Charakter kommt bildlos in die Datei. Die
+   * Datei trägt dann nur Texte/Festlegungen – klein und schnell.
+   */
+  ohneBilder = false,
 ): Promise<ScenarioFile> {
-  // Das Weltbild nur holen, wenn es eines gibt – sonst bleibt das Feld leer.
+  // Das Weltbild nur holen, wenn es eines gibt **und** Bilder gewünscht sind.
   let imageData: string | undefined;
   let thumbnail: string | undefined;
-  if (bild?.vorhanden) {
+  if (!ohneBilder && bild?.vorhanden) {
     imageData = await getScenarioImage(bild.scenarioId);
     thumbnail = (await safeThumbnail(imageData)) ?? undefined;
   }
@@ -466,7 +483,10 @@ export async function buildScenarioFile(
     // Dutzende Megabyte parallel in den Speicher. Ein Export darf ein paar
     // Sekunden dauern.
     characters: await characters.reduce<Promise<CharacterPayload[]>>(
-      async (bisher, c) => [...(await bisher), await buildCharacterPayload(c)],
+      async (bisher, c) => [
+        ...(await bisher),
+        await buildCharacterPayload(c, undefined, undefined, ohneBilder),
+      ],
       Promise.resolve([]),
     ),
   };
@@ -932,6 +952,10 @@ export function generateChapterText(
     kreativ?: boolean;
     /** Erzählform (`STORY_FORMS`-Wert). Leer/`allround` = ohne Erzählform-Block. */
     form?: string;
+    /** Kapitellänge (`KAPITEL_LAENGEN`-Wert) – steuert die Prosalänge. */
+    kapitelLaenge?: string;
+    /** Werkform (`WERKFORMEN`-Wert) – prägt den Prosastil. */
+    werkform?: string;
   } = {},
 ) {
   return postJson<{ text: string }>("/api/story-chapter-text", {

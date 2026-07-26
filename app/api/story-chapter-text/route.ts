@@ -4,6 +4,7 @@ import { getTextClient } from "@/lib/openai";
 import { buildChapterTextPrompt, type ChapterCharacter } from "@/lib/prompts";
 import {
   MAX_KAPITEL_PRO_STUFE,
+  kapitelLaengeMaxTokens,
   normalizeTraits,
   scenarioDetailsSchema,
   toneHint,
@@ -54,8 +55,12 @@ const bodySchema = z.object({
   ton: z.string().trim().max(40).optional().default(""),
   // Erzählform (Krimi, Liebe, …) – als String ohne Allowlist.
   form: z.string().trim().max(40).optional().default(""),
-  // Kreativ: längerer, stärker ausgemalter Text; höhere Temperatur.
+  // Kreativ: höhere Temperatur (Impulse/Freiheit) – **nicht** mehr die Länge.
   kreativ: z.boolean().optional().default(false),
+  // Kapitellänge: steuert die Prosalänge (entkoppelt von „kreativ").
+  kapitelLaenge: z.string().trim().max(40).optional().default(""),
+  // Werkform: prägt den Prosastil (verdichtet ↔ ausladend).
+  werkform: z.string().trim().max(40).optional().default(""),
 });
 
 /** Zerlegt einen Namen in kleingeschriebene Wortteile (für den Abgleich). */
@@ -87,6 +92,8 @@ export async function POST(request: Request) {
       ton,
       form,
       kreativ,
+      kapitelLaenge,
+      werkform,
     } = parsed.data;
 
     // Der Index muss in die Liste zeigen.
@@ -160,13 +167,14 @@ export async function POST(request: Request) {
             kapitelListe,
             kapitelIndex,
             figuren,
-            { ton, kreativ, form },
+            { ton, form, kapitelLaenge, werkform },
           ),
         },
       ],
+      // `kreativ` regelt nur noch die Temperatur (Impulse/Freiheit).
       temperature: kreativ ? 0.95 : 0.85,
-      // Eine Szene mit Beschreibung und Dialog wird lang; kreativ noch länger.
-      max_tokens: kreativ ? 2600 : 1800,
+      // Ausgabe-Budget aus der **Kapitellänge** (entkoppelt von „kreativ").
+      max_tokens: kapitelLaengeMaxTokens(kapitelLaenge),
     });
 
     const text = (completion.choices[0]?.message.content ?? "").trim();

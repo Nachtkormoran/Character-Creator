@@ -8,17 +8,22 @@ import {
   KAPITEL_COUNTS,
   MAX_ARC_STUFEN,
   MAX_KAPITEL_PRO_STUFE,
+  KAPITEL_LAENGEN,
   STORY_FORMS,
   STORY_TONES,
+  WERKFORMEN,
   variantBadge,
+  werkformPresets,
   type ArcFormat,
   type ArcLength,
   type ArcPhase,
   type KapitelCount,
+  type KapitelLaenge,
   type StoryArc,
   type StoryForm,
   type StoryTone,
   type VariantMeta,
+  type Werkform,
 } from "@/lib/schema";
 import { AutoTextarea } from "./AutoTextarea";
 
@@ -92,6 +97,7 @@ export function StoryArcSection({
   arcMeta,
   onArcWaehlen,
   onArcTitelAendern,
+  onArcFavorit,
   onArcLoeschen,
   onAlleArcsLoeschen,
 }: {
@@ -102,22 +108,26 @@ export function StoryArcSection({
   error: string | null;
   /** Alle Lauf-Parameter der Arc-/Kapitel-Erzeugung – nicht gespeichert. */
   params: {
+    werkform: Werkform;
     laenge: ArcLength;
     format: ArcFormat;
     zusatz: string;
     kreativ: boolean;
     weiterspinnen: boolean;
     kapitelAnzahl: KapitelCount;
+    kapitelLaenge: KapitelLaenge;
     ton: StoryTone;
     form: StoryForm;
   };
   onParamsChange: (p: {
+    werkform: Werkform;
     laenge: ArcLength;
     format: ArcFormat;
     zusatz: string;
     kreativ: boolean;
     weiterspinnen: boolean;
     kapitelAnzahl: KapitelCount;
+    kapitelLaenge: KapitelLaenge;
     ton: StoryTone;
     form: StoryForm;
   }) => void;
@@ -152,6 +162,8 @@ export function StoryArcSection({
   onArcWaehlen: (i: number) => void;
   /** Den Titel eines Arcs ändern (✎ am aktiven Reiter). */
   onArcTitelAendern: (i: number) => void;
+  /** Einen Arc als Favorit markieren/entmarken (Stern am Reiter). */
+  onArcFavorit: (i: number) => void;
   /** Einen Arc löschen (nur ab zwei möglich). */
   onArcLoeschen: (i: number) => void;
   /** Alle Arcs auf einmal löschen. */
@@ -268,6 +280,41 @@ export function StoryArcSection({
             das Feld, daher braucht es kein `aria-label` (die Beschriftung ist
             der Name). Die Feinheiten stehen weiter im `title`. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {/*
+            Werkform – die **führende** Einstellung: belegt beim Wählen Länge,
+            Kapitel je Station und Kapitellänge vor (die bleiben danach frei) und
+            prägt zusätzlich live den Prosastil (verdichtet ↔ ausladend).
+          */}
+          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+            Werkform:
+            <select
+              value={params.werkform}
+              onChange={(e) => {
+                const w = e.target.value as Werkform;
+                const p = werkformPresets(w);
+                onParamsChange(
+                  p
+                    ? {
+                        ...params,
+                        werkform: w,
+                        laenge: p.laenge,
+                        kapitelAnzahl: p.kapitelAnzahl,
+                        kapitelLaenge: p.kapitelLaenge,
+                      }
+                    : { ...params, werkform: w },
+                );
+              }}
+              disabled={disabled || busy}
+              title="Führende Einstellung: Kurzgeschichte/Novelle/Roman belegt Länge, Kapitel je Station und Kapitellänge vor und prägt den Prosastil (verdichtet ↔ ausladend). Die Zahlen bleiben danach frei justierbar. „— frei —“ = keine Vorgabe."
+              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+            >
+              {WERKFORMEN.map((w) => (
+                <option key={w.value} value={w.value}>
+                  {w.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
             Länge:
             <select
@@ -276,7 +323,7 @@ export function StoryArcSection({
                 onParamsChange({ ...params, laenge: e.target.value as ArcLength })
               }
               disabled={disabled || busy}
-              title="Wie viele Stationen erzeugt werden"
+              title="Wie viele Stationen (Akte) der Arc hat – die Dramaturgie, nicht die Gesamtlänge. Von der Werkform vorbelegt, danach frei."
               className={`${CHIP_BTN} bg-white dark:bg-white/5`}
             >
               {ARC_LENGTHS.map((l) => (
@@ -340,23 +387,27 @@ export function StoryArcSection({
               ))}
             </select>
           </label>
-          <button
-            type="button"
-            onClick={onAbleiten}
-            disabled={!kannAbleiten}
-            title={
-              handlung.trim()
-                ? "Zerlegt den aktiven Handlungsentwurf in Stationen"
-                : "Zuerst einen Handlungsentwurf erzeugen"
-            }
-            className={CHIP_BTN}
-          >
-            {busy
-              ? "Leite ab …"
-              : hatArc
-                ? "📖 Neu ableiten"
-                : "📖 Story Arc ableiten"}
-          </button>
+          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+            Kapitellänge:
+            <select
+              value={params.kapitelLaenge}
+              onChange={(e) =>
+                onParamsChange({
+                  ...params,
+                  kapitelLaenge: e.target.value as KapitelLaenge,
+                })
+              }
+              disabled={disabled || busy}
+              title="Wie viel Prosa „Story generieren“ je Kapitel schreibt – entkoppelt vom Kreativ-Haken. Von der Werkform vorbelegt, danach frei."
+              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+            >
+              {KAPITEL_LAENGEN.map((k) => (
+                <option key={k.value} value={k.value}>
+                  {k.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
@@ -378,7 +429,12 @@ export function StoryArcSection({
             const loeschbar = arcs.length >= 2;
             // Titel (KI, sonst „Arc N") oben, „Erzählform · Ton" klein darunter –
             // Letzteres nur, wenn es etwas Unterscheidendes hergibt.
-            const meta = arcMeta[i] ?? { titel: "", form: "", ton: "" };
+            const meta = arcMeta[i] ?? {
+              titel: "",
+              form: "",
+              ton: "",
+              favorit: false,
+            };
             const titel = meta.titel.trim() || `Arc ${i + 1}`;
             const badge = variantBadge(meta);
             const stationen = `${arc.stufen.length} ${
@@ -398,9 +454,7 @@ export function StoryArcSection({
                   onClick={() => onArcWaehlen(i)}
                   disabled={disabled || busy}
                   title={stationen}
-                  className={`flex flex-col items-start gap-0.5 py-1 pl-2.5 text-left disabled:opacity-50 ${
-                    loeschbar || i === arcAktiv ? "pr-1" : "pr-2.5"
-                  }`}
+                  className="flex flex-col items-start gap-0.5 py-1 pr-1 pl-2.5 text-left disabled:opacity-50"
                 >
                   <span className="max-w-[15rem] truncate font-medium">
                     {titel}
@@ -412,6 +466,36 @@ export function StoryArcSection({
                   >
                     {badge ? `${badge} · ${stationen}` : stationen}
                   </span>
+                </button>
+                {/*
+                  Favorit-Stern – auf **jedem** Reiter, schaltet mit einem Klick
+                  um, ohne den aktiven Arc zu wechseln. Wie beim Handlungsentwurf
+                  ein Stern, kein Herz.
+                */}
+                <button
+                  type="button"
+                  onClick={() => onArcFavorit(i)}
+                  disabled={disabled || busy}
+                  aria-pressed={meta.favorit}
+                  title={
+                    meta.favorit
+                      ? `Story Arc ${i + 1} ist Favorit – klicken zum Aufheben`
+                      : `Story Arc ${i + 1} als Favorit markieren`
+                  }
+                  aria-label={
+                    meta.favorit
+                      ? `Favorit-Markierung von Story Arc ${i + 1} aufheben`
+                      : `Story Arc ${i + 1} als Favorit markieren`
+                  }
+                  className={`flex items-center px-1 leading-none transition disabled:opacity-40 ${
+                    meta.favorit
+                      ? ""
+                      : i === arcAktiv
+                        ? "text-background/45 hover:text-background/80"
+                        : "text-foreground/30 hover:text-amber-500"
+                  }`}
+                >
+                  {meta.favorit ? "⭐" : "☆"}
                 </button>
                 {/* Titel ändern – nur am aktiven Reiter. */}
                 {i === arcAktiv && (
@@ -496,13 +580,14 @@ export function StoryArcSection({
 
       {/*
         Kreativ-Haken – gilt für **beide** Erzeugungen (Arc und Kapitel): Es
-        fließen zufällige erzählerische Impulse ein, die Kapitel werden länger
-        und ausgemalt, und die Temperatur steigt. Deshalb steht er oben im
-        Abschnitt, nicht bei einem einzelnen Knopf.
+        fließen zufällige erzählerische Impulse ein, die Kapitel-Gerüste werden
+        ausführlicher ausgearbeitet, und die Temperatur steigt. Die **Länge** der
+        ausgeschriebenen Prosa steuert er **nicht** mehr – das ist die
+        Kapitellänge oben (entkoppelt).
       */}
       <label
         className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
-        title="Zufällige Impulse und mehr Freiheit: Der Arc fällt lebendiger aus, Kapitel werden länger und mit Details ausgearbeitet. Wirkt auf „Ableiten“ und auf die Kapitel-Erzeugung."
+        title="Zufällige Impulse und mehr Freiheit: Der Arc fällt lebendiger aus, die Kapitel-Gerüste werden ausführlicher und die Temperatur steigt. Die Länge der ausgeschriebenen Prosa steuert dagegen die „Kapitellänge“ oben."
       >
         <input
           type="checkbox"
@@ -513,7 +598,7 @@ export function StoryArcSection({
           disabled={disabled}
           className="size-4 accent-foreground"
         />
-        ✨ Kreativ – Impulse und ausgearbeitete Kapitel
+        ✨ Kreativ – Impulse und lebendigere Ausarbeitung
       </label>
 
       {/*
@@ -523,17 +608,43 @@ export function StoryArcSection({
         Figuren-Checkbox mehr.
       */}
 
-      {/* Zusatzwunsch für die Arc-Erzeugung. */}
-      <input
-        value={params.zusatz}
-        onChange={(e) => onParamsChange({ ...params, zusatz: e.target.value })}
-        disabled={disabled || busy}
-        maxLength={1000}
-        placeholder="Stichwörter für den Arc – z. B. „ein Verrat trägt den Wendepunkt“, „ohne Gewalt“"
-        title="Stichwörter, die der nächste Arc berücksichtigen soll. Werden nicht gespeichert."
-        aria-label="Stichwörter für den Story Arc"
-        className="mt-3 w-full rounded-md border border-black/15 bg-white px-3 py-1.5 text-xs outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
-      />
+      {/*
+        Zusatzwunsch + „Ableiten"-Knopf **nebeneinander** – wie beim
+        Handlungsentwurf, wo der Erzeugen-Knopf neben den Stichwörtern sitzt. Die
+        Nähe sagt: Der Knopf steuert die Erzeugung, das Feld liefert die
+        Stichwörter dafür. Das Feld wächst in die Breite, der Knopf bricht nicht um.
+      */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={params.zusatz}
+          onChange={(e) =>
+            onParamsChange({ ...params, zusatz: e.target.value })
+          }
+          disabled={disabled || busy}
+          maxLength={1000}
+          placeholder="Stichwörter für den Arc – z. B. „ein Verrat trägt den Wendepunkt“, „ohne Gewalt“"
+          title="Stichwörter, die der nächste Arc berücksichtigen soll. Werden nicht gespeichert."
+          aria-label="Stichwörter für den Story Arc"
+          className="min-w-0 flex-1 basis-56 rounded-md border border-black/15 bg-white px-3 py-1.5 text-xs outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+        />
+        <button
+          type="button"
+          onClick={onAbleiten}
+          disabled={!kannAbleiten}
+          title={
+            handlung.trim()
+              ? "Zerlegt den aktiven Handlungsentwurf in Stationen"
+              : "Zuerst einen Handlungsentwurf erzeugen"
+          }
+          className={`${CHIP_BTN} whitespace-nowrap`}
+        >
+          {busy
+            ? "Leite ab …"
+            : hatArc
+              ? "📖 Neu ableiten"
+              : "📖 Story Arc ableiten"}
+        </button>
+      </div>
 
       {error && (
         <p className="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>

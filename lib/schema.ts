@@ -738,12 +738,18 @@ export interface VariantMeta {
   form: string;
   /** `STORY_TONES`-Wert der Erzeugung (leer = unbekannt/Altbestand). */
   ton: string;
+  /**
+   * Als **Favorit** markiert (per Stern am Reiter). Rein zur Kennzeichnung, ohne
+   * Funktion darüber hinaus (keine Sortierung/Filterung). Default `false`.
+   */
+  favorit: boolean;
 }
 
 export const variantMetaSchema = z.object({
   titel: z.string().trim().max(120).optional().default(""),
   form: z.string().trim().max(40).optional().default(""),
   ton: z.string().trim().max(40).optional().default(""),
+  favorit: z.boolean().optional().default(false),
 });
 
 /**
@@ -759,6 +765,7 @@ export function normalizeMetaList(raw: unknown, laenge: number): VariantMeta[] {
       titel: typeof o.titel === "string" ? o.titel : "",
       form: typeof o.form === "string" ? o.form : "",
       ton: typeof o.ton === "string" ? o.ton : "",
+      favorit: typeof o.favorit === "boolean" ? o.favorit : false,
     };
   });
 }
@@ -872,6 +879,61 @@ export const DEFAULT_KAPITEL_COUNT: KapitelCount = "wenig";
 export function kapitelSpanne(value: string): { min: number; max: number } {
   const e = KAPITEL_COUNTS.find((k) => k.value === value);
   return e ? { min: e.min, max: e.max } : { min: 2, max: 3 };
+}
+
+/**
+ * **Kapitellänge** – wie viel **Prosa** ein „Story generieren" je Kapitel
+ * schreibt. Bewusst **entkoppelt vom „kreativ"-Haken**: Länge und
+ * Impulse/Temperatur sind zwei Dinge. `mittel` ist die frühere Vorgabe (der
+ * „kreativ aus"-Fall), `lang` die frühere „kreativ an"-Länge – so bleibt das
+ * Standardverhalten (mittel) zeichengleich. `sehr_lang` ist neu für
+ * Roman-Kapitel. Ein Lauf-Parameter, nicht gespeichert. `hint` ist die
+ * Längen-Anweisung im Prosa-Prompt, `maxTokens` das Ausgabe-Budget der Route.
+ */
+export const KAPITEL_LAENGEN = [
+  {
+    value: "kurz",
+    label: "Kurz",
+    hint: "Zwei bis vier Absätze (insgesamt ca. 1000–1800 Zeichen).",
+    maxTokens: 1400,
+  },
+  {
+    value: "mittel",
+    label: "Mittel",
+    hint: "Drei bis fünf Absätze (insgesamt ca. 1800–3200 Zeichen).",
+    maxTokens: 1800,
+  },
+  {
+    value: "lang",
+    label: "Lang",
+    hint: "Fünf bis acht Absätze (insgesamt ca. 3000–5000 Zeichen).",
+    maxTokens: 2600,
+  },
+  {
+    value: "sehr_lang",
+    label: "Sehr lang",
+    hint: "Acht bis zwölf Absätze (insgesamt ca. 5000–8000 Zeichen).",
+    maxTokens: 3600,
+  },
+] as const;
+
+export type KapitelLaenge = (typeof KAPITEL_LAENGEN)[number]["value"];
+export const DEFAULT_KAPITEL_LAENGE: KapitelLaenge = "mittel";
+
+/** Die Längen-Anweisung zu einer Kapitellänge (Fallback: mittel). */
+export function kapitelLaengeHint(value: string): string {
+  return (
+    KAPITEL_LAENGEN.find((k) => k.value === value)?.hint ??
+    KAPITEL_LAENGEN[1].hint
+  );
+}
+
+/** Das Token-Budget zu einer Kapitellänge (Fallback: mittel). */
+export function kapitelLaengeMaxTokens(value: string): number {
+  return (
+    KAPITEL_LAENGEN.find((k) => k.value === value)?.maxTokens ??
+    KAPITEL_LAENGEN[1].maxTokens
+  );
 }
 
 /**
@@ -1079,6 +1141,67 @@ export const ARC_FORMATS = [
 
 export type ArcFormat = (typeof ARC_FORMATS)[number]["value"];
 export const DEFAULT_ARC_FORMAT: ArcFormat = "buch";
+
+/**
+ * **Werkform** – die *führende* Einstellung für den ausgeschriebenen Text:
+ * Kurzgeschichte, Novelle oder Roman (plus `frei` als Default = keine Vorgabe,
+ * Verhalten wie bisher). Sie tut **zwei** Dinge:
+ *
+ * 1. **Belegt die Zahlen-Regler vor** (`presets`): Arc-Länge (Stationen),
+ *    Kapitel je Station und Kapitellänge. Das ist reine UI-Vorbelegung – die drei
+ *    bleiben danach frei justierbar (die Werkform bleibt trotzdem gewählt).
+ * 2. **Prägt den Prosastil** (`stil`) – live bei jedem „Story generieren":
+ *    verdichtet (Kurzgeschichte) bis ausladend (Roman). Das kann keine Zahl
+ *    ausdrücken, deshalb wirkt die Werkform **zusätzlich** zur Kapitellänge.
+ *
+ * `frei` trägt **keinen** Stil (leerer Block) und **keine** Presets – dann bleibt
+ * der Prosa-Prompt zeichengleich mit dem von vorher. Ein Lauf-Parameter, nicht
+ * gespeichert. Die Presets sind bewusst moderat gewählt (ein „Roman" hier ist ein
+ * kurzer Roman/Novelle-Plus); wer mehr will, dreht die Zahlen hoch.
+ */
+export const WERKFORMEN = [
+  { value: "frei", label: "— frei —", stil: "" },
+  {
+    value: "kurzgeschichte",
+    label: "Kurzgeschichte",
+    stil: "Schreib **verdichtet wie in einer Kurzgeschichte**: ein enger Fokus, wenige Figuren, jeder Satz trägt. Kein Ausschweifen, keine Nebenstränge – die Szene läuft zielstrebig auf ihren Kern zu.",
+    presets: { laenge: "kurz", kapitelAnzahl: "wenig", kapitelLaenge: "kurz" },
+  },
+  {
+    value: "novelle",
+    label: "Novelle",
+    stil: "Schreib **wie in einer Novelle**: konzentriert auf einen zentralen Konflikt, mit etwas mehr Raum zur Entfaltung als in einer Kurzgeschichte, aber ohne die Breite eines Romans.",
+    presets: { laenge: "mittel", kapitelAnzahl: "mittel", kapitelLaenge: "mittel" },
+  },
+  {
+    value: "roman",
+    label: "Roman",
+    stil: "Schreib **ausladend wie in einem Roman**: Nimm dir Zeit für Innensicht, Atmosphäre und Nebenbeobachtungen, entwickle die Szene in Ruhe und gönn den Figuren Gedanken und Zwischentöne.",
+    presets: { laenge: "lang", kapitelAnzahl: "viel", kapitelLaenge: "lang" },
+  },
+] as const;
+
+export type Werkform = (typeof WERKFORMEN)[number]["value"];
+export const DEFAULT_WERKFORM: Werkform = "frei";
+
+/** Der Prosastil-Hinweis einer Werkform (leer bei `frei`/unbekannt). */
+export function werkformStil(value: string): string {
+  return WERKFORMEN.find((w) => w.value === value)?.stil ?? "";
+}
+
+/**
+ * Die Vorbelegung (Arc-Länge, Kapitel je Station, Kapitellänge) einer Werkform –
+ * `null` bei `frei`/unbekannt (dann nichts vorbelegen). Die Werte sind
+ * `as const`-Literale und typkompatibel zu den jeweiligen Achsen.
+ */
+export function werkformPresets(value: string): {
+  laenge: ArcLength;
+  kapitelAnzahl: KapitelCount;
+  kapitelLaenge: KapitelLaenge;
+} | null {
+  const w = WERKFORMEN.find((x) => x.value === value);
+  return w && "presets" in w ? w.presets : null;
+}
 
 /**
  * **Die Structured-Output-Fassungen** (gehen an OpenAI). Alle Felder sind
