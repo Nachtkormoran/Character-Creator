@@ -96,7 +96,13 @@ export async function POST(request: Request) {
     // Ein gesetztes Feld gewinnt gegen die Modellantwort; ein leeres wird
     // gefüllt. Danach auf die Feldgrenze gedeckelt (`SCENARIO_MAXLENGTHS`).
     const nimmDetail = (
-      key: "ort" | "zeit" | "regeln" | "beschreibung" | "figuren",
+      key:
+        | "ort"
+        | "zeit"
+        | "regeln"
+        | "beschreibung"
+        | "figuren"
+        | "handlungselemente",
     ) => {
       const orig = details[key].trim();
       const wert = orig || ergebnis![key].trim();
@@ -118,6 +124,9 @@ export async function POST(request: Request) {
         figuren: nimmDetail("figuren"),
         // Nicht erzeugt – ein vorhandener bleibt, sonst leer.
         handlung: details.handlung,
+        // Handlungselemente – gefüllt wie Figuren (Vorhandenes gewinnt). So
+        // landen Handlungs-Ansätze aus der Vorgabe-Textbox in der Kartenliste.
+        handlungselemente: nimmDetail("handlungselemente"),
       },
     });
   } catch (err) {

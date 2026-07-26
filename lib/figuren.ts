@@ -98,3 +98,14 @@ export function figurenText(text: string): string {
     .map((f) => f.text)
     .join("\n");
 }
+
+/**
+ * Generische Aliasse: Dieselbe „Liste mit `⊘ `-Markup"-Maschinerie trägt auch
+ * die **Handlungselemente** (`details.handlungselemente`), nicht nur die
+ * Figuren – Zeilenform und Aktiv-Markup sind identisch. Über diese Namen liest
+ * sich der Handlungselemente-Code sauber, ohne „Figur" im Bezeichner.
+ */
+export type Eintrag = FigurEintrag;
+export const splitEintraege = splitFigurenDetail;
+export const joinEintraege = joinFigurenDetail;
+export const aktiveEintraege = aktiveFiguren;

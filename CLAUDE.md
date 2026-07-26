@@ -108,6 +108,8 @@ als eines, das immer dasselbe ist.
   `POST /api/scenario-plot`, `POST /api/scenario-plot-persons`,
   `POST /api/scenario-from-character`, `POST /api/scenario-arc`,
   `POST /api/story-arc-chapters`, `POST /api/story-chapter-text`,
+  `POST /api/story-title` (kurzer Titel für einen Entwurf/Arc, Freitext wie
+  `generate-name`, s. u. „Reiter-Titel"),
   `POST /api/scenario-image`, `POST /api/story-hooks` – KI-Text/-Bild
   (persistieren **nichts**; s. u. „Story Arc" für die drei Arc-/Kapitel-Routen).
 - `GET|POST /api/characters` – Liste / Anlegen (POST akzeptiert optional
@@ -797,11 +799,49 @@ als ein einzelner Ansatzpunkt). Der letzte verbliebene lässt sich über die
 Leiste nicht löschen. Die Rückfrage **vor** dem Erzeugen ist entfallen (der Knopf
 ersetzt nichts mehr); die vor dem Löschen der Beschreibung bleibt.
 
+**Reiter-Titel (KI-Titel + „Erzählform · Ton"-Badge).** Die Reiter sind
+**zweizeilig**: oben ein per KI erzeugter **Titel**, darunter klein das Badge –
+statt bloß „Entwurf 1/2/3", die einander nicht unterscheidbar waren. Das gilt
+**für Handlungsentwurf und Story Arc** gleich (`StoryArcSection` bekommt die
+Arc-Metadaten als Prop). Die Daten liegen in einer **parallelen `meta`-Liste**
+je Variantensatz: `plotVariants`/`storyArcVariants` heißen jetzt
+`{ items, aktiv, meta }` mit `meta[i] = VariantMeta { titel, form, ton }`,
+**index-gleich** zu `items`. Bewusst parallel und **nicht** in die Einträge
+eingebettet: So bleiben `plotVariants.items` ein `string[]` und
+`storyArcVariants.items` ein `StoryArc[]` – Altbestände **und alte
+Exportdateien** (die kein `meta` kennen) bleiben gültig, denn `meta` ist
+`.optional()` und `normalizeMetaList` füllt es beim Lesen auf `items.length` auf.
+Erzählform und Ton sind sonst reine **Lauf-Parameter** (nicht gespeichert); hier
+werden sie **zum Erzeugungszeitpunkt** an der Variante festgehalten – das ist der
+einzige Ort, an dem sie persistieren.
+
+Der Titel entsteht über `POST /api/story-title` (Freitext wie `generate-name`,
+kleines `max_tokens`, kein Structured Output) **nach** dem Entwurf/Arc: Der Text
+(bzw. beim Arc eine Zusammenfassung der Stationen) geht hin, ein 2–5-Wort-Titel
+kommt zurück und wird als `meta[…].titel` an die neue Variante gehängt. Schlägt
+der Aufruf fehl, bleibt der Titel leer und der Reiter zeigt den Rückfall
+„Entwurf N"/„Arc N" – der Entwurf entsteht trotzdem (der Titel ist Beiwerk).
+Alte/leere/von Hand angelegte Varianten tragen keinen Titel und kein Badge. Das
+Badge (`variantBadge`) lässt die **neutralen Vorgaben** (`allround`, `neutral`)
+und leere Werte **weg** – sie unterscheiden keine Varianten und wären nur
+Rauschen.
+
+**Die `meta`-Liste muss mit `items` in Deckung bleiben.** Alle Mutationen
+(Erzeugen, Löschen, „Alle löschen", leeren Entwurf anhängen) pflegen sie parallel;
+`ausgerichtet(meta, laenge)` bringt sie vor jedem Speichern/Vergleich zeichengenau
+auf `items.length` (fehlende leer, überzählige weg), falls der Zustand einmal
+auseinanderläuft. **`meta` gehört auch in den „ungespeichert"-Vergleich** (`dirty`)
+und die `saved`-Grundlinie – sonst wiche der Vergleich schon an der Metadaten-Liste
+ab, und ein neuer Titel markierte nie „ungespeichert". *Round-Trip geprüft* (tsx):
+Altbestand ohne `meta` füllt auf `items.length` leer auf, eine alte Exportdatei
+ohne `meta` bleibt schema-gültig, `variantBadge` lässt die Defaults weg, `meta`
+länger/kürzer als `items` wird angeglichen.
+
 **Genau eine Variante ist aktiv**, und die ist zugleich `details.handlung` –
 dort lesen **Personensuche und Export** sie unverändert weiter, ohne von den
 übrigen zu wissen. Deshalb liegen die Varianten in einer **eigenen Spalte
-`Scenario.plotVariants`** (JSON `{ items, aktiv }`), nicht als weiteres Feld in
-`details`: Es ist eine Liste, die die Oberfläche führt und die erst auf
+`Scenario.plotVariants`** (JSON `{ items, aktiv, meta }`, s. u. „Reiter-Titel"),
+nicht als weiteres Feld in `details`: Es ist eine Liste, die die Oberfläche führt und die erst auf
 Knopfdruck entsteht – genau wie `storyHooks` neben `traits` liegt und nicht
 darin. So bleiben `ScenarioDetails` und alle `SCENARIO_LABELS`-Karten
 unangetastet, und kein Verbraucher von `handlung` muss etwas wissen.
@@ -832,6 +872,37 @@ Wunsch kommt kein Brief vor, mit Wunsch trägt der Brief die ganze Handlung, und
 der Konflikt bleibt gewaltfrei. Anders als bei der „Richtung" der Ansatzpunkte
 gibt es hier **keine konkurrierende Bindungsstufe**, die das Feld überstimmen
 müsste – der Konflikt, der dort auftrat, entsteht hier gar nicht.
+
+**Handlungselemente – die persistente Fassung des Zusatzwunschs.** Der `zusatz`
+oben steuert **einen** Lauf und wird nicht gespeichert; daneben steht das Feld
+`details.handlungselemente` – eine **Kartenliste wie die Figuren**, dauerhaft
+gespeichert. Bausteine für die Handlung (ein Konflikt, ein Ereignis, ein
+Geheimnis, eine Wendung), je Zeile eines, mit **Aktiv-Häkchen** und Löschknopf.
+Es teilt sich die gesamte Maschinerie mit dem Figuren-Feld: dieselbe
+Kartenkomponente (`EintragListe` in `ScenarioFields.tsx`, aus der früheren
+`FigurenListe` verallgemeinert) und dieselben `lib/figuren.ts`-Helfer (die
+generischen Aliasse `splitEintraege`/`joinEintraege`/`aktiveEintraege`, `⊘ `-
+Präfix für inaktiv). In der Detailansicht sitzt die Liste in der
+Handlungsentwurf-Sektion **zwischen den Lauf-Optionen und dem Entwurf-Feld**; im
+Anlege-Formular zieht sie automatisch mit (Feld in `SCENARIO_LABELS`).
+
+Beim Erzeugen gehen die **aktiven** Elemente als reiner Text (`aktiveEintraege`,
+ohne Markup) an `scenario-plot`; `buildScenarioPlotPrompt` setzt sie als eigenen
+Block „Vorgegebene Handlungselemente – diese Aspekte sollen den Entwurf tragen"
+**vor** den `zusatz`. **Härteste Regel wie beim Figuren-Feld: sind keine
+Handlungselemente vorhanden oder keins aktiv, ist der Block `""` und der
+Plot-Prompt zeichengenau der von vorher** (per Byte-Vergleich verifiziert:
+fehlendes Feld === leeres Feld === alle inaktiv).
+
+Der **Bezug zum Zufalls-Szenario** war der Auslöser: Handlungs-Eingaben in der
+Vorgabe-Textbox des `RandomScenarioModal` verpufften früher (es gab kein
+Handlungs-Ausgabefeld). Jetzt trägt `randomScenarioSchema` ein Feld
+`handlungselemente` (genau wie `figuren`): Nennt die eine Vorgabe-Textbox
+Ansätze zur Handlung, hält das Modell **genau diese** als Handlungselement-Karten
+fest, sonst schlägt es ein bis drei passende vor. Die Route füllt es wie die
+Welt-Felder (Vorhandenes gewinnt, `nimmDetail`). Ein **zweites Textfeld im Modal
+war ausdrücklich nicht gewünscht** – die eine Box speist Welt, Figuren und
+Handlungselemente zugleich, wie bei den Figuren schon erprobt.
 
 Er steht in der **Kopfzeile des Feldes, direkt neben dem Erzeugen-Knopf** –
 nicht unter dem Textfeld, wo er anfangs saß. Dort las man ihn als weitere
@@ -891,7 +962,8 @@ Handlungsentwurf, Komponente `StoryArcSection` (präsentierend wie
   die Handlung ein statt mit erneuter Stimmungs-Einstimmung.
 
 **Mehrere Story Arcs (Varianten)** – exakt das Muster der Handlungsentwürfe:
-`Scenario.storyArcVariants` (JSON `{ items, aktiv }`), die aktive Variante ist
+`Scenario.storyArcVariants` (JSON `{ items, aktiv, meta }`, `meta` s. o.
+„Reiter-Titel"), die aktive Variante ist
 zugleich die Spalte `storyArc` (dort lesen Export und Anzeige sie unverändert),
 `serializeScenario` erzwingt die Gleichheit. Client hält den aktiven Arc live
 (`storyArc`), die übrigen in `arcVarianten`; zusammengeführt erst in
@@ -1534,8 +1606,9 @@ geöffnete Bilder-Ansicht hat bewusst **keinen** eigenen Esc-Handler (es schlie�
 `Scenario` (`details` als JSON-String, dazu **ein** Weltbild direkt als
 `imageData` + `thumbnail` am Szenario – anders als der Charakter, der eine eigene
 Bildtabelle hat; `plotVariants` als JSON-String für die Handlungsentwürfe
-`{ items, aktiv }` und `storyArcVariants` als JSON-String für die Story Arcs
-`{ items, aktiv }`, beide eigene Spalten neben `details` wie `storyHooks` neben
+`{ items, aktiv, meta }` und `storyArcVariants` als JSON-String für die Story
+Arcs `{ items, aktiv, meta }` (`meta` = Reiter-Titel/Form/Ton je Variante),
+beide eigene Spalten neben `details` wie `storyHooks` neben
 `traits` – s. o. „Mehrere Entwürfe je Szenario" und „Story Arc"; `onDelete:
 SetNull` – beim Löschen des Szenarios bleiben Charaktere erhalten) und `Setting`
 (Key-Value für App-Einstellungen). SQLite lokal.

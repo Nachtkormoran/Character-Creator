@@ -35,7 +35,8 @@ function summary(details: ScenarioDetails): string {
       if (
         key === "beschreibung" ||
         key === "figuren" ||
-        key === "handlung"
+        key === "handlung" ||
+        key === "handlungselemente"
       )
         return null;
       const value = details[key]?.trim();

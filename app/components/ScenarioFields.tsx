@@ -13,9 +13,9 @@ import { randomTime } from "@/lib/scenarioTimes";
 import { randomRules } from "@/lib/scenarioRules";
 import { randomFigure, randomFigures } from "@/lib/scenarioFigures";
 import {
-  joinFigurenDetail,
-  splitFigurenDetail,
-  type FigurEintrag,
+  joinEintraege,
+  splitEintraege,
+  type Eintrag,
 } from "@/lib/figuren";
 import { useEffect, useRef, useState } from "react";
 import { useAutoGrow } from "./useAutoGrow";
@@ -129,64 +129,84 @@ function AutoGrowTextarea({
   );
 }
 
+/** Optionaler Knopf je Eintrag (bei den Figuren: „✨ Charakter"). */
+interface EintragAktion {
+  /** Tooltip des Aktionsknopfes. */
+  titel: string;
+  /** Beschriftung im Ruhezustand bzw. während dieser Eintrag lädt. */
+  labelIdle: string;
+  labelBusy: string;
+  onAktion: (text: string) => void;
+  /** Text des gerade ladenden Eintrags (sperrt alle Aktionsknöpfe). */
+  busy: string | null;
+  /** Fehler samt betroffenem Eintragstext. */
+  fehler: { item: string; text: string } | null;
+}
+
 /**
- * Das Figuren-Feld als **Kartenliste** statt eines einzigen Textfeldes – jede
- * Figur ein eigener, editierbarer Abschnitt mit Aktiv-Häkchen und Löschknopf,
- * wie die Ansatzpunkte in der Charakter-Detailansicht. Unten bleibt es **ein
- * String** (`details.figuren`, je Figur eine Zeile, inaktive mit `⊘ `-Präfix);
- * zerlegt/zusammengesetzt wird über `lib/figuren.ts`, damit die Prompts
- * unverändert reinen Fließtext bekommen.
+ * Ein Feld als **Kartenliste mit Aktiv-Häkchen** statt eines einzigen
+ * Textfeldes – jeder Eintrag ein eigener, editierbarer Abschnitt mit Häkchen und
+ * Löschknopf, wie die Ansatzpunkte in der Charakter-Detailansicht. Genutzt für
+ * die **Figuren** und die **Handlungselemente**; beide sind unten **ein String**
+ * (je Eintrag eine Zeile, inaktive mit `⊘ `-Präfix), zerlegt/zusammengesetzt
+ * über `lib/figuren.ts`, damit die Prompts reinen Fließtext bekommen.
  *
  * Eigener lokaler Zustand `list`, nicht bei jedem Rendern aus `value` neu
  * abgeleitet: Sonst verschwände eine gerade angelegte **leere** Karte sofort
- * wieder (`joinFigurenDetail` filtert Leeres). Ein Ref merkt sich den zuletzt
- * nach oben gemeldeten Wert; ändert sich `value` von **außen** (Würfel,
- * KI-Ergänzen, „Verwerfen"), wird neu zerlegt – dieselbe Mechanik wie bei den
- * Ansatzpunkten, nur dass das Feld hier Teil des geteilten `details`-Objekts ist.
+ * wieder (`joinEintraege` filtert Leeres). Ein Ref merkt sich den zuletzt nach
+ * oben gemeldeten Wert; ändert sich `value` von **außen** (Würfel, KI-Ergänzen,
+ * „Verwerfen", Zufalls-Szenario), wird neu zerlegt – dieselbe Mechanik wie bei
+ * den Ansatzpunkten, nur dass das Feld hier Teil des geteilten `details`-Objekts
+ * ist.
  *
- * Das **Häkchen je Figur** entscheidet, ob sie in Handlungsentwurf und Story Arc
- * einfließt (Default an – eine notierte Figur wird genutzt, außer man hakt sie
- * ab). Es ist Teil der gespeicherten Zeile, reist also über „Änderungen
- * speichern", Export und Import mit.
- *
- * Der Knopf **„✨ Charakter"** je Karte erscheint nur, wenn die aufrufende Seite
- * `onFigurCharakter` reicht (die Detailseite, die eine `scenarioId` hat) – im
- * Anlege-Formular gibt es noch kein Szenario, dem man einen Charakter zuordnen
- * könnte.
+ * Das **Häkchen je Eintrag** entscheidet über den Einbezug in die Erzeugung
+ * (Default an); es ist Teil der gespeicherten Zeile und reist über „Änderungen
+ * speichern", Export und Import mit. Der **Aktionsknopf** (`aktion`) erscheint
+ * nur, wenn die aufrufende Seite einen reicht – bei den Figuren „✨ Charakter"
+ * (nur die Detailseite mit `scenarioId`), bei den Handlungselementen keiner.
  */
-function FigurenListe({
+function EintragListe({
   value,
   onChange,
   disabled,
-  onFigurCharakter,
-  figurBusy = null,
-  figurFehler = null,
+  einzahl,
+  leerHinweis,
+  aktivTitel,
+  aktivAria,
+  entfernenTitel,
+  hinzufuegenTitel,
+  aktion,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
-  /** Aus der Figur einen Charakter fürs Szenario anlegen. Nur die Detailseite. */
-  onFigurCharakter?: (figurText: string) => void;
-  /** Welche Figur gerade ihre Angaben ausliest (KI-Aufruf) – sperrt die Knöpfe. */
-  figurBusy?: string | null;
-  /** Fehler beim Ableiten, samt betroffener Figur. */
-  figurFehler?: { figur: string; text: string } | null;
+  /** Einzahl-Wort für Aria-Labels und Knöpfe („Figur", „Handlungselement"). */
+  einzahl: string;
+  /** Text der leeren Liste. */
+  leerHinweis: string;
+  /** Tooltip des Aktiv-Häkchens, abhängig vom Zustand. */
+  aktivTitel: (aktiv: boolean) => string;
+  /** Aria-Zusatz des Aktiv-Häkchens (z. B. „bei … berücksichtigen"). */
+  aktivAria: string;
+  /** Tooltip des Löschknopfes. */
+  entfernenTitel: string;
+  /** Tooltip des „hinzufügen"-Knopfes. */
+  hinzufuegenTitel: string;
+  aktion?: EintragAktion;
 }) {
-  const [list, setList] = useState<FigurEintrag[]>(() =>
-    splitFigurenDetail(value),
-  );
+  const [list, setList] = useState<Eintrag[]>(() => splitEintraege(value));
   const lastEmitted = useRef(value);
 
   useEffect(() => {
     if (value !== lastEmitted.current) {
-      setList(splitFigurenDetail(value));
+      setList(splitEintraege(value));
       lastEmitted.current = value;
     }
   }, [value]);
 
-  const emit = (next: FigurEintrag[]) => {
+  const emit = (next: Eintrag[]) => {
     setList(next);
-    const joined = joinFigurenDetail(next);
+    const joined = joinEintraege(next);
     lastEmitted.current = joined;
     onChange(joined);
   };
@@ -195,31 +215,30 @@ function FigurenListe({
     <div className="flex flex-col gap-2">
       {list.length === 0 ? (
         <p className="rounded-md border border-dashed border-black/15 px-3 py-6 text-center text-sm text-foreground/50 dark:border-white/15">
-          Noch keine Figuren – würfeln, per KI ergänzen oder von Hand hinzufügen.
-          Jede Figur wird ein eigener Abschnitt.
+          {leerHinweis}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {list.map((figur, i) => (
+          {list.map((eintrag, i) => (
             <li
               // Index als Key wie bei den Ansatzpunkten: kein stabiler
               // Schlüssel vorhanden, und die Liste ändert sich nur am Ende
               // (Anhängen) oder durch Löschen.
               key={i}
               className={`flex items-start gap-2 rounded-md border px-3 py-1 transition ${
-                figur.aktiv
+                eintrag.aktiv
                   ? "border-black/10 bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03]"
                   : "border-dashed border-black/10 bg-transparent opacity-60 dark:border-white/10"
               }`}
             >
               {/*
-                Aktiv-Häkchen: entscheidet, ob die Figur in Handlungsentwurf und
-                Story Arc einfließt. Steht vorne, weil es die Zeile einordnet
-                (wie das ✕ sie beendet). Die Nummer sitzt daneben.
+                Aktiv-Häkchen: entscheidet über den Einbezug in die Erzeugung.
+                Steht vorne, weil es die Zeile einordnet (wie das ✕ sie beendet).
+                Die Nummer sitzt daneben.
               */}
               <input
                 type="checkbox"
-                checked={figur.aktiv}
+                checked={eintrag.aktiv}
                 onChange={(e) =>
                   emit(
                     list.map((x, j) =>
@@ -228,12 +247,8 @@ function FigurenListe({
                   )
                 }
                 disabled={disabled}
-                title={
-                  figur.aktiv
-                    ? "Aktiv – fließt in Handlungsentwurf und Story Arc ein. Abhaken, um sie auszuschließen."
-                    : "Inaktiv – wird bei Handlungsentwurf und Story Arc übergangen."
-                }
-                aria-label={`Figur ${i + 1} bei Handlungsentwurf und Story Arc berücksichtigen`}
+                title={aktivTitel(eintrag.aktiv)}
+                aria-label={`${einzahl} ${i + 1} ${aktivAria}`}
                 className="mt-1.5 size-4 shrink-0 accent-foreground"
               />
               <span className="mt-1 w-4 shrink-0 text-right text-xs text-foreground/40 tabular-nums">
@@ -241,36 +256,38 @@ function FigurenListe({
               </span>
               <div className="min-w-0 flex-1">
                 <AutoTextarea
-                  value={figur.text}
+                  value={eintrag.text}
                   onChange={(v) =>
                     emit(list.map((x, j) => (j === i ? { ...x, text: v } : x)))
                   }
-                  ariaLabel={`Figur ${i + 1}`}
+                  ariaLabel={`${einzahl} ${i + 1}`}
                   className="text-sm"
                 />
-                {figurFehler && figurFehler.figur === figur.text && (
+                {aktion?.fehler && aktion.fehler.item === eintrag.text && (
                   <p className="mt-0.5 text-xs text-red-600 dark:text-red-400">
-                    {figurFehler.text}
+                    {aktion.fehler.text}
                   </p>
                 )}
               </div>
-              {onFigurCharakter && (
+              {aktion && (
                 <button
                   type="button"
-                  onClick={() => onFigurCharakter(figur.text)}
-                  disabled={disabled || figurBusy !== null || !figur.text.trim()}
-                  title="Aus dieser Figur einen Charakter für das Szenario anlegen"
+                  onClick={() => aktion.onAktion(eintrag.text)}
+                  disabled={
+                    disabled || aktion.busy !== null || !eintrag.text.trim()
+                  }
+                  title={aktion.titel}
                   className="mt-0.5 shrink-0 rounded-md border border-black/15 px-2 py-0.5 text-xs font-medium whitespace-nowrap transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
                 >
-                  {figurBusy === figur.text ? "Liest …" : "✨ Charakter"}
+                  {aktion.busy === eintrag.text ? aktion.labelBusy : aktion.labelIdle}
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => emit(list.filter((_, j) => j !== i))}
                 disabled={disabled}
-                title="Diese Figur entfernen"
-                aria-label={`Figur ${i + 1} entfernen`}
+                title={entfernenTitel}
+                aria-label={`${einzahl} ${i + 1} entfernen`}
                 className="mt-0.5 shrink-0 rounded-md border border-transparent px-2 py-0.5 text-sm text-foreground/40 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
               >
                 ✕
@@ -284,10 +301,10 @@ function FigurenListe({
           type="button"
           onClick={() => emit([...list, { text: "", aktiv: true }])}
           disabled={disabled}
-          title="Eine leere Figur zum Selbstschreiben anlegen"
+          title={hinzufuegenTitel}
           className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium text-foreground/70 transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
         >
-          ➕ Figur hinzufügen
+          ➕ {einzahl} hinzufügen
         </button>
       </div>
     </div>
@@ -629,13 +646,51 @@ export function ScenarioFields({
                   ))}
                 </select>
               ) : key === "figuren" ? (
-                <FigurenListe
+                <EintragListe
                   value={details.figuren}
                   onChange={(v) => set("figuren", v)}
                   disabled={disabled}
-                  onFigurCharakter={onFigurCharakter}
-                  figurBusy={figurBusy}
-                  figurFehler={figurFehler}
+                  einzahl="Figur"
+                  leerHinweis="Noch keine Figuren – würfeln, per KI ergänzen oder von Hand hinzufügen. Jede Figur wird ein eigener Abschnitt."
+                  aktivTitel={(aktiv) =>
+                    aktiv
+                      ? "Aktiv – fließt in Handlungsentwurf und Story Arc ein. Abhaken, um sie auszuschließen."
+                      : "Inaktiv – wird bei Handlungsentwurf und Story Arc übergangen."
+                  }
+                  aktivAria="bei Handlungsentwurf und Story Arc berücksichtigen"
+                  entfernenTitel="Diese Figur entfernen"
+                  hinzufuegenTitel="Eine leere Figur zum Selbstschreiben anlegen"
+                  aktion={
+                    onFigurCharakter
+                      ? {
+                          titel:
+                            "Aus dieser Figur einen Charakter für das Szenario anlegen",
+                          labelIdle: "✨ Charakter",
+                          labelBusy: "Liest …",
+                          onAktion: onFigurCharakter,
+                          busy: figurBusy,
+                          fehler: figurFehler
+                            ? { item: figurFehler.figur, text: figurFehler.text }
+                            : null,
+                        }
+                      : undefined
+                  }
+                />
+              ) : key === "handlungselemente" ? (
+                <EintragListe
+                  value={details.handlungselemente}
+                  onChange={(v) => set("handlungselemente", v)}
+                  disabled={disabled}
+                  einzahl="Handlungselement"
+                  leerHinweis="Noch keine Handlungselemente – von Hand hinzufügen oder aus einem zufälligen Szenario übernehmen. Die aktiven fließen als Vorgaben in den Handlungsentwurf."
+                  aktivTitel={(aktiv) =>
+                    aktiv
+                      ? "Aktiv – fließt als Vorgabe in den Handlungsentwurf ein. Abhaken, um es auszuschließen."
+                      : "Inaktiv – wird beim Handlungsentwurf übergangen."
+                  }
+                  aktivAria="als Vorgabe für den Handlungsentwurf verwenden"
+                  entfernenTitel="Dieses Handlungselement entfernen"
+                  hinzufuegenTitel="Ein leeres Handlungselement zum Selbstschreiben anlegen"
                 />
               ) : SCENARIO_MULTILINE.has(key) ? (
                 <AutoGrowTextarea

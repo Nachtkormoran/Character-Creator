@@ -15,6 +15,7 @@ import {
   generateScenarioFigures,
   generateScenarioPlot,
   generateStoryArc,
+  generateStoryTitle,
   generateChapterText,
   generateStoryArcChapters,
   getScenario,
@@ -39,6 +40,7 @@ import {
   STORY_FORMS,
   STORY_TONES,
   normalizeScenarioDetails,
+  variantBadge,
   type ArcFormat,
   type ArcLength,
   type KapitelCount,
@@ -50,9 +52,11 @@ import {
   type ScenarioDetails,
   type StoryArc,
   type StoryArcVariants,
+  type VariantMeta,
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
 import {
+  aktiveEintraege,
   aktiveFiguren,
   joinFigurenDetail,
   splitFigurenDetail,
@@ -68,6 +72,18 @@ import { PlotPersonModal } from "../../components/PlotPersonModal";
 import { ScenarioFields } from "../../components/ScenarioFields";
 import { ScenarioImageModal } from "../../components/ScenarioImageModal";
 import { StoryArcSection } from "../../components/StoryArcSection";
+
+/** Leere Metadaten – für neue leere/von Hand angelegte Varianten und als Rückfall. */
+const LEER_META: VariantMeta = { titel: "", form: "", ton: "" };
+
+/**
+ * Bringt eine Metadaten-Liste auf genau `laenge` Einträge (fehlende leer,
+ * überzählige weg) – hält `meta` mit der Variantenliste deckungsgleich, egal
+ * was der Zustand gerade hält.
+ */
+function ausgerichtet(meta: VariantMeta[], laenge: number): VariantMeta[] {
+  return Array.from({ length: laenge }, (_, i) => meta[i] ?? LEER_META);
+}
 
 export default function ScenarioDetailPage({
   params,
@@ -91,6 +107,15 @@ export default function ScenarioDetailPage({
   const [varianten, setVarianten] = useState<string[]>([]);
   const [aktiv, setAktiv] = useState(0);
   /**
+   * Anzeige-Metadaten je Entwurf (KI-Titel, Erzählform, Ton), index-gleich zur
+   * vollen Variantenliste (`aktuelleVarianten()`). Getrennt gehalten wie die
+   * Ansatzpunkte neben `edited`: Erzählform/Ton sind sonst reine Lauf-Parameter,
+   * hier werden sie **zum Erzeugungszeitpunkt** an der Variante festgehalten.
+   * `ausgerichtet(...)` hält die Länge deckungsgleich, falls der Zustand einmal
+   * auseinanderläuft.
+   */
+  const [variantenMeta, setVariantenMeta] = useState<VariantMeta[]>([]);
+  /**
    * Der Story Arc – die dramaturgische Zerlegung des aktiven Handlungsentwurfs.
    * Wie die Varianten lebt er im Bearbeitungs-Zustand: „Änderungen speichern"
    * legt ihn ab, „Verwerfen" holt den gespeicherten zurück. `stufen: []` ist
@@ -105,6 +130,8 @@ export default function ScenarioDetailPage({
    */
   const [arcVarianten, setArcVarianten] = useState<StoryArc[]>([]);
   const [arcAktiv, setArcAktiv] = useState(0);
+  /** Anzeige-Metadaten je Arc (Titel, Erzählform, Ton) – wie `variantenMeta`. */
+  const [arcMeta, setArcMeta] = useState<VariantMeta[]>([]);
   const [arcBusy, setArcBusy] = useState(false);
   const [arcFehler, setArcFehler] = useState<string | null>(null);
   /**
@@ -349,6 +376,7 @@ export default function ScenarioDetailPage({
     setVarianten(rest);
     setAktiv(na);
     setDetails((d) => ({ ...d, handlung: rest[na] }));
+    setVariantenMeta(ausgerichtet(variantenMeta, items.length).filter((_, k) => k !== i));
   }
 
   /**
@@ -367,6 +395,7 @@ export default function ScenarioDetailPage({
     setVarianten([]);
     setAktiv(0);
     setDetails((d) => ({ ...d, handlung: "" }));
+    setVariantenMeta([]);
   }
 
   /**
@@ -388,6 +417,7 @@ export default function ScenarioDetailPage({
     setVarianten(neu);
     setAktiv(neu.length - 1);
     setDetails((d) => ({ ...d, handlung: "" }));
+    setVariantenMeta([...ausgerichtet(variantenMeta, items.length), LEER_META]);
   }
 
   // --- Story-Arc-Varianten (analog zu den Handlungsentwürfen) --------------
@@ -435,6 +465,7 @@ export default function ScenarioDetailPage({
     setArcVarianten(rest);
     setArcAktiv(na);
     setStoryArc(rest[na]);
+    setArcMeta(ausgerichtet(arcMeta, items.length).filter((_, k) => k !== i));
   }
 
   /**
@@ -450,6 +481,7 @@ export default function ScenarioDetailPage({
     setArcVarianten([]);
     setArcAktiv(0);
     setStoryArc({ stufen: [] });
+    setArcMeta([]);
   }
 
   /**
@@ -517,9 +549,14 @@ export default function ScenarioDetailPage({
         const { handlung } = await generateScenarioPlot(
           id,
           name.trim(),
-          // Nur die **aktiven** Figuren (reiner Text ohne Markup) fließen ein;
-          // sind keine aktiv, ist das Feld leer und wird komplett ignoriert.
-          { ...details, figuren: aktiveFiguren(details.figuren) },
+          // Nur **aktive** Figuren und **aktive** Handlungselemente (reiner Text
+          // ohne Markup) fließen ein; sind keine aktiv, ist das jeweilige Feld
+          // leer und der Prompt zeichengenau der von vorher.
+          {
+            ...details,
+            figuren: aktiveFiguren(details.figuren),
+            handlungselemente: aktiveEintraege(details.handlungselemente),
+          },
           zusatz.handlung ?? "",
           basis,
           handlungWeiterspinnen,
@@ -528,10 +565,22 @@ export default function ScenarioDetailPage({
           handlungNeuePersonenWunsch,
           handlungForm,
         );
-        const items = [...aktuelleVarianten(), handlung];
-        setVarianten(items);
-        setAktiv(items.length - 1);
+        // Kurzer Titel für die Reiter-Leiste. Scheitert der Aufruf, bleibt er
+        // leer – der Reiter zeigt dann „Entwurf N", der Entwurf entsteht trotzdem.
+        let titel = "";
+        try {
+          titel = await generateStoryTitle(handlung, "entwurf");
+        } catch {
+          // Titel ist Beiwerk.
+        }
+        const alt = aktuelleVarianten();
+        setVarianten([...alt, handlung]);
+        setAktiv(alt.length);
         setDetails((d) => ({ ...d, handlung }));
+        setVariantenMeta([
+          ...ausgerichtet(variantenMeta, alt.length),
+          { titel, form: handlungForm, ton: handlungTon },
+        ]);
       } else {
         const { beschreibung } = await generateScenarioDescription(
           name.trim(),
@@ -554,9 +603,11 @@ export default function ScenarioDetailPage({
         setDetails(scenario.details);
         setVarianten(scenario.plotVariants.items);
         setAktiv(scenario.plotVariants.aktiv);
+        setVariantenMeta(scenario.plotVariants.meta);
         setStoryArc(scenario.storyArc);
         setArcVarianten(scenario.storyArcVariants.items);
         setArcAktiv(scenario.storyArcVariants.aktiv);
+        setArcMeta(scenario.storyArcVariants.meta);
         setCharacters(characters);
         setThumbnail(scenario.thumbnail);
         setSaved(
@@ -669,8 +720,19 @@ export default function ScenarioDetailPage({
     JSON.stringify({
       name,
       details,
-      plot: { items: aktuelleVarianten(), aktiv },
-      arc: { items: aktuelleArcs(), aktiv: arcAktiv },
+      // `meta` muss mit – sonst wiche der Vergleich schon an der fehlenden
+      // Metadaten-Liste ab (die `saved` enthält). Ein neuer Titel oder eine
+      // gelöschte Variante markiert damit korrekt „ungespeichert".
+      plot: {
+        items: aktuelleVarianten(),
+        aktiv,
+        meta: ausgerichtet(variantenMeta, aktuelleVarianten().length),
+      },
+      arc: {
+        items: aktuelleArcs(),
+        aktiv: arcAktiv,
+        meta: ausgerichtet(arcMeta, aktuelleArcs().length),
+      },
     }) !== saved;
   const nameValid = name.trim().length > 0;
   // Für die Reiter-Leiste: die Entwürfe im aktuellen (womöglich ungespeicherten)
@@ -842,10 +904,25 @@ export default function ScenarioDetailPage({
         // Nur die **aktiven** Figuren (reiner Text); sind keine aktiv, leer.
         figuren: aktiveFiguren(details.figuren),
       });
-      const items = [...aktuelleArcs(), neu];
-      setArcVarianten(items);
-      setArcAktiv(items.length - 1);
+      // Titel für die Reiter-Leiste – aus einer Zusammenfassung der Stationen
+      // (Titel + Beschreibung). Scheitert er, bleibt er leer („Arc N").
+      const arcText = neu.stufen
+        .map((s) => [s.titel, s.beschreibung].filter(Boolean).join(": "))
+        .join("\n");
+      let titel = "";
+      try {
+        titel = await generateStoryTitle(arcText, "arc");
+      } catch {
+        // Titel ist Beiwerk.
+      }
+      const alt = aktuelleArcs();
+      setArcVarianten([...alt, neu]);
+      setArcAktiv(alt.length);
       setStoryArc(neu);
+      setArcMeta([
+        ...ausgerichtet(arcMeta, alt.length),
+        { titel, form: arcParams.form, ton: arcParams.ton },
+      ]);
     } catch (e) {
       setArcFehler(e instanceof Error ? e.message : "Fehler.");
     } finally {
@@ -967,16 +1044,26 @@ export default function ScenarioDetailPage({
       const aktualisiert = await updateScenario(id, {
         name: name.trim(),
         details: zuSpeichern,
-        plotVariants: { items: aktuelleVarianten(), aktiv },
-        storyArcVariants: { items: aktuelleArcs(), aktiv: arcAktiv },
+        plotVariants: {
+          items: aktuelleVarianten(),
+          aktiv,
+          meta: ausgerichtet(variantenMeta, aktuelleVarianten().length),
+        },
+        storyArcVariants: {
+          items: aktuelleArcs(),
+          aktiv: arcAktiv,
+          meta: ausgerichtet(arcMeta, aktuelleArcs().length),
+        },
       });
       setName(aktualisiert.name);
       setDetails(aktualisiert.details);
       setVarianten(aktualisiert.plotVariants.items);
       setAktiv(aktualisiert.plotVariants.aktiv);
+      setVariantenMeta(aktualisiert.plotVariants.meta);
       setStoryArc(aktualisiert.storyArc);
       setArcVarianten(aktualisiert.storyArcVariants.items);
       setArcAktiv(aktualisiert.storyArcVariants.aktiv);
+      setArcMeta(aktualisiert.storyArcVariants.meta);
       setSaved(
         JSON.stringify({
           name: aktualisiert.name,
@@ -1025,10 +1112,18 @@ export default function ScenarioDetailPage({
           name: name.trim(),
           details,
           // Der **bearbeitete** Stand, wie bei den Festlegungen: alle Entwürfe
-          // und alle Story Arcs samt aktivem Index.
-          plotVariants: { items: aktuelleVarianten(), aktiv },
+          // und alle Story Arcs samt aktivem Index und Metadaten (Titel/Form/Ton).
+          plotVariants: {
+            items: aktuelleVarianten(),
+            aktiv,
+            meta: ausgerichtet(variantenMeta, aktuelleVarianten().length),
+          },
           storyArc,
-          storyArcVariants: { items: aktuelleArcs(), aktiv: arcAktiv },
+          storyArcVariants: {
+            items: aktuelleArcs(),
+            aktiv: arcAktiv,
+            meta: ausgerichtet(arcMeta, aktuelleArcs().length),
+          },
         },
         mitCharakteren ? characters : [],
         // Das Weltbild ist unabhängig vom bearbeiteten Stand (eigene Route,
@@ -1118,8 +1213,10 @@ export default function ScenarioDetailPage({
               setDetails(s.details);
               setVarianten(s.plot.items);
               setAktiv(s.plot.aktiv);
+              setVariantenMeta(s.plot.meta);
               setArcVarianten(s.arc.items);
               setArcAktiv(s.arc.aktiv);
+              setArcMeta(s.arc.meta);
               setStoryArc(s.arc.items[s.arc.aktiv] ?? { stufen: [] });
             }}
             disabled={saving}
@@ -1405,15 +1502,33 @@ export default function ScenarioDetailPage({
       </section>
 
       {/*
-        Der Handlungsentwurf steht als eigene Karte unter den Festlegungen: Er
-        handelt von den Figuren und ihrer Geschichte, nicht von der Welt selbst.
-        Die Überschrift steht – wie bei „Festlegungen" und „Figuren" – als
-        Sektions-`<h2>` **oben**; das Feld-Label darunter ist deshalb per
-        `hideLabel` ausgeblendet (für Screenreader bleibt es erhalten), sonst
-        stünde „Handlungsentwurf" doppelt da.
+        Eine Karte, zwei Teile in dieser Reihenfolge: **oben die
+        Handlungselemente** (die persistenten Vorgaben – eine Kartenliste wie die
+        Figuren), **darunter der Handlungsentwurf** selbst, der aus ihnen (und den
+        Charakteren) entsteht. Beide tragen eine eigene `<h2>`; die Feld-Labels
+        darunter sind per `hideLabel` ausgeblendet (für Screenreader bleiben sie
+        erhalten), sonst stünde die Überschrift doppelt da.
       */}
       <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
-        <h2 className="mb-4 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+        {/*
+          Handlungselemente – die persistenten Vorgaben für die Erzeugung: was der
+          nächste „✨ Neu erzeugen“-Lauf aufgreift. Aktive Elemente (Häkchen)
+          fließen ein; die einmalige Stichwörter-Zeile im Entwurf-Kopf wirkt
+          zusätzlich. Ein zufällig erzeugtes Szenario füllt die Liste mit.
+        */}
+        <h2 className="mb-3 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+          Handlungselemente
+        </h2>
+        <ScenarioFields
+          details={details}
+          onChange={setDetails}
+          disabled={saving}
+          fields={["handlungselemente"]}
+          generatingField={generatingField}
+          hideLabel
+        />
+
+        <h2 className="mt-6 mb-4 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
           Handlungsentwurf
         </h2>
         {/*
@@ -1433,10 +1548,16 @@ export default function ScenarioDetailPage({
               // über die Leiste löschen, und ohne Löschknopf braucht die Kachel
               // rechts wieder ihren vollen Rand.
               const loeschbar = variantenAnzeige.length >= 2;
+              // Titel (KI, sonst „Entwurf N") oben, „Erzählform · Ton" klein
+              // darunter – Letzteres nur, wenn es etwas Unterscheidendes hergibt
+              // (leer/neutral wird weggelassen, s. `variantBadge`).
+              const meta = variantenMeta[i] ?? LEER_META;
+              const titel = meta.titel.trim() || `Entwurf ${i + 1}`;
+              const badge = variantBadge(meta);
               return (
                 <span
                   key={i}
-                  className={`inline-flex items-center gap-1 rounded-full border text-xs transition ${
+                  className={`inline-flex items-stretch gap-1 rounded-lg border text-xs transition ${
                     i === aktiv
                       ? "border-foreground bg-foreground text-background"
                       : "border-black/15 hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
@@ -1446,12 +1567,25 @@ export default function ScenarioDetailPage({
                     type="button"
                     onClick={() => varianteWaehlen(i)}
                     disabled={saving || generatingField !== null}
-                    title={text.trim().slice(0, 120) || "(leerer Entwurf)"}
-                    className={`py-1 pl-2.5 font-medium disabled:opacity-50 ${
+                    title={text.trim().slice(0, 200) || "(leerer Entwurf)"}
+                    className={`flex flex-col items-start gap-0.5 py-1 pl-2.5 text-left disabled:opacity-50 ${
                       loeschbar ? "pr-1" : "pr-2.5"
                     }`}
                   >
-                    Entwurf {i + 1}
+                    <span className="max-w-[15rem] truncate font-medium">
+                      {titel}
+                    </span>
+                    {badge && (
+                      <span
+                        className={`text-[10px] leading-tight ${
+                          i === aktiv
+                            ? "text-background/70"
+                            : "text-foreground/50"
+                        }`}
+                      >
+                        {badge}
+                      </span>
+                    )}
                   </button>
                   {loeschbar && (
                     <button
@@ -1460,7 +1594,7 @@ export default function ScenarioDetailPage({
                       disabled={saving || generatingField !== null}
                       title={`Entwurf ${i + 1} löschen`}
                       aria-label={`Entwurf ${i + 1} löschen`}
-                      className={`rounded-full py-1 pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
+                      className={`flex items-center rounded-r-lg pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
                         i === aktiv
                           ? "hover:text-red-300"
                           : "hover:text-red-600 dark:hover:text-red-400"
@@ -1650,6 +1784,7 @@ export default function ScenarioDetailPage({
             )}
           </div>
         </div>
+
         <ScenarioFields
           details={details}
           onChange={setDetails}
@@ -1752,9 +1887,12 @@ export default function ScenarioDetailPage({
         kapitelTextError={kapitelTextFehler}
         disabled={saving}
         handlung={details.handlung}
-        quelleLabel={`Entwurf ${aktiv + 1}`}
+        quelleLabel={
+          variantenMeta[aktiv]?.titel?.trim() || `Entwurf ${aktiv + 1}`
+        }
         arcs={aktuelleArcs()}
         arcAktiv={arcAktiv}
+        arcMeta={ausgerichtet(arcMeta, aktuelleArcs().length)}
         onArcWaehlen={arcWaehlen}
         onArcLoeschen={arcLoeschen}
         onAlleArcsLoeschen={alleArcsLoeschen}

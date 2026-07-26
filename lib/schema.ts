@@ -475,6 +475,7 @@ export const SCENARIO_MAXLENGTHS = {
   beschreibung: 4000,
   figuren: 3000,
   handlung: 4000,
+  handlungselemente: 3000,
 } as const;
 
 export const scenarioDetailsSchema = z.object({
@@ -503,6 +504,15 @@ export const scenarioDetailsSchema = z.object({
     .string()
     .trim()
     .max(SCENARIO_MAXLENGTHS.handlung)
+    .optional()
+    .default(""),
+  // Handlungselemente – eine Liste (je Zeile eines, inaktive mit `⊘ `-Präfix wie
+  // die Figuren, s. `lib/figuren.ts`). Vorgaben für die Handlungsentwurf-
+  // Erzeugung; die **aktiven** fließen in `scenario-plot` (leer = Prompt wie vorher).
+  handlungselemente: z
+    .string()
+    .trim()
+    .max(SCENARIO_MAXLENGTHS.handlungselemente)
     .optional()
     .default(""),
 });
@@ -544,6 +554,11 @@ export const randomScenarioSchema = z.object({
     .describe(
       "Zwei bis vier wichtige Personen, um die es gehen könnte – je Zeile Name und ein bis zwei Sätze zu Rolle, Wesen und einem Riss (Wunsch, Geheimnis, Konflikt). Noch keine ausgearbeiteten Charaktere, sondern Anhaltspunkte für einen späteren Handlungsentwurf.",
     ),
+  handlungselemente: z
+    .string()
+    .describe(
+      "Ein bis drei knappe Handlungselemente, je Zeile eines – ein Konflikt, ein Ereignis, ein Geheimnis, ein Ziel oder eine Wendung, die eine Geschichte in dieser Welt tragen könnte. Stecken in der Vorgabe des Nutzers Ansätze zur Handlung, halte genau diese fest; sonst schlage passende vor. Noch kein ausgearbeiteter Handlungsentwurf, sondern Bausteine dafür.",
+    ),
 });
 
 export type RandomScenario = z.infer<typeof randomScenarioSchema>;
@@ -579,6 +594,10 @@ export const SCENARIO_LABELS: Record<keyof ScenarioDetails, string> = {
   // sie mitverwendet.
   figuren: "Figuren",
   handlung: "Handlungsentwurf",
+  // Handlungselemente – eine Liste von Vorgaben (Konflikte, Ereignisse,
+  // Wendungen), die in den Handlungsentwurf einfließen. Steht **hinter** dem
+  // Entwurf: sie speisen ihn, sind aber nicht der Entwurf selbst.
+  handlungselemente: "Handlungselemente",
 };
 
 /**
@@ -598,6 +617,8 @@ export const SCENARIO_HINTS: Record<keyof ScenarioDetails, string> = {
     "Wichtige Personen, um die es gehen soll – Notizen, noch keine ausgearbeiteten Charaktere. Fließt in den Handlungsentwurf und den Story Arc ein. Ein zufällig erzeugtes Szenario füllt das Feld mit.",
   handlung:
     "Wer gerät hier mit wem worüber aneinander? Lässt sich aus den Festlegungen und den zugeordneten Charakteren erzeugen – dafür muss das Szenario gespeichert sein und Figuren enthalten.",
+  handlungselemente:
+    "Bausteine für die Handlung – ein Konflikt, ein Ereignis, ein Geheimnis, eine Wendung. Die aktiven fließen als Vorgaben in den Handlungsentwurf. Ein zufällig erzeugtes Szenario füllt das Feld mit.",
 };
 
 /**
@@ -696,9 +717,57 @@ export const MAX_PLOT_VARIANTS = 20;
  */
 export const MAX_NEUE_PLOT_PERSONEN = 5;
 
+/**
+ * **Anzeige-Metadaten je Variante** (Handlungsentwurf **oder** Story Arc): ein
+ * kurzer, per KI erzeugter Titel und die Erzählform/der Ton, mit denen die
+ * Variante erzeugt wurde. Damit tragen die Reiter einen wiedererkennbaren Namen
+ * und ein „Erzählform · Ton"-Badge, statt nur „Entwurf 1/2/3".
+ *
+ * Bewusst **parallel** zur `items`-Liste gehalten (`meta[i]` gehört zu
+ * `items[i]`), nicht in die Einträge eingebettet: So bleiben `plotVariants.items`
+ * ein `string[]` und `storyArcVariants.items` ein `StoryArc[]` – Altbestände und
+ * **alte Exportdateien** (die kein `meta` kennen) bleiben gültig, das Feld ist
+ * `.optional()`. `normalizeMetaList` füllt es beim Lesen auf `items.length` auf.
+ * Erzählform/Ton sind sonst reine Lauf-Parameter (nicht gespeichert) – hier
+ * werden sie **zum Erzeugungszeitpunkt** an der Variante festgehalten.
+ */
+export interface VariantMeta {
+  /** Kurzer KI-Titel (leer bei Altbeständen, leeren oder von Hand angelegten). */
+  titel: string;
+  /** `STORY_FORMS`-Wert der Erzeugung (leer = unbekannt/Altbestand). */
+  form: string;
+  /** `STORY_TONES`-Wert der Erzeugung (leer = unbekannt/Altbestand). */
+  ton: string;
+}
+
+export const variantMetaSchema = z.object({
+  titel: z.string().trim().max(120).optional().default(""),
+  form: z.string().trim().max(40).optional().default(""),
+  ton: z.string().trim().max(40).optional().default(""),
+});
+
+/**
+ * Bringt eine (womöglich fehlende oder zu kurze/lange) Metadaten-Liste auf genau
+ * `laenge` Einträge – fehlende Positionen werden leer aufgefüllt, überzählige
+ * fallen weg. Hält `meta` mit `items` in Deckung, egal was gespeichert war.
+ */
+export function normalizeMetaList(raw: unknown, laenge: number): VariantMeta[] {
+  const arr = Array.isArray(raw) ? raw : [];
+  return Array.from({ length: laenge }, (_, i) => {
+    const o = (arr[i] ?? {}) as Record<string, unknown>;
+    return {
+      titel: typeof o.titel === "string" ? o.titel : "",
+      form: typeof o.form === "string" ? o.form : "",
+      ton: typeof o.ton === "string" ? o.ton : "",
+    };
+  });
+}
+
 export interface PlotVariants {
   items: string[];
   aktiv: number;
+  /** Anzeige-Metadaten, index-gleich zu `items` (s. `VariantMeta`). */
+  meta: VariantMeta[];
 }
 
 export const plotVariantsSchema = z
@@ -707,6 +776,9 @@ export const plotVariantsSchema = z
       .array(z.string().trim().max(SCENARIO_MAXLENGTHS.handlung))
       .max(MAX_PLOT_VARIANTS),
     aktiv: z.number().int().nonnegative(),
+    // Optional: alte Stände und Exportdateien kennen es nicht (`normalizeMetaList`
+    // füllt beim Lesen auf `items.length` auf).
+    meta: z.array(variantMetaSchema).optional(),
   })
   .refine((v) => (v.items.length === 0 ? v.aktiv === 0 : v.aktiv < v.items.length), {
     message: "Die aktive Variante liegt außerhalb der Liste.",
@@ -726,14 +798,18 @@ export function normalizePlotVariants(
   raw: unknown,
   handlung: string,
 ): PlotVariants {
-  const src = (raw ?? {}) as { items?: unknown; aktiv?: unknown };
+  const src = (raw ?? {}) as {
+    items?: unknown;
+    aktiv?: unknown;
+    meta?: unknown;
+  };
   let items = Array.isArray(src.items)
     ? src.items.filter((x): x is string => typeof x === "string")
     : [];
   if (items.length === 0) items = handlung.trim() ? [handlung] : [];
   let aktiv = typeof src.aktiv === "number" ? src.aktiv : 0;
   if (!Number.isInteger(aktiv) || aktiv < 0 || aktiv >= items.length) aktiv = 0;
-  return { items, aktiv };
+  return { items, aktiv, meta: normalizeMetaList(src.meta, items.length) };
 }
 
 // ---------------------------------------------------------------------------
@@ -901,6 +977,32 @@ export function formHint(value: string): string {
   return STORY_FORMS.find((f) => f.value === value)?.hint ?? "";
 }
 
+/** Anzeige-Label einer Erzählform (roher Wert als Rückfall). */
+export function formLabel(value: string): string {
+  return STORY_FORMS.find((f) => f.value === value)?.label ?? value;
+}
+
+/** Anzeige-Label eines Tons (roher Wert als Rückfall). */
+export function toneLabel(value: string): string {
+  return STORY_TONES.find((t) => t.value === value)?.label ?? value;
+}
+
+/**
+ * Das **„Erzählform · Ton"-Badge** einer Variante für die Reiter-Leiste.
+ *
+ * Die **neutralen Vorgaben** (`allround`, `neutral`) und leere Werte
+ * (Altbestände) werden **weggelassen** – sie unterscheiden keine Varianten und
+ * wären nur Rauschen. Bleibt nichts übrig, ist das Ergebnis `""` (der Reiter
+ * zeigt dann nur den Titel).
+ */
+export function variantBadge(meta: { form: string; ton: string }): string {
+  const teile: string[] = [];
+  if (meta.form && meta.form !== DEFAULT_STORY_FORM)
+    teile.push(formLabel(meta.form));
+  if (meta.ton && meta.ton !== DEFAULT_STORY_TONE) teile.push(toneLabel(meta.ton));
+  return teile.join(" · ");
+}
+
 /**
  * **Länge des Arcs** – steuert, in wie viele Stationen der Handlungsentwurf
  * zerlegt wird. Die Zahl bestimmt die Dramaturgie: 3 = Kurzbogen (Anfang,
@@ -1041,12 +1143,17 @@ export const MAX_STORY_ARCS = 20;
 export interface StoryArcVariants {
   items: StoryArc[];
   aktiv: number;
+  /** Anzeige-Metadaten, index-gleich zu `items` (Titel, Erzählform, Ton). */
+  meta: VariantMeta[];
 }
 
 export const storyArcVariantsSchema = z
   .object({
     items: z.array(storyArcStoredSchema).max(MAX_STORY_ARCS),
     aktiv: z.number().int().nonnegative(),
+    // Optional wie bei `plotVariantsSchema` – Altbestände/Exportdateien kennen
+    // es nicht (`normalizeMetaList` füllt beim Lesen auf).
+    meta: z.array(variantMetaSchema).optional(),
   })
   .refine(
     (v) => (v.items.length === 0 ? v.aktiv === 0 : v.aktiv < v.items.length),
@@ -1116,7 +1223,11 @@ export function normalizeStoryArcVariants(
   raw: unknown,
   aktiverArc: StoryArc,
 ): StoryArcVariants {
-  const src = (raw ?? {}) as { items?: unknown; aktiv?: unknown };
+  const src = (raw ?? {}) as {
+    items?: unknown;
+    aktiv?: unknown;
+    meta?: unknown;
+  };
   let items = Array.isArray(src.items)
     ? src.items.map((x) => normalizeStoryArc(x))
     : [];
@@ -1124,7 +1235,7 @@ export function normalizeStoryArcVariants(
     items = aktiverArc.stufen.length > 0 ? [aktiverArc] : [];
   let aktiv = typeof src.aktiv === "number" ? src.aktiv : 0;
   if (!Number.isInteger(aktiv) || aktiv < 0 || aktiv >= items.length) aktiv = 0;
-  return { items, aktiv };
+  return { items, aktiv, meta: normalizeMetaList(src.meta, items.length) };
 }
 
 /**

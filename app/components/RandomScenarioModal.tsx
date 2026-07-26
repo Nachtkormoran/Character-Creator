@@ -80,8 +80,9 @@ export function RandomScenarioModal({
       >
         <h2 className="text-lg font-semibold">Zufälliges Szenario erzeugen</h2>
         <p className="mt-1 text-sm text-foreground/60">
-          Ein Stichwort, ein Satz – oder nichts. Die KI füllt daraus Name, Ort,
-          Zeit, Regeln und Beschreibung.
+          Ein Stichwort, ein Satz – oder nichts. Die KI füllt daraus Name, Welt,
+          Figuren – und, wenn du Ansätze zur Handlung nennst, auch
+          Handlungselemente.
         </p>
 
         <label className="mt-4 flex flex-col gap-1.5">
@@ -97,8 +98,10 @@ export function RandomScenarioModal({
           />
           <span className="text-xs text-foreground/50">
             Bereits ausgefüllte Felder bleiben erhalten; alle leeren Felder
-            werden passend ausgefüllt. Der Handlungsentwurf bleibt frei – er
-            entsteht später aus den Figuren.
+            werden passend ausgefüllt. Nennst du Ansätze zur Handlung, werden
+            sie als Handlungselemente-Karten gespeichert. Der Handlungsentwurf
+            selbst bleibt frei – er entsteht später aus Figuren und
+            Handlungselementen.
           </span>
         </label>
 

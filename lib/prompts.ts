@@ -416,6 +416,14 @@ export function buildScenarioPlotPrompt(
      * vorher.**
      */
     figuren?: string;
+    /**
+     * **Vorgegebene Handlungselemente** (die aktiven Karten aus
+     * `details.handlungselemente`, als reiner Text ohne Markup). Ist etwas
+     * gesetzt, sollen diese Aspekte im Entwurf vorkommen. **Leer = der Prompt
+     * ist zeichengenau der von vorher** – der Aufrufer filtert inaktive/leere
+     * heraus, hier wird nur auf „getrimmt nicht leer" geprüft.
+     */
+    handlungselemente?: string;
   },
   characters: PlotCharacter[],
   zusatz?: string,
@@ -523,6 +531,14 @@ export function buildScenarioPlotPrompt(
   // zeichengenau der von vorher (alle Figuren gleichrangig).
   const hatProtagonisten = characters.some((c) => c.isProtagonist);
 
+  // Vorgegebene Handlungselemente – die aktiven Karten. Leer (nichts vorhanden
+  // oder nichts aktiv) → Block ist "", der Prompt bleibt zeichengenau der von
+  // vorher (dieselbe Regel wie beim Figuren-Feld).
+  const handlungselemente = (details.handlungselemente ?? "").trim();
+  const handlungselementeBlock = handlungselemente
+    ? `\nVorgegebene Handlungselemente – diese Aspekte sollen den Entwurf tragen und darin vorkommen:\n${handlungselemente}\n`
+    : "";
+
   const zusatzBlock = zusatz?.trim()
     ? `\nBesonders wichtig – zusätzliche Wünsche für diesen Entwurf:\n${zusatz.trim()}\n`
     : "";
@@ -626,8 +642,31 @@ ${figurenRegel}${protagonistBlock}
 - Alles muss den Regeln des Szenarios gehorchen. Was dort gilt, gilt auch hier.
 ${ergebnisAnforderung}
 - Reiner Fließtext auf Deutsch, ohne Markdown, ohne Überschriften, ohne Aufzählung.
-${formBlock}${tonBlock}${zusatzBlock}
+${formBlock}${tonBlock}${handlungselementeBlock}${zusatzBlock}
 Antworte mit nichts als dem Entwurf selbst.`;
+}
+
+/**
+ * Kurzer Titel für einen **Handlungsentwurf** oder **Story Arc** – damit die
+ * Reiter-Leiste einen wiedererkennbaren Namen trägt statt „Entwurf 1/2/3".
+ *
+ * Bewusst **sehr knapp** (wie `buildNamePrompt`): Die Route nutzt
+ * `chat.completions.create` mit kleinem `max_tokens`, kein Structured Output –
+ * ein Titel ist ein String, ein JSON-Schema drumherum wäre reiner Aufschlag.
+ */
+export function buildStoryTitlePrompt(
+  text: string,
+  art: "entwurf" | "arc",
+): string {
+  const was =
+    art === "arc"
+      ? "Story Arc (die dramaturgische Gliederung einer Geschichte in Stationen)"
+      : "Handlungsentwurf für eine Geschichte";
+  return `Gib einen **kurzen, treffenden Titel** für den folgenden ${was}. Zwei bis fünf Wörter, kein ganzer Satz, kein Punkt am Ende, keine Anführungszeichen. Der Titel soll die Geschichte auf einen Blick wiedererkennbar machen – der Kern des Konflikts, ein Motiv oder ein Ort, nicht eine allgemeine Gattung.
+
+${text.trim()}
+
+Antworte mit nichts als dem Titel.`;
 }
 
 /**
@@ -1481,6 +1520,7 @@ export function buildRandomScenarioPrompt(
     regeln?: string;
     beschreibung?: string;
     figuren?: string;
+    handlungselemente?: string;
   },
   freitext: string,
   genreWuerfeln = false,
@@ -1492,6 +1532,7 @@ export function buildRandomScenarioPrompt(
     ["Regeln", details.regeln ?? ""],
     ["Beschreibung", details.beschreibung ?? ""],
     ["Figuren", details.figuren ?? ""],
+    ["Handlungselemente", details.handlungselemente ?? ""],
   ];
 
   const fest = felder.filter(([, wert]) => wert.trim());
@@ -1535,6 +1576,7 @@ Anforderungen:
 - **Regeln**: vollständige Sätze über den Technik-/Weltenstand, mit Leerzeichen verbunden. Keine Zahlen, keine Eigennamen – zwei Regeln müssen nebeneinander stehen können.
 - **Beschreibung**: zwei bis drei Absätze, konkret und sinnlich (Atmosphäre, Alltag), ohne den übrigen Feldern zu widersprechen.
 - **Figuren**: zwei bis vier wichtige Personen, um die es gehen könnte – je Zeile ein Name und ein bis zwei Sätze zu Rolle, Wesen und einem Riss (ein Wunsch, ein Geheimnis, ein Konflikt). Noch keine ausgearbeiteten Charaktere, sondern Anhaltspunkte, aus denen später ein Handlungsentwurf entsteht. Sie müssen in diese Welt passen.
+- **Handlungselemente**: ein bis drei knappe Bausteine für eine mögliche Geschichte – je Zeile eines: ein Konflikt, ein Ereignis, ein Geheimnis, ein Ziel oder eine Wendung. Enthält die Vorgabe oben Ansätze zur Handlung, halte **genau diese** hier fest; sonst schlage passende vor. Noch kein ausgearbeiteter Handlungsentwurf, sondern Ausgangspunkte für einen.
 - Alles auf Deutsch.`;
 }
 

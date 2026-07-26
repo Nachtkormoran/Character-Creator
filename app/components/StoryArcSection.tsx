@@ -10,6 +10,7 @@ import {
   MAX_KAPITEL_PRO_STUFE,
   STORY_FORMS,
   STORY_TONES,
+  variantBadge,
   type ArcFormat,
   type ArcLength,
   type ArcPhase,
@@ -17,6 +18,7 @@ import {
   type StoryArc,
   type StoryForm,
   type StoryTone,
+  type VariantMeta,
 } from "@/lib/schema";
 import { AutoTextarea } from "./AutoTextarea";
 
@@ -87,6 +89,7 @@ export function StoryArcSection({
   quelleLabel,
   arcs,
   arcAktiv,
+  arcMeta,
   onArcWaehlen,
   onArcLoeschen,
   onAlleArcsLoeschen,
@@ -142,6 +145,8 @@ export function StoryArcSection({
   arcs: StoryArc[];
   /** Index des aktiven Arcs in `arcs`. */
   arcAktiv: number;
+  /** Anzeige-Metadaten je Arc (Titel, Erzählform, Ton), index-gleich zu `arcs`. */
+  arcMeta: VariantMeta[];
   /** Auf einen anderen Arc umschalten. */
   onArcWaehlen: (i: number) => void;
   /** Einen Arc löschen (nur ab zwei möglich). */
@@ -368,10 +373,18 @@ export function StoryArcSection({
             // Der letzte verbliebene Arc trägt kein ✕ – er lässt sich nicht über
             // die Leiste löschen; dafür ist „Alle löschen" da.
             const loeschbar = arcs.length >= 2;
+            // Titel (KI, sonst „Arc N") oben, „Erzählform · Ton" klein darunter –
+            // Letzteres nur, wenn es etwas Unterscheidendes hergibt.
+            const meta = arcMeta[i] ?? { titel: "", form: "", ton: "" };
+            const titel = meta.titel.trim() || `Arc ${i + 1}`;
+            const badge = variantBadge(meta);
+            const stationen = `${arc.stufen.length} ${
+              arc.stufen.length === 1 ? "Station" : "Stationen"
+            }`;
             return (
               <span
                 key={i}
-                className={`inline-flex items-center gap-1 rounded-full border text-xs transition ${
+                className={`inline-flex items-stretch gap-1 rounded-lg border text-xs transition ${
                   i === arcAktiv
                     ? "border-foreground bg-foreground text-background"
                     : "border-black/15 hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
@@ -381,14 +394,21 @@ export function StoryArcSection({
                   type="button"
                   onClick={() => onArcWaehlen(i)}
                   disabled={disabled || busy}
-                  title={`${arc.stufen.length} ${
-                    arc.stufen.length === 1 ? "Station" : "Stationen"
-                  }`}
-                  className={`py-1 pl-2.5 font-medium disabled:opacity-50 ${
+                  title={stationen}
+                  className={`flex flex-col items-start gap-0.5 py-1 pl-2.5 text-left disabled:opacity-50 ${
                     loeschbar ? "pr-1" : "pr-2.5"
                   }`}
                 >
-                  Arc {i + 1}
+                  <span className="max-w-[15rem] truncate font-medium">
+                    {titel}
+                  </span>
+                  <span
+                    className={`text-[10px] leading-tight ${
+                      i === arcAktiv ? "text-background/70" : "text-foreground/50"
+                    }`}
+                  >
+                    {badge ? `${badge} · ${stationen}` : stationen}
+                  </span>
                 </button>
                 {loeschbar && (
                   <button
@@ -397,7 +417,7 @@ export function StoryArcSection({
                     disabled={disabled || busy}
                     title={`Story Arc ${i + 1} löschen`}
                     aria-label={`Story Arc ${i + 1} löschen`}
-                    className={`rounded-full py-1 pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
+                    className={`flex items-center rounded-r-lg pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
                       i === arcAktiv
                         ? "hover:text-red-300"
                         : "hover:text-red-600 dark:hover:text-red-400"

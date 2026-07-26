@@ -834,6 +834,26 @@ export function generateScenarioPlot(
 }
 
 /**
+ * Erzeugt einen **kurzen Titel** für einen Handlungsentwurf oder Story Arc
+ * (`POST /api/story-title`) – für die Reiter-Leiste. Persistiert nichts; der
+ * Aufrufer hängt den Titel an die Variante und speichert ihn über
+ * `updateScenario`.
+ */
+export async function generateStoryTitle(
+  text: string,
+  art: "entwurf" | "arc" = "entwurf",
+): Promise<string> {
+  const res = await fetch("/api/story-title", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text, art }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Titel fehlgeschlagen.");
+  return (data.titel as string) ?? "";
+}
+
+/**
  * Leitet den **Story Arc** aus dem aktiven Handlungsentwurf ab. Wie
  * `generateScenarioPlot` lädt die Route die Figuren selbst über die `scenarioId`
  * (Rückbindung der Stationen); der Entwurf kommt im aktuellen, womöglich
