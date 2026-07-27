@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       max_tokens: MAX_TOKENS[feld],
     });
 
-    const wert = cleanValue(completion.choices[0]?.message.content ?? "", feld);
+    const wert = cleanValue(completion.choices[0]?.message?.content ?? "", feld);
     if (!wert) {
       return NextResponse.json(
         { error: "Das Modell lieferte keinen Inhalt." },

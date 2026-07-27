@@ -90,7 +90,7 @@ export async function POST(request: Request) {
       max_tokens: maxTokens,
     });
 
-    let wert = (completion.choices[0]?.message.content ?? "").trim();
+    let wert = (completion.choices[0]?.message?.content ?? "").trim();
 
     // Letzte Absicherung wie bei `scenario-field`: an einer Zeilen-/Wortgrenze
     // kürzen, falls die Antwort das Limit doch reißt – besser knapp als beim

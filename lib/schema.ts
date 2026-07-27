@@ -106,10 +106,11 @@ export const IMAGE_PRICES_AS_OF = "18.07.2026";
 
 /**
  * Anbieter für die **Text**-Erzeugung. `openai` ist der Standard (kostenpflichtig,
- * sehr zuverlässig auch bei Structured Outputs), `gemini` die kostenlose
- * Alternative über Google AI Studio. Beide laufen über denselben OpenAI-SDK-Client
- * – Gemini über seinen OpenAI-kompatiblen Endpunkt (`baseURL`). Die **Bilder**
- * bleiben davon unberührt und laufen weiter über OpenAI (`gpt-image-*`).
+ * sehr zuverlässig auch bei Structured Outputs), `gemini` und `mistral` sind die
+ * kostenlosen Alternativen (Google AI Studio bzw. Mistral). Alle laufen über
+ * denselben OpenAI-SDK-Client – Gemini und Mistral über ihren OpenAI-kompatiblen
+ * Endpunkt (`baseURL`). Die **Bilder** bleiben davon unberührt und laufen weiter
+ * über OpenAI (`gpt-image-*`).
  */
 export const TEXT_PROVIDERS = [
   {
@@ -121,6 +122,11 @@ export const TEXT_PROVIDERS = [
     value: "gemini",
     label: "Google Gemini",
     hint: "Kostenloses Kontingent über Google AI Studio. Braucht GEMINI_API_KEY in .env.local. Bei strukturierten Ausgaben (Charakter erzeugen, Szenario ableiten) noch nicht garantiert – im Zweifel wieder auf OpenAI stellen.",
+  },
+  {
+    value: "mistral",
+    label: "Mistral",
+    hint: "Kostenloses Kontingent über Mistral (Experiment-Tier). Braucht MISTRAL_API_KEY in .env.local. Weniger stark gefiltert – gut für drastische/intime Prosa. Bei strukturierten Ausgaben (Charakter erzeugen, Szenario ableiten) noch nicht garantiert – im Zweifel wieder auf OpenAI stellen.",
   },
 ] as const;
 
@@ -743,6 +749,14 @@ export interface VariantMeta {
    * Funktion darüber hinaus (keine Sortierung/Filterung). Default `false`.
    */
   favorit: boolean;
+  /**
+   * **Quell-Handlungsentwurf** (nur bei Story Arcs): das Label des Entwurfs, aus
+   * dem der Arc **zum Ableitungszeitpunkt** abgeleitet wurde – ein Schnappschuss
+   * (z. B. „Der Brief" oder „Entwurf 2"). Bei Handlungsentwurf-Varianten leer.
+   * Wird beim Ableiten gesetzt und beim Kopieren mitgenommen; bleibt stehen, auch
+   * wenn der Entwurf später umbenannt/gelöscht wird.
+   */
+  quelle: string;
 }
 
 export const variantMetaSchema = z.object({
@@ -750,6 +764,7 @@ export const variantMetaSchema = z.object({
   form: z.string().trim().max(40).optional().default(""),
   ton: z.string().trim().max(40).optional().default(""),
   favorit: z.boolean().optional().default(false),
+  quelle: z.string().trim().max(200).optional().default(""),
 });
 
 /**
@@ -766,6 +781,7 @@ export function normalizeMetaList(raw: unknown, laenge: number): VariantMeta[] {
       form: typeof o.form === "string" ? o.form : "",
       ton: typeof o.ton === "string" ? o.ton : "",
       favorit: typeof o.favorit === "boolean" ? o.favorit : false,
+      quelle: typeof o.quelle === "string" ? o.quelle : "",
     };
   });
 }

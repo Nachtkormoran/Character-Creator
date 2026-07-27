@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       max_tokens: 24,
     });
 
-    const titel = cleanTitel(completion.choices[0]?.message.content ?? "");
+    const titel = cleanTitel(completion.choices[0]?.message?.content ?? "");
     if (!titel) {
       return NextResponse.json(
         { error: "Das Modell lieferte keinen Titel." },

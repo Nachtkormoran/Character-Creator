@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       max_tokens: 800,
     });
 
-    const beschreibung = (completion.choices[0]?.message.content ?? "").trim();
+    const beschreibung = (completion.choices[0]?.message?.content ?? "").trim();
     if (!beschreibung) {
       return NextResponse.json(
         { error: "Das Modell lieferte keinen Text." },

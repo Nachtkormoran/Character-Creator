@@ -98,6 +98,7 @@ export function StoryArcSection({
   onArcWaehlen,
   onArcTitelAendern,
   onArcFavorit,
+  onArcKopieren,
   onArcLoeschen,
   onAlleArcsLoeschen,
 }: {
@@ -164,6 +165,8 @@ export function StoryArcSection({
   onArcTitelAendern: (i: number) => void;
   /** Einen Arc als Favorit markieren/entmarken (Stern am Reiter). */
   onArcFavorit: (i: number) => void;
+  /** Einen Arc kopieren (eigenständige Kopie, angehängt). */
+  onArcKopieren: (i: number) => void;
   /** Einen Arc löschen (nur ab zwei möglich). */
   onArcLoeschen: (i: number) => void;
   /** Alle Arcs auf einmal löschen. */
@@ -434,12 +437,19 @@ export function StoryArcSection({
               form: "",
               ton: "",
               favorit: false,
+              quelle: "",
             };
             const titel = meta.titel.trim() || `Arc ${i + 1}`;
             const badge = variantBadge(meta);
             const stationen = `${arc.stufen.length} ${
               arc.stufen.length === 1 ? "Station" : "Stationen"
             }`;
+            // Quell-Handlungsentwurf (Schnappschuss vom Ableiten); leer bei
+            // Altbeständen. Kommt auf die zweite Zeile des Reiters.
+            const quelle = meta.quelle.trim();
+            const zeile2 = [badge, stationen, quelle && `aus „${quelle}“`]
+              .filter(Boolean)
+              .join(" · ");
             return (
               <span
                 key={i}
@@ -453,18 +463,22 @@ export function StoryArcSection({
                   type="button"
                   onClick={() => onArcWaehlen(i)}
                   disabled={disabled || busy}
-                  title={stationen}
+                  title={
+                    quelle
+                      ? `${stationen} · abgeleitet aus „${quelle}“`
+                      : stationen
+                  }
                   className="flex flex-col items-start gap-0.5 py-1 pr-1 pl-2.5 text-left disabled:opacity-50"
                 >
                   <span className="max-w-[15rem] truncate font-medium">
                     {titel}
                   </span>
                   <span
-                    className={`text-[10px] leading-tight ${
+                    className={`max-w-[18rem] truncate text-[10px] leading-tight ${
                       i === arcAktiv ? "text-background/70" : "text-foreground/50"
                     }`}
                   >
-                    {badge ? `${badge} · ${stationen}` : stationen}
+                    {zeile2}
                   </span>
                 </button>
                 {/*
@@ -529,6 +543,20 @@ export function StoryArcSection({
               </span>
             );
           })}
+          {/*
+            Aktiven Arc kopieren – eine eigenständige Kopie (samt Stationen und
+            Kapiteln), angehängt und aktiv. Kein KI-Aufruf; sitzt bei den Reitern,
+            weil er einen weiteren anlegt.
+          */}
+          <button
+            type="button"
+            onClick={() => onArcKopieren(arcAktiv)}
+            disabled={disabled || busy}
+            title="Den aktiven Story Arc kopieren – als eigenständige neue Variante"
+            className="rounded-full border border-black/15 px-2.5 py-1 text-xs font-medium text-foreground/70 transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+          >
+            ⧉ Kopieren
+          </button>
           {/*
             Bei genau einem Arc ist die Leiste keine Umschaltung, sondern ein
             Hinweis: „Neu ableiten" legt einen weiteren an, statt diesen zu

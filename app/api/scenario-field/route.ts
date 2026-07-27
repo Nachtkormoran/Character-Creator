@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       max_tokens: maxTokens,
     });
 
-    let wert = (completion.choices[0]?.message.content ?? "").trim();
+    let wert = (completion.choices[0]?.message?.content ?? "").trim();
 
     // Letzte Absicherung: Trotz Prompt-Budget und `max_tokens` kann die Antwort
     // das Limit überschreiten (das Modell zählt Zeichen nicht zuverlässig). Statt

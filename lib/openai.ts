@@ -67,6 +67,37 @@ function getGemini(): OpenAI {
 }
 
 /**
+ * Mistral über seinen **OpenAI-kompatiblen** Endpunkt – exakt dasselbe Muster
+ * wie Gemini: derselbe OpenAI-SDK-Client, nur anderer `baseURL` und Key. So
+ * bleibt der gesamte Aufruf-Code unverändert.
+ *
+ * Modell und Endpunkt sind per Env überschreibbar; der Key kommt aus
+ * `MISTRAL_API_KEY` (kostenloses Kontingent im Experiment-Tier). `mistral-small-latest`
+ * ist ein solider, kostenloser Default; Mistral gilt als weniger stark gefiltert
+ * und eignet sich damit für drastische/intime Prosa.
+ */
+export const MISTRAL_TEXT_MODEL =
+  process.env.MISTRAL_TEXT_MODEL || "mistral-small-latest";
+export const MISTRAL_BASE_URL =
+  process.env.MISTRAL_BASE_URL || "https://api.mistral.ai/v1";
+
+let mistralClient: OpenAI | null = null;
+
+function getMistral(): OpenAI {
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "MISTRAL_API_KEY ist nicht gesetzt. Bitte in .env.local eintragen oder in " +
+        "den Einstellungen das Textmodell wieder auf OpenAI umstellen.",
+    );
+  }
+  if (!mistralClient) {
+    mistralClient = new OpenAI({ apiKey, baseURL: MISTRAL_BASE_URL });
+  }
+  return mistralClient;
+}
+
+/**
  * Zusätzliche Request-Parameter, die eine Text-Route unverändert in ihren
  * `chat.completions.create`/`.parse`-Aufruf spreizt (`...extraParams`). Bei
  * OpenAI leer, bei Gemini das Abschalten des „Nachdenkens" (s. u.).
@@ -101,6 +132,11 @@ export async function getTextClient(): Promise<{
       model: GEMINI_TEXT_MODEL,
       extraParams: { reasoning_effort: "minimal" },
     };
+  }
+  // Mistral (mistral-small) „denkt" nicht per Default, braucht also kein
+  // `reasoning_effort` – `extraParams` bleibt wie bei OpenAI leer.
+  if (textProvider === "mistral") {
+    return { client: getMistral(), model: MISTRAL_TEXT_MODEL, extraParams: {} };
   }
   return { client: getOpenAI(), model: OPENAI_TEXT_MODEL, extraParams: {} };
 }

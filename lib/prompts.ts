@@ -1151,7 +1151,7 @@ ${ziel.inhalt.trim() || "(keine Angabe – halte dich an die Station und die Wel
 ${figurenTeil}
 Anforderungen:
 ${grenzAnforderung}${anschlussAnforderung ? "\n" + anschlussAnforderung : ""}
-- ${laenge}${werkformBlock ? "\n- " + werkformBlock : ""}
+- ${laenge}${werkformBlock ? "\n- " + werkformBlock + (hatTon ? " Der Ton oben bleibt dabei **bindend**: Er bestimmt Deutlichkeit und Wortwahl – auch bei intimen, körperlichen oder drastischen Szenen –, die Werkform nur Tempo und Tiefe. Nichts davon wird durch die Werkform abgemildert oder ausgespart." : "") : ""}
 - **Beschreibe die Personen genau** – ihr Aussehen und Auftreten – und schildere ihre **Tätigkeiten** Schritt für Schritt, konkret und sichtbar.
 ${atmosphaereBullet}
 - **Baue Dialog in wörtlicher Rede ein** (mit Anführungszeichen), der die Figuren charakterisiert und die Handlung trägt. Nicht nur berichten, was gesagt wird – lass sie sprechen.

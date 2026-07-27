@@ -158,10 +158,16 @@ export async function POST(request: Request) {
       max_tokens: 1100 + neuePersonen * 120,
     });
 
-    const handlung = (completion.choices[0]?.message.content ?? "").trim();
+    const choice = completion.choices?.[0];
+    const handlung = (choice?.message?.content ?? "").trim();
     if (!handlung) {
+      const blockiert = choice?.finish_reason === "content_filter";
       return NextResponse.json(
-        { error: "Das Modell lieferte keinen Text." },
+        {
+          error: blockiert
+            ? "Der Sicherheitsfilter des Modells hat den Text blockiert. Das kommt bei explizitem Ton vor – versuch einen weicheren Ton oder ein anderes Modell."
+            : "Das Modell lieferte keinen Text – möglicherweise vom Sicherheitsfilter blockiert (kann bei explizitem Ton passieren). Bitte erneut versuchen.",
+        },
         { status: 502 },
       );
     }

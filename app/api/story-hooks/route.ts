@@ -94,7 +94,7 @@ export async function POST(request: Request) {
       max_tokens: 350,
     });
 
-    const ansatzpunkte = (completion.choices[0]?.message.content ?? "").trim();
+    const ansatzpunkte = (completion.choices[0]?.message?.content ?? "").trim();
     if (!ansatzpunkte) {
       return NextResponse.json(
         { error: "Das Modell lieferte keinen Ansatzpunkt." },

@@ -78,7 +78,13 @@ import { ScenarioImageModal } from "../../components/ScenarioImageModal";
 import { StoryArcSection } from "../../components/StoryArcSection";
 
 /** Leere Metadaten – für neue leere/von Hand angelegte Varianten und als Rückfall. */
-const LEER_META: VariantMeta = { titel: "", form: "", ton: "", favorit: false };
+const LEER_META: VariantMeta = {
+  titel: "",
+  form: "",
+  ton: "",
+  favorit: false,
+  quelle: "",
+};
 
 /**
  * Bringt eine Metadaten-Liste auf genau `laenge` Einträge (fehlende leer,
@@ -523,6 +529,37 @@ export default function ScenarioDetailPage({
   }
 
   /**
+   * Einen bestehenden Story Arc **kopieren** – eine eigenständige Kopie des
+   * Arcs am Index `i` (tiefe Kopie samt Stationen und Kapiteln), angehängt und
+   * aktiv geschaltet. Der Titel bekommt „(Kopie)", Form/Ton/Quelle reisen mit,
+   * die Favorit-Markierung nicht. Kein KI-Aufruf; nur im Bearbeitungs-Zustand.
+   */
+  function arcKopieren(i: number) {
+    if (arcBusy || saving) return;
+    const items = aktuelleArcs();
+    if (i < 0 || i >= items.length) return;
+    if (items.length >= MAX_STORY_ARCS) {
+      setArcFehler(
+        `Mehr als ${MAX_STORY_ARCS} Story Arcs werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
+      );
+      return;
+    }
+    // Tiefe Kopie, damit das Bearbeiten der Kopie das Original nicht anrührt.
+    const kopie = JSON.parse(JSON.stringify(items[i])) as StoryArc;
+    const meta = ausgerichtet(arcMeta, items.length);
+    const q = meta[i];
+    const kopieMeta: VariantMeta = {
+      ...q,
+      titel: q.titel.trim() ? `${q.titel.trim()} (Kopie)` : "",
+      favorit: false,
+    };
+    setArcVarianten([...items, kopie]);
+    setArcAktiv(items.length);
+    setStoryArc(kopie);
+    setArcMeta([...meta, kopieMeta]);
+  }
+
+  /**
    * Einen Arc löschen. Wie beim Handlungsentwurf mit Rückfrage – ein Arc ist
    * eine große, teuer erzeugte Struktur. Der letzte verbliebene lässt sich nicht
    * über die Leiste löschen; dafür ist „Alle löschen" da.
@@ -656,7 +693,7 @@ export default function ScenarioDetailPage({
         setDetails((d) => ({ ...d, handlung }));
         setVariantenMeta([
           ...ausgerichtet(variantenMeta, alt.length),
-          { titel, form: handlungForm, ton: handlungTon, favorit: false },
+          { titel, form: handlungForm, ton: handlungTon, favorit: false, quelle: "" },
         ]);
       } else {
         const { beschreibung } = await generateScenarioDescription(
@@ -992,13 +1029,17 @@ export default function ScenarioDetailPage({
       } catch {
         // Titel ist Beiwerk.
       }
+      // Label des Handlungsentwurfs, aus dem dieser Arc abgeleitet wird – als
+      // Schnappschuss an der Arc-Variante festgehalten (Reiter zeigen ihn an).
+      const quelle =
+        variantenMeta[aktiv]?.titel?.trim() || `Entwurf ${aktiv + 1}`;
       const alt = aktuelleArcs();
       setArcVarianten([...alt, neu]);
       setArcAktiv(alt.length);
       setStoryArc(neu);
       setArcMeta([
         ...ausgerichtet(arcMeta, alt.length),
-        { titel, form: arcParams.form, ton: arcParams.ton, favorit: false },
+        { titel, form: arcParams.form, ton: arcParams.ton, favorit: false, quelle },
       ]);
     } catch (e) {
       setArcFehler(e instanceof Error ? e.message : "Fehler.");
@@ -2023,6 +2064,7 @@ export default function ScenarioDetailPage({
         onArcWaehlen={arcWaehlen}
         onArcTitelAendern={arcTitelAendern}
         onArcFavorit={arcFavoritUmschalten}
+        onArcKopieren={arcKopieren}
         onArcLoeschen={arcLoeschen}
         onAlleArcsLoeschen={alleArcsLoeschen}
       />

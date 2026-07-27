@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       max_tokens: 24,
     });
 
-    const name = cleanName(completion.choices[0]?.message.content ?? "");
+    const name = cleanName(completion.choices[0]?.message?.content ?? "");
     if (!name) {
       return NextResponse.json(
         { error: "Das Modell lieferte keinen Namen." },

@@ -166,6 +166,31 @@ die er hinterlässt:
   nutzt den Text-Client, also dasselbe Modell wie die Hauptgenerierung, für
   eine Aufgabe mit 120 Token Ausgabe. Seit **Gemini** umschaltbar ist, ließe
   sich hierfür gezielt ein günstiges/kostenloses Modell setzen.
+- ⭐ **Lokales LLM über Ollama als dritter Text-Anbieter** – technisch klein,
+  weil Ollama eine **OpenAI-kompatible API** bietet (`http://localhost:11434/v1`)
+  und die App die Anbieter-Umschaltung bereits über denselben OpenAI-SDK-Client
+  mit anderem `baseURL` löst (genau das Gemini-Muster). Einbau spiegelt Gemini:
+  - `getOllama()` in `lib/openai.ts` (`new OpenAI({ baseURL: OLLAMA_BASE_URL,
+    apiKey: "ollama" })` – Ollama ignoriert den Key, der SDK braucht aber einen
+    String), Env `OLLAMA_BASE_URL` (Default `.../v1`) + `OLLAMA_TEXT_MODEL`.
+  - `"ollama"` in die Allowlist `TEXT_PROVIDERS` (`lib/schema.ts`) + Option im
+    Einstellungs-Menü; `getTextClient()` gibt bei `ollama` den Client mit
+    **leeren `extraParams`** zurück (das `reasoning_effort: "minimal"` ist
+    Gemini-spezifisch). Keine Migration (Key-Value-Setting).
+  - **Motivation:** Ein lokales Modell hat **keinen Sicherheitsfilter** – löst
+    das „explizite Inhalte werden blockiert/weichgebügelt"-Problem, an dem
+    Gemini scheitert. Außerdem kostenlos und offline.
+  - **Fallstricke:** (1) **Structured Outputs** sind der wunde Punkt – die
+    Charakter-Erstellung (`generate-text`), Szenario-Ableitung, Story Arc,
+    Kapitel, „Zufälliges Szenario" und die Personensuche nutzen
+    `chat.completions.parse` mit JSON-Schema. Ollama unterstützt das (seit ~0.5),
+    aber die **Schema-Treue hängt stark vom Modell** ab; starke Instruct-Modelle
+    mit guter JSON-Treue nötig (`qwen2.5`, `llama3.1`, `mistral-nemo`). Die
+    Freitext-Routen (Prosa, Name, Ansatzpunkte, Handlungsentwurf) sind
+    unkritisch. (2) **Qualität** langer deutscher Prosa meist unter GPT-4o/Gemini.
+    (3) **Bilder bleiben bei OpenAI** (`gpt-image-*`) – Ollama kann keine
+    Portraits/Weltbilder. (4) Läuft nur, solange Dev-Server und Ollama auf
+    **derselben Maschine** sind (`localhost`).
 - **Alte Sicherungskopien aufräumen** – jeder Datenbank-Import legt eine
   `.bak`-Datei neben `dev.db` ab, die niemand löscht. Dazu kommen von Hand
   angelegte Kopien vor größeren Datenänderungen. **Stand 25.07.2026: neun

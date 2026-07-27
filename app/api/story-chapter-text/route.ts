@@ -177,10 +177,20 @@ export async function POST(request: Request) {
       max_tokens: kapitelLaengeMaxTokens(kapitelLaenge),
     });
 
-    const text = (completion.choices[0]?.message.content ?? "").trim();
+    // `?.` bis zu `content` durchziehen: Bei einer Blockade (Sicherheitsfilter)
+    // liefert das Modell eine Antwort **ohne** `message`/`content`; ein Zugriff
+    // ohne Schutz stürzte hier mit „Cannot read properties of undefined
+    // (reading 'content')" ab, statt eine verständliche Meldung zu geben.
+    const choice = completion.choices?.[0];
+    const text = (choice?.message?.content ?? "").trim();
     if (!text) {
+      const blockiert = choice?.finish_reason === "content_filter";
       return NextResponse.json(
-        { error: "Das Modell lieferte keinen Text." },
+        {
+          error: blockiert
+            ? "Der Sicherheitsfilter des Modells hat den Text blockiert. Das kommt bei explizitem Ton vor – versuch einen weicheren Ton, eine mildere Kapitel-Vorgabe oder ein anderes Modell."
+            : "Das Modell lieferte keinen Text – möglicherweise hat der Sicherheitsfilter den Inhalt blockiert (kann bei explizitem Ton passieren). Bitte erneut versuchen.",
+        },
         { status: 502 },
       );
     }

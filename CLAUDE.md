@@ -817,7 +817,7 @@ statt bloß „Entwurf 1/2/3", die einander nicht unterscheidbar waren. Das gilt
 **für Handlungsentwurf und Story Arc** gleich (`StoryArcSection` bekommt die
 Arc-Metadaten als Prop). Die Daten liegen in einer **parallelen `meta`-Liste**
 je Variantensatz: `plotVariants`/`storyArcVariants` heißen jetzt
-`{ items, aktiv, meta }` mit `meta[i] = VariantMeta { titel, form, ton, favorit }`,
+`{ items, aktiv, meta }` mit `meta[i] = VariantMeta { titel, form, ton, favorit, quelle }`,
 **index-gleich** zu `items`. Bewusst parallel und **nicht** in die Einträge
 eingebettet: So bleiben `plotVariants.items` ein `string[]` und
 `storyArcVariants.items` ein `StoryArc[]` – Altbestände **und alte
@@ -850,6 +850,20 @@ sowohl bei den **Handlungsentwürfen als auch den Story Arcs** (⭐ = Favorit fa
 ☆ = nicht, gedämpft), der mit einem Klick umschaltet, **ohne** die aktive Variante
 zu wechseln. Reine Kennzeichnung, keine Sortier-/Filterfunktion. Liegt in den
 Metadaten, geht also in `dirty` und über „Änderungen speichern" (wie der Titel).
+
+**Story-Arc-Reiter zeigen zusätzlich ihren Quell-Handlungsentwurf** (`meta[…].quelle`):
+Beim Ableiten hält der Arc das **Label des aktiven Entwurfs** als Schnappschuss fest
+(„Der Brief" bzw. „Entwurf 2") und zeigt es auf der zweiten Reiter-Zeile („… · aus
+„…""). Bewusst ein Schnappschuss – wird der Entwurf später umbenannt/gelöscht,
+bleibt am Arc stehen, woraus er entstand. Nur bei Arcs (bei Handlungsentwürfen
+leer). Altbestände ohne `quelle` zeigen keinen Quellhinweis.
+
+**Story Arcs kopieren** (`arcKopieren` / `onArcKopieren`, Knopf „⧉ Kopieren" in der
+Arc-Reiter-Leiste): eine **tiefe Kopie** des aktiven Arcs (`JSON.parse(JSON.stringify)`,
+samt Stationen und Kapiteln), angehängt und aktiv geschaltet – Titel + „(Kopie)",
+Form/Ton/Quelle reisen mit, die Favorit-Markierung nicht. Kein KI-Aufruf. Wie das
+Ableiten nur im Bearbeitungs-Zustand und gegen `MAX_STORY_ARCS` geprüft.
+
 Das
 Badge (`variantBadge`) zeigt **Erzählform zuerst, dann Ton**, und zwar **auch die
 Vorgaben** (`allround`/`neutral`) – nur **leere** Werte (Altbestände, von Hand
@@ -1020,6 +1034,13 @@ Text wird:
   (Kurzgeschichte) bis ausladend (Roman) –, der als eigener Bullet in
   `buildChapterTextPrompt` steht. `frei` trägt **keinen** Stil und **keine**
   Presets: dann ist der Prosa-Prompt zeichengleich mit dem von vorher.
+  **Der Ton ist dem Werkform-Stil übergeordnet:** Ist zusätzlich ein Ton gesetzt
+  (`hatTon`), bekommt der Werkform-Bullet eine Klausel, dass der **Ton bindend**
+  bleibt und Deutlichkeit/Wortwahl bestimmt – auch bei intimen/drastischen
+  Szenen –, die Werkform nur Tempo und Tiefe. Sonst konkurrierte etwa der
+  Roman-Stil („Innensicht, Zwischentöne") mit einem expliziten Ton und bügelte
+  ihn weich. Nur bei Werkform **und** Ton zugleich; „frei" oder neutraler Ton
+  bleiben zeichengleich.
 - **Kapitellänge** (`KAPITEL_LAENGEN`/`kapitelLaengeHint`/`kapitelLaengeMaxTokens`:
   kurz/mittel/lang/sehr_lang) steuert die **Prosalänge je Kapitel** – **entkoppelt
   vom „kreativ"-Haken**. `mittel` ist die frühere „kreativ aus"-Länge, `lang` die
