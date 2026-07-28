@@ -172,7 +172,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ handlung, characters: characters.length });
+    return NextResponse.json({ handlung, characters: characters.length, model });
   } catch (err) {
     console.error("scenario-plot error:", err);
     const message = err instanceof Error ? err.message : "Unbekannter Fehler.";

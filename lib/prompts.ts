@@ -886,7 +886,8 @@ ${kernAnforderung}${protagonistZeile}
 - Jede Station **verändert die Lage** gegenüber der vorigen. Keine zwei Stationen, die dasselbe noch einmal sagen.
 ${namenZeile}
 ${formatZeile}
-- Titel kurz und prägnant (2–5 Wörter). Beschreibung als Fließtext, ohne Nummerierung, ohne Aufzählungszeichen.
+- Titel kurz und prägnant (2–5 Wörter).
+- **Jede Stationsbeschreibung ist ein ausgearbeiteter Fließtext von mindestens 700 Zeichen** (etwa fünf bis acht Sätze): Schildere ausführlich und konkret, was in der Station geschieht, wie sich die Lage gegenüber der vorigen verändert, welche Figuren wie beteiligt sind und woran es sich entscheidet. Am Ende muss **jede** Beschreibung diese Länge erreichen. Als Fließtext, ohne Nummerierung, ohne Aufzählungszeichen.
 - Alles auf Deutsch.
 ${formHinweis(form)}${tonHinweis(ton)}${sparksBlock}${zusatzBlock}`;
 }

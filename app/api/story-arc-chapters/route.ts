@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       .filter((k) => k.titel.trim() || k.inhalt.trim())
       .slice(0, max);
 
-    return NextResponse.json({ kapitel });
+    return NextResponse.json({ kapitel, model });
   } catch (err) {
     console.error("story-arc-chapters error:", err);
     const message = err instanceof Error ? err.message : "Unbekannter Fehler.";

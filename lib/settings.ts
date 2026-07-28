@@ -24,6 +24,14 @@ import {
 const IMAGE_MODEL_KEY = "imageModel";
 const IMAGE_QUALITY_KEY = "imageQuality";
 const TEXT_PROVIDER_KEY = "textProvider";
+const SHOW_MODEL_KEY = "showModel";
+
+/** Boolean aus dem Key-Value-Store ("true"/"false"); null bei Unbekanntem. */
+function parseBool(value: string | undefined | null): boolean | null {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
+}
 
 /** Prüft einen Wert gegen die Allowlist; liefert null, wenn er nicht passt. */
 function parseImageModel(value: string | undefined | null): ImageModel | null {
@@ -48,7 +56,14 @@ function parseTextProvider(
 export async function getSettings(): Promise<Settings> {
   const rows = await prisma.setting.findMany({
     where: {
-      key: { in: [IMAGE_MODEL_KEY, IMAGE_QUALITY_KEY, TEXT_PROVIDER_KEY] },
+      key: {
+        in: [
+          IMAGE_MODEL_KEY,
+          IMAGE_QUALITY_KEY,
+          TEXT_PROVIDER_KEY,
+          SHOW_MODEL_KEY,
+        ],
+      },
     },
   });
   const byKey = new Map(rows.map((r) => [r.key, r.value]));
@@ -74,7 +89,13 @@ export async function getSettings(): Promise<Settings> {
     parseTextProvider(process.env.TEXT_PROVIDER) ??
     DEFAULT_TEXT_PROVIDER;
 
-  return { imageModel, imageQuality, textProvider };
+  // Reine Anzeige-Einstellung, Default aus. Wie oben: gespeichert → Env → Default.
+  const showModel =
+    parseBool(byKey.get(SHOW_MODEL_KEY)) ??
+    parseBool(process.env.SHOW_MODEL) ??
+    false;
+
+  return { imageModel, imageQuality, textProvider, showModel };
 }
 
 /** Speichert einzelne Einstellungen und liefert den neuen Gesamtstand. */
@@ -82,12 +103,16 @@ export async function updateSettings(patch: {
   imageModel?: ImageModel;
   imageQuality?: ImageQuality;
   textProvider?: TextProvider;
+  showModel?: boolean;
 }): Promise<Settings> {
   const writes: Array<[string, string]> = [];
   if (patch.imageModel) writes.push([IMAGE_MODEL_KEY, patch.imageModel]);
   if (patch.imageQuality) writes.push([IMAGE_QUALITY_KEY, patch.imageQuality]);
   if (patch.textProvider)
     writes.push([TEXT_PROVIDER_KEY, patch.textProvider]);
+  // Boolean: explizit auf undefined prüfen, sonst würde `false` verschluckt.
+  if (patch.showModel !== undefined)
+    writes.push([SHOW_MODEL_KEY, String(patch.showModel)]);
 
   for (const [key, value] of writes) {
     await prisma.setting.upsert({

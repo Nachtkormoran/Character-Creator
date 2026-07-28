@@ -811,13 +811,20 @@ als ein einzelner Ansatzpunkt). Der letzte verbliebene lässt sich über die
 Leiste nicht löschen. Die Rückfrage **vor** dem Erzeugen ist entfallen (der Knopf
 ersetzt nichts mehr); die vor dem Löschen der Beschreibung bleibt.
 
+**Entwürfe kopieren** (`varianteKopieren`, Knopf „⧉ Kopieren" in der
+Reiter-Leiste): eine eigenständige Kopie des **aktiven** Entwurfs, angehängt und
+aktiv geschaltet – Titel + „(Kopie)", Erzählform/Ton/Modell reisen mit, die
+Favorit-Markierung nicht. Analog zu `arcKopieren` (s. u. „Story Arcs kopieren"),
+nur **ohne** tiefe Kopie: ein Entwurf ist ein String, der Arc eine Struktur. Kein
+KI-Aufruf; nur im Bearbeitungs-Zustand und gegen `MAX_PLOT_VARIANTS` geprüft.
+
 **Reiter-Titel (KI-Titel + „Erzählform · Ton"-Badge).** Die Reiter sind
 **zweizeilig**: oben ein per KI erzeugter **Titel**, darunter klein das Badge –
 statt bloß „Entwurf 1/2/3", die einander nicht unterscheidbar waren. Das gilt
 **für Handlungsentwurf und Story Arc** gleich (`StoryArcSection` bekommt die
 Arc-Metadaten als Prop). Die Daten liegen in einer **parallelen `meta`-Liste**
 je Variantensatz: `plotVariants`/`storyArcVariants` heißen jetzt
-`{ items, aktiv, meta }` mit `meta[i] = VariantMeta { titel, form, ton, favorit, quelle }`,
+`{ items, aktiv, meta }` mit `meta[i] = VariantMeta { titel, form, ton, favorit, quelle, modell }`,
 **index-gleich** zu `items`. Bewusst parallel und **nicht** in die Einträge
 eingebettet: So bleiben `plotVariants.items` ein `string[]` und
 `storyArcVariants.items` ein `StoryArc[]` – Altbestände **und alte
@@ -861,8 +868,33 @@ leer). Altbestände ohne `quelle` zeigen keinen Quellhinweis.
 **Story Arcs kopieren** (`arcKopieren` / `onArcKopieren`, Knopf „⧉ Kopieren" in der
 Arc-Reiter-Leiste): eine **tiefe Kopie** des aktiven Arcs (`JSON.parse(JSON.stringify)`,
 samt Stationen und Kapiteln), angehängt und aktiv geschaltet – Titel + „(Kopie)",
-Form/Ton/Quelle reisen mit, die Favorit-Markierung nicht. Kein KI-Aufruf. Wie das
-Ableiten nur im Bearbeitungs-Zustand und gegen `MAX_STORY_ARCS` geprüft.
+Form/Ton/Quelle/Modell reisen mit, die Favorit-Markierung nicht. Kein KI-Aufruf. Wie
+das Ableiten nur im Bearbeitungs-Zustand und gegen `MAX_STORY_ARCS` geprüft.
+
+**Verwendetes Modell anzeigen** (Einstellung `showModel`, Default **aus**): Ein
+Schalter im Bereich *Einstellungen* (unter „Textmodell") blendet bei den vier
+Story-Erzeugungen das erzeugende **Textmodell** ein (z. B. `gpt-4o`,
+`mistral-small-latest`). Reine Anzeige – ändert nichts an der Erzeugung. Die vier
+Routen (`scenario-plot`, `scenario-arc`, `story-arc-chapters`, `story-chapter-text`)
+geben ihr `model` aus `getTextClient()` **mit zurück**; die Client-Helfer reichen es
+durch. Zwei Speicher-Zuschnitte, bewusst verschieden:
+- **Handlungsentwurf & Story Arc**: das Modell wird **persistiert** – als
+  `VariantMeta.modell` an der Variante festgehalten (wie `form`/`ton`/`quelle`, zum
+  Erzeugungszeitpunkt), überlebt also Reload/Export/Import und ist **je Variante**
+  korrekt. Angezeigt wird `meta[aktiv].modell` unter der Reiter-Leiste (Entwurf) bzw.
+  über den Stationen (Arc), nur wenn `showModel` an **und** der Wert nicht leer ist
+  (Altbestände tragen keinen). Backward-kompatibel über `normalizeMetaList` (fehlt →
+  `""`), `variantMetaSchema.modell` ist `.optional().default("")`.
+- **Kapitel-Ableitung & Kapitel-Prosa**: **transient**, nur für die Sitzung – die
+  Station/das Kapitel hat keine `meta`-Liste (der Arc ist Structured-Output-Schema,
+  in das keine internen Felder gehören). Die Seite hält `kapitelModell`
+  (Station-Index → Modell) und `storyTextModell` (`"stufe-kapitel"` → Modell) als
+  State und reicht sie an `StoryArcSection`; nach Reload sind sie weg.
+
+Die Einstellung folgt dem `Setting`-Key-Value-Muster (Key `showModel`, Vorrang
+gespeichert → Env `SHOW_MODEL` → Default `false`, **keine Migration**). `updateSettings`
+prüft den Boolean **explizit auf `undefined`**, sonst verschluckte ein `if (patch.x)`
+den Wert `false`.
 
 Das
 Badge (`variantBadge`) zeigt **Erzählform zuerst, dann Ton**, und zwar **auch die
@@ -995,6 +1027,17 @@ Handlungsentwurf, Komponente `StoryArcSection` (präsentierend wie
   aufloesung) werden **explizit** über die geforderte Stationenzahl verteilt und
   als fertige Liste vorgegeben – „prüfbarer Endzustand statt Verfahren". Ohne
   Figuren → 400. `hatKaputteZeichen`-Wächter + ein Wiederholversuch.
+  **Mindestlänge je Station: 700 Zeichen** Beschreibung – dreifach abgesichert
+  wie bei den Szenariofeldern: der Prompt fordert es als prüfbaren Endzustand
+  („Am Ende muss **jede** Beschreibung diese Länge erreichen"), das
+  Feld-`describe()` von `arcStufeSchema.beschreibung` nennt es (Structured
+  Outputs sieht es), und die Route zählt zu kurze Stationen (`MIN_STUFE_LEN =
+  700`) und löst **denselben** Wiederholversuch aus wie der Umlaut-Wächter –
+  danach gewinnt die Antwort mit weniger zu kurzen Stationen (kaputte Zeichen
+  schlagen die Längenfrage). Kein Hard-Fail bei Unterlänge (best effort); das
+  Speicher-Schema deckelt bei 5000, 700 passt also bequem hinein. *Gegen den
+  Dev-Server geprüft* (gemini-flash-lite): fünf Stationen, kürzeste 748 Zeichen,
+  ohne Wiederholung.
 - `POST /api/story-arc-chapters` – Kapitel **einer Station** (Spanne aus
   `KAPITEL_COUNTS`), Structured Output. Bewusst **ohne DB-Zugriff**: die Station
   trägt Beschreibung und Figuren schon in sich und kommt aus dem Request.
@@ -1564,7 +1607,7 @@ Ergebnis geht in den Formular-State.
   gebaut – sonst verlören alte Sicherungen ihre Portraits. Vor dem Überschreiben entsteht eine `*.bak`-Kopie
   neben `dev.db` (in `.gitignore`).
 - `settings.ts` – serverseitiger Zugriff auf die `Setting`-Tabelle
-  (Key-Value: `imageModel`, `imageQuality`, `textProvider`). **Vorrang:
+  (Key-Value: `imageModel`, `imageQuality`, `textProvider`, `showModel`). **Vorrang:
   gespeicherter Wert → Env → Default.** Gespeicherte Werte stammen aus
   dem Browser und werden gegen die Allowlists `IMAGE_MODELS` / `IMAGE_QUALITIES`
   / `TEXT_PROVIDERS` geprüft. `textProvider` (`openai` | `gemini`, Env

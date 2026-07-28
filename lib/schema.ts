@@ -146,6 +146,10 @@ export const settingsPatchSchema = z.object({
   imageModel: imageModelSchema,
   imageQuality: imageQualitySchema,
   textProvider: textProviderSchema,
+  // Ob bei den Story-Erzeugungen (Handlungsentwurf, Story Arc, Kapitel,
+  // Kapitel-Prosa) das verwendete Modell mit angezeigt wird. Reine Anzeige,
+  // Default aus.
+  showModel: z.boolean(),
 });
 
 /**
@@ -157,6 +161,8 @@ export interface Settings {
   imageModel: string;
   imageQuality: ImageQuality;
   textProvider: TextProvider;
+  /** Modell bei den Story-Erzeugungen mit anzeigen (reine Anzeige, Default aus). */
+  showModel: boolean;
 }
 
 /** Steht das Modell in der Auswahlliste (oder kommt es aus der Env)? */
@@ -757,6 +763,12 @@ export interface VariantMeta {
    * wenn der Entwurf später umbenannt/gelöscht wird.
    */
   quelle: string;
+  /**
+   * **Verwendetes Textmodell** zum Erzeugungszeitpunkt (z. B. `gpt-4o` oder
+   * `mistral-small-latest`). Wird nur angezeigt, wenn die Einstellung
+   * `showModel` an ist. Leer bei Altbeständen und von Hand angelegten Varianten.
+   */
+  modell: string;
 }
 
 export const variantMetaSchema = z.object({
@@ -765,6 +777,7 @@ export const variantMetaSchema = z.object({
   ton: z.string().trim().max(40).optional().default(""),
   favorit: z.boolean().optional().default(false),
   quelle: z.string().trim().max(200).optional().default(""),
+  modell: z.string().trim().max(120).optional().default(""),
 });
 
 /**
@@ -782,6 +795,7 @@ export function normalizeMetaList(raw: unknown, laenge: number): VariantMeta[] {
       ton: typeof o.ton === "string" ? o.ton : "",
       favorit: typeof o.favorit === "boolean" ? o.favorit : false,
       quelle: typeof o.quelle === "string" ? o.quelle : "",
+      modell: typeof o.modell === "string" ? o.modell : "",
     };
   });
 }
@@ -1133,7 +1147,7 @@ export function variantBadge(meta: { form: string; ton: string }): string {
 export const ARC_LENGTHS = [
   { value: "kurz", label: "Kurz · 3", stationen: 3 },
   { value: "mittel", label: "Mittel · 5", stationen: 5 },
-  { value: "lang", label: "Lang · 8", stationen: 8 },
+  { value: "lang", label: "Lang · 7", stationen: 7 },
   { value: "sehr_lang", label: "Sehr lang · 10", stationen: 10 },
 ] as const;
 
@@ -1243,7 +1257,7 @@ export const arcStufeSchema = z.object({
   beschreibung: z
     .string()
     .describe(
-      "Was in dieser Station geschieht, als Fließtext ohne Nummerierung – ein bis zwei Sätze mehr genügen. Sie verändert die Lage gegenüber der vorigen Station.",
+      "Was in dieser Station geschieht, als ausgearbeiteter Fließtext ohne Nummerierung – mindestens 700 Zeichen (etwa fünf bis acht Sätze): ausführlich und konkret, wie sich die Lage gegenüber der vorigen Station verändert und welche Figuren wie beteiligt sind.",
     ),
   figuren: z
     .array(z.string())

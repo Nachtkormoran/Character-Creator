@@ -19,6 +19,7 @@ import {
   generateChapterText,
   generateStoryArcChapters,
   getScenario,
+  getSettings,
   listScenarios,
   updateCharacterContent,
   updateCharacterProtagonist,
@@ -84,6 +85,7 @@ const LEER_META: VariantMeta = {
   ton: "",
   favorit: false,
   quelle: "",
+  modell: "",
 };
 
 /**
@@ -203,6 +205,21 @@ export default function ScenarioDetailPage({
     kapitel: number;
     text: string;
   } | null>(null);
+  /**
+   * Einstellung „Verwendetes Modell anzeigen" (aus den App-Einstellungen). Steuert
+   * nur die Anzeige, nicht die Erzeugung. Default aus, bis die Einstellung geladen ist.
+   */
+  const [showModel, setShowModel] = useState(false);
+  /**
+   * **Transiente** Modell-Anzeige für die Kapitel-Ableitung je Station (Index →
+   * Modellname). Anders als bei Entwurf/Arc nicht in den Metadaten persistiert –
+   * die Station kennt keine `meta`-Liste; hier genügt der Hinweis für die Sitzung.
+   */
+  const [kapitelModell, setKapitelModell] = useState<Record<number, string>>({});
+  /** Transiente Modell-Anzeige für die Kapitel-Prosa, Schlüssel `"stufe-kapitel"`. */
+  const [storyTextModell, setStoryTextModell] = useState<Record<string, string>>(
+    {},
+  );
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
   /**
    * Der angeklickte Charakter – öffnet dasselbe Detail-Modal wie in der
@@ -416,6 +433,37 @@ export default function ScenarioDetailPage({
     setVariantenMeta(
       meta.map((m, k) => (k === i ? { ...m, favorit: !m.favorit } : m)),
     );
+  }
+
+  /**
+   * Einen bestehenden Handlungsentwurf **kopieren** – analog zu `arcKopieren`:
+   * eine eigenständige Kopie des Entwurfs am Index `i`, angehängt und aktiv
+   * geschaltet. Der Titel bekommt „(Kopie)", Erzählform/Ton/Modell reisen mit, die
+   * Favorit-Markierung nicht. Ein Entwurf ist ein String – anders als der Arc
+   * braucht es keine tiefe Kopie. Kein KI-Aufruf; nur im Bearbeitungs-Zustand und
+   * gegen `MAX_PLOT_VARIANTS` geprüft.
+   */
+  function varianteKopieren(i: number) {
+    if (generatingField || saving) return;
+    const items = aktuelleVarianten();
+    if (i < 0 || i >= items.length) return;
+    if (items.length >= MAX_PLOT_VARIANTS) {
+      setSaveError(
+        `Mehr als ${MAX_PLOT_VARIANTS} Entwürfe werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
+      );
+      return;
+    }
+    const meta = ausgerichtet(variantenMeta, items.length);
+    const q = meta[i];
+    const kopieMeta: VariantMeta = {
+      ...q,
+      titel: q.titel.trim() ? `${q.titel.trim()} (Kopie)` : "",
+      favorit: false,
+    };
+    setVarianten([...items, items[i]]);
+    setAktiv(items.length);
+    setDetails((d) => ({ ...d, handlung: items[i] }));
+    setVariantenMeta([...meta, kopieMeta]);
   }
 
   /**
@@ -660,7 +708,7 @@ export default function ScenarioDetailPage({
         // und Figuren wie bisher).
         const basis =
           handlungAlsBasis && details.handlung.trim() ? details.handlung : "";
-        const { handlung } = await generateScenarioPlot(
+        const { handlung, model } = await generateScenarioPlot(
           id,
           name.trim(),
           // Nur **aktive** Figuren und **aktive** Handlungselemente (reiner Text
@@ -693,7 +741,14 @@ export default function ScenarioDetailPage({
         setDetails((d) => ({ ...d, handlung }));
         setVariantenMeta([
           ...ausgerichtet(variantenMeta, alt.length),
-          { titel, form: handlungForm, ton: handlungTon, favorit: false, quelle: "" },
+          {
+            titel,
+            form: handlungForm,
+            ton: handlungTon,
+            favorit: false,
+            quelle: "",
+            modell: model,
+          },
         ]);
       } else {
         const { beschreibung } = await generateScenarioDescription(
@@ -709,6 +764,14 @@ export default function ScenarioDetailPage({
       setGeneratingField(null);
     }
   }
+
+  // Anzeige-Einstellung laden (ob das verwendete Modell mit angezeigt wird).
+  // Scheitert der Aufruf, bleibt es beim Default aus.
+  useEffect(() => {
+    getSettings()
+      .then((s) => setShowModel(s.showModel))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     getScenario(id)
@@ -1007,7 +1070,7 @@ export default function ScenarioDetailPage({
     setArcBusy(true);
     setArcFehler(null);
     try {
-      const { storyArc: neu } = await generateStoryArc(id, details.handlung, {
+      const { storyArc: neu, model } = await generateStoryArc(id, details.handlung, {
         laenge: arcParams.laenge,
         format: arcParams.format,
         zusatz: arcParams.zusatz,
@@ -1039,7 +1102,14 @@ export default function ScenarioDetailPage({
       setStoryArc(neu);
       setArcMeta([
         ...ausgerichtet(arcMeta, alt.length),
-        { titel, form: arcParams.form, ton: arcParams.ton, favorit: false, quelle },
+        {
+          titel,
+          form: arcParams.form,
+          ton: arcParams.ton,
+          favorit: false,
+          quelle,
+          modell: model,
+        },
       ]);
     } catch (e) {
       setArcFehler(e instanceof Error ? e.message : "Fehler.");
@@ -1061,7 +1131,7 @@ export default function ScenarioDetailPage({
     setKapitelBusy(stufeIndex);
     setKapitelFehler(null);
     try {
-      const { kapitel } = await generateStoryArcChapters(
+      const { kapitel, model } = await generateStoryArcChapters(
         {
           titel: stufe.titel,
           beschreibung: stufe.beschreibung,
@@ -1074,6 +1144,7 @@ export default function ScenarioDetailPage({
           form: arcParams.form,
         },
       );
+      setKapitelModell((m) => ({ ...m, [stufeIndex]: model }));
       // Die Route liefert nur Titel und Inhalt; der Prosatext (`text`) entsteht
       // erst später auf Knopfdruck – hier leer auffüllen, damit das Kapitel dem
       // Typ genügt und die Ausklapp-Ansicht kein `undefined` bekommt.
@@ -1109,7 +1180,7 @@ export default function ScenarioDetailPage({
     setKapitelTextBusy({ stufe: stufeIndex, kapitel: kapitelIndex });
     setKapitelTextFehler(null);
     try {
-      const { text } = await generateChapterText(
+      const { text, model } = await generateChapterText(
         id,
         details,
         {
@@ -1129,6 +1200,10 @@ export default function ScenarioDetailPage({
           werkform: arcParams.werkform,
         },
       );
+      setStoryTextModell((m) => ({
+        ...m,
+        [`${stufeIndex}-${kapitelIndex}`]: model,
+      }));
       setStoryArc((arc) => ({
         stufen: arc.stufen.map((s, si) =>
           si === stufeIndex
@@ -1775,6 +1850,19 @@ export default function ScenarioDetailPage({
               );
             })}
             {/*
+              Aktiven Entwurf kopieren – als eigenständige neue Variante (wie
+              „⧉ Kopieren" beim Story Arc). Kein KI-Aufruf; hängt einen Reiter an.
+            */}
+            <button
+              type="button"
+              onClick={() => varianteKopieren(aktiv)}
+              disabled={saving || generatingField !== null}
+              title="Den aktiven Handlungsentwurf kopieren – als eigenständige neue Variante"
+              className="rounded-full border border-black/15 px-2.5 py-1 text-xs font-medium text-foreground/70 transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              ⧉ Kopieren
+            </button>
+            {/*
               Leeren Entwurf anhängen – der Gegenpol zu „✨ Neu erzeugen": kein
               KI-Aufruf, ein leeres Feld zum Selbstschreiben. Sitzt bei den
               Reitern, weil er einen weiteren Reiter anlegt.
@@ -1817,6 +1905,16 @@ export default function ScenarioDetailPage({
               </button>
             )}
           </div>
+        )}
+        {/*
+          Verwendetes Modell des aktiven Entwurfs – nur bei aktivierter
+          Einstellung und wenn es (nicht bei Altbeständen) bekannt ist.
+        */}
+        {showModel && variantenMeta[aktiv]?.modell?.trim() && (
+          <p className="mb-3 text-xs text-foreground/50">
+            Erzeugt mit{" "}
+            <span className="font-mono">{variantenMeta[aktiv].modell}</span>
+          </p>
         )}
         <div className="mb-3 flex flex-col gap-2">
           {/*
@@ -2067,6 +2165,9 @@ export default function ScenarioDetailPage({
         onArcKopieren={arcKopieren}
         onArcLoeschen={arcLoeschen}
         onAlleArcsLoeschen={alleArcsLoeschen}
+        showModel={showModel}
+        kapitelModell={kapitelModell}
+        storyTextModell={storyTextModell}
       />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-4 dark:border-white/10">

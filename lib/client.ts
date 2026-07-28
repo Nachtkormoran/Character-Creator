@@ -836,7 +836,7 @@ export function generateScenarioPlot(
   /** Erzählform (`STORY_FORMS`-Wert). Leer/`allround` = gemischt wie bisher. */
   form = "",
 ) {
-  return postJson<{ handlung: string; characters: number }>(
+  return postJson<{ handlung: string; characters: number; model: string }>(
     "/api/scenario-plot",
     {
       scenarioId,
@@ -899,7 +899,7 @@ export function generateStoryArc(
     figuren?: string;
   } = {},
 ) {
-  return postJson<{ storyArc: StoryArc }>("/api/scenario-arc", {
+  return postJson<{ storyArc: StoryArc; model: string }>("/api/scenario-arc", {
     scenarioId,
     handlung,
     ...options,
@@ -925,7 +925,7 @@ export function generateStoryArcChapters(
     form?: string;
   } = {},
 ) {
-  return postJson<{ kapitel: Kapitel[] }>("/api/story-arc-chapters", {
+  return postJson<{ kapitel: Kapitel[]; model: string }>("/api/story-arc-chapters", {
     stufe,
     ...options,
   });
@@ -958,7 +958,7 @@ export function generateChapterText(
     werkform?: string;
   } = {},
 ) {
-  return postJson<{ text: string }>("/api/story-chapter-text", {
+  return postJson<{ text: string; model: string }>("/api/story-chapter-text", {
     scenarioId,
     details,
     stufe,

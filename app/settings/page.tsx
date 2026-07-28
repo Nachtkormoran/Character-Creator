@@ -76,6 +76,23 @@ export default function SettingsPage() {
     }
   }
 
+  async function chooseShowModel(showModel: boolean) {
+    const previous = settings;
+    setSettings((s) => (s ? { ...s, showModel } : s)); // optimistisch
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      setSettings(await updateSettings({ showModel }));
+      setSaved(true);
+    } catch (e) {
+      setSettings(previous); // Rollback bei Fehler
+      setError(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Ein über OPENAI_IMAGE_MODEL gesetztes, nicht gelistetes Modell soll
   // sichtbar sein statt stillschweigend als "nichts ausgewählt" zu erscheinen.
   const fromEnv =
@@ -156,6 +173,30 @@ export default function SettingsPage() {
                 ? "Gespeichert."
                 : "Änderungen werden sofort gespeichert."}
           </p>
+
+          {/*
+            Anzeige-Schalter: Modell bei den Story-Erzeugungen mit anzeigen.
+            Reine Anzeige, Default aus – ändert nichts an der Erzeugung selbst.
+          */}
+          <label className="mt-1 flex cursor-pointer items-start gap-3 border-t border-black/5 pt-4 dark:border-white/5">
+            <input
+              type="checkbox"
+              checked={settings.showModel}
+              onChange={(e) => chooseShowModel(e.target.checked)}
+              disabled={saving}
+              className="mt-1"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">
+                Verwendetes Modell anzeigen
+              </span>
+              <span className="text-xs text-foreground/60">
+                Zeigt bei Handlungsentwurf, Story Arc, Kapitel-Ableitung und
+                Kapitel-Prosa an, mit welchem Textmodell sie erzeugt wurden.
+                Reine Anzeige – Standard aus.
+              </span>
+            </span>
+          </label>
         </section>
       )}
 

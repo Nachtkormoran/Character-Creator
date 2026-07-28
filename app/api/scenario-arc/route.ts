@@ -166,10 +166,31 @@ export async function POST(request: Request) {
         temperature: kreativ ? 0.9 : weiterspinnen ? 0.75 : 0.5,
       });
 
+    // Jede Station soll ausführlich sein – mindestens 700 Zeichen Beschreibung.
+    // Der Prompt und das Feld-`describe()` fordern das bereits; hier ist die
+    // Absicherung: Zählt, wie viele Stationen die Vorgabe reißen.
+    const MIN_STUFE_LEN = 700;
+    const zuKurz = (e: z.infer<typeof storyArcSchema>) =>
+      e.stufen.filter((s) => s.beschreibung.trim().length < MIN_STUFE_LEN).length;
+
     let ergebnis = (await versuch()).choices[0]?.message.parsed;
-    if (ergebnis && hatKaputteZeichen(ergebnis)) {
-      console.warn("scenario-arc: fehlerhafte Zeichenkodierung, zweiter Versuch.");
-      ergebnis = (await versuch()).choices[0]?.message.parsed;
+    // Ein Wiederholversuch bei kaputten Umlauten **oder** wenn eine Station zu
+    // kurz ist. Danach die bessere Antwort behalten: kaputte Zeichen sind
+    // unbrauchbar und schlagen die Längenfrage, sonst gewinnt die mit weniger
+    // zu kurzen Stationen (bei Gleichstand bleibt die erste).
+    if (ergebnis && (hatKaputteZeichen(ergebnis) || zuKurz(ergebnis) > 0)) {
+      console.warn(
+        "scenario-arc: Nachbesserung nötig (kaputte Zeichen oder Station < 700 Zeichen), zweiter Versuch.",
+      );
+      const zweit = (await versuch()).choices[0]?.message.parsed;
+      if (zweit) {
+        const erstKaputt = hatKaputteZeichen(ergebnis);
+        const zweitKaputt = hatKaputteZeichen(zweit);
+        if (erstKaputt && !zweitKaputt) ergebnis = zweit;
+        else if (!erstKaputt && !zweitKaputt && zuKurz(zweit) < zuKurz(ergebnis))
+          ergebnis = zweit;
+        else if (erstKaputt && zweitKaputt) ergebnis = zweit;
+      }
     }
 
     if (!ergebnis) {
@@ -220,7 +241,7 @@ export async function POST(request: Request) {
       kapitel: [] as { titel: string; inhalt: string }[],
     }));
 
-    return NextResponse.json({ storyArc: { stufen } });
+    return NextResponse.json({ storyArc: { stufen }, model });
   } catch (err) {
     console.error("scenario-arc error:", err);
     const message = err instanceof Error ? err.message : "Unbekannter Fehler.";

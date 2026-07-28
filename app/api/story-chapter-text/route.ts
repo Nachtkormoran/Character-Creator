@@ -195,7 +195,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ text });
+    return NextResponse.json({ text, model });
   } catch (err) {
     console.error("story-chapter-text error:", err);
     const message = err instanceof Error ? err.message : "Unbekannter Fehler.";

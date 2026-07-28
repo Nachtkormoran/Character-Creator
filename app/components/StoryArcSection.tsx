@@ -101,6 +101,9 @@ export function StoryArcSection({
   onArcKopieren,
   onArcLoeschen,
   onAlleArcsLoeschen,
+  showModel,
+  kapitelModell,
+  storyTextModell,
 }: {
   storyArc: StoryArc;
   onChange: (arc: StoryArc) => void;
@@ -171,6 +174,15 @@ export function StoryArcSection({
   onArcLoeschen: (i: number) => void;
   /** Alle Arcs auf einmal löschen. */
   onAlleArcsLoeschen: () => void;
+  /**
+   * Einstellung „Verwendetes Modell anzeigen". Bei `true` wird bei Arc,
+   * Kapitel-Ableitung und Kapitel-Prosa das erzeugende Modell mit angezeigt.
+   */
+  showModel?: boolean;
+  /** Transiente Modell-Anzeige der Kapitel-Ableitung je Station (Index → Modell). */
+  kapitelModell?: Record<number, string>;
+  /** Transiente Modell-Anzeige der Kapitel-Prosa, Schlüssel `"stufe-kapitel"`. */
+  storyTextModell?: Record<string, string>;
 }) {
   const stufen = storyArc.stufen;
   const hatArc = stufen.length > 0;
@@ -584,6 +596,17 @@ export function StoryArcSection({
       )}
 
       {/*
+        Verwendetes Modell des aktiven Arcs – nur bei aktivierter Einstellung
+        und wenn bekannt (nicht bei Altbeständen/von Hand angelegten Arcs).
+      */}
+      {showModel && hatArc && arcMeta[arcAktiv]?.modell?.trim() && (
+        <p className="mt-2 text-xs text-foreground/50">
+          Arc erzeugt mit{" "}
+          <span className="font-mono">{arcMeta[arcAktiv].modell}</span>
+        </p>
+      )}
+
+      {/*
         Handlung weiterspinnen – bestimmt den **Grundcharakter** des Arcs und
         steht deshalb zuerst: Der Handlungsentwurf ist eine Ausgangslage mit
         offenem Ausgang. Angehakt entwickelt der Arc daraus eine vollständige
@@ -891,6 +914,14 @@ export function StoryArcSection({
                       </p>
                     )}
 
+                    {/* Modell der letzten Kapitel-Ableitung dieser Station (transient). */}
+                    {showModel && kapitelModell?.[i]?.trim() && (
+                      <p className="mt-2 text-xs text-foreground/50">
+                        Kapitel erzeugt mit{" "}
+                        <span className="font-mono">{kapitelModell[i]}</span>
+                      </p>
+                    )}
+
                     {s.kapitel.length > 0 && (
                       <ol className="mt-2 flex flex-col gap-2">
                         {s.kapitel.map((k, ki) => (
@@ -1012,6 +1043,17 @@ export function StoryArcSection({
                                 kapitelTextError?.kapitel === ki && (
                                   <p className="mt-1 text-xs text-red-600 dark:text-red-400">
                                     {kapitelTextError.text}
+                                  </p>
+                                )}
+
+                              {/* Modell der zuletzt erzeugten Prosa dieses Kapitels (transient). */}
+                              {showModel &&
+                                storyTextModell?.[`${i}-${ki}`]?.trim() && (
+                                  <p className="mt-1 text-xs text-foreground/50">
+                                    Story erzeugt mit{" "}
+                                    <span className="font-mono">
+                                      {storyTextModell[`${i}-${ki}`]}
+                                    </span>
                                   </p>
                                 )}
 
