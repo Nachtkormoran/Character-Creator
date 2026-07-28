@@ -13,10 +13,12 @@ import {
   IMAGE_PRICES_USD,
   IMAGE_QUALITIES,
   isKnownImageModel,
+  STORY_GENERATIONS,
   TEXT_PROVIDERS,
   type ImageModel,
   type ImageQuality,
   type Settings,
+  type StoryGeneration,
   type TextProvider,
 } from "@/lib/schema";
 
@@ -84,6 +86,48 @@ export default function SettingsPage() {
     setSaved(false);
     try {
       setSettings(await updateSettings({ showModel }));
+      setSaved(true);
+    } catch (e) {
+      setSettings(previous); // Rollback bei Fehler
+      setError(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function chooseUseModelOverrides(useModelOverrides: boolean) {
+    const previous = settings;
+    setSettings((s) => (s ? { ...s, useModelOverrides } : s)); // optimistisch
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      setSettings(await updateSettings({ useModelOverrides }));
+      setSaved(true);
+    } catch (e) {
+      setSettings(previous); // Rollback bei Fehler
+      setError(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function chooseStoryModel(
+    generation: StoryGeneration,
+    provider: TextProvider,
+  ) {
+    if (!settings) return;
+    const previous = settings;
+    // Vollständige Karte mit der einen geänderten Erzeugung – der Server
+    // schreibt zwar nur geänderte Schlüssel, aber die Client-Signatur erwartet
+    // die volle Karte (wie Modell + Qualität zusammen).
+    const storyModels = { ...settings.storyModels, [generation]: provider };
+    setSettings((s) => (s ? { ...s, storyModels } : s)); // optimistisch
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      setSettings(await updateSettings({ storyModels }));
       setSaved(true);
     } catch (e) {
       setSettings(previous); // Rollback bei Fehler
@@ -197,6 +241,89 @@ export default function SettingsPage() {
               </span>
             </span>
           </label>
+        </section>
+      )}
+
+      {!loading && settings && (
+        <section className="flex flex-col gap-4 rounded-lg border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+          <div>
+            <h2 className="font-medium">Modell je Story-Erzeugung</h2>
+            <p className="text-sm text-foreground/60">
+              Legt für die vier Story-Erzeugungen jeweils <strong>ein eigenes</strong>{" "}
+              Textmodell fest. Alle übrigen Text-Erzeugungen (Beschreibungen,
+              Namen, Szenarien, Ansatzpunkte …) folgen weiter dem{" "}
+              <strong>Textmodell</strong> oben.
+            </p>
+          </div>
+
+          {/*
+            Master-Schalter oberhalb der Detaileinstellungen: Erst wenn er an ist,
+            greifen die vier Auswahlfelder. Aus → jede Story-Erzeugung folgt dem
+            globalen Textmodell (wie bisher).
+          */}
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={settings.useModelOverrides}
+              onChange={(e) => chooseUseModelOverrides(e.target.checked)}
+              disabled={saving}
+              className="mt-1"
+            />
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium">
+                Modell je Story-Erzeugung separat festlegen
+              </span>
+              <span className="text-xs text-foreground/60">
+                Aus (Standard): alle vier folgen dem Textmodell oben. An: die
+                Auswahl darunter wird verwendet. Ein Pro-Lauf-Selektor auf der
+                Szenario-Seite übersteuert die Wahl weiterhin für einen
+                einzelnen Lauf.
+              </span>
+            </span>
+          </label>
+
+          {/*
+            Detaileinstellungen – je Story-Erzeugung ein Anbieter. Iteriert über
+            STORY_GENERATIONS und TEXT_PROVIDERS: eine weitere Erzeugung oder ein
+            weiteres Modell zieht hier automatisch mit. Ausgegraut, solange der
+            Schalter oben aus ist.
+          */}
+          <div
+            className={`flex flex-col gap-3 border-t border-black/5 pt-4 dark:border-white/5 ${
+              settings.useModelOverrides ? "" : "opacity-50"
+            }`}
+          >
+            {STORY_GENERATIONS.map((g) => (
+              <label
+                key={g.value}
+                className="flex flex-wrap items-center justify-between gap-2"
+              >
+                <span className="text-sm font-medium">{g.label}</span>
+                <select
+                  value={settings.storyModels[g.value]}
+                  onChange={(e) =>
+                    chooseStoryModel(g.value, e.target.value as TextProvider)
+                  }
+                  disabled={saving || !settings.useModelOverrides}
+                  className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-60 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                >
+                  {TEXT_PROVIDERS.map((p) => (
+                    <option key={p.value} value={p.value}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+
+          <p className="text-xs text-foreground/50">
+            {saving
+              ? "Speichere …"
+              : saved
+                ? "Gespeichert."
+                : "Änderungen werden sofort gespeichert."}
+          </p>
         </section>
       )}
 

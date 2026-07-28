@@ -5,10 +5,13 @@ import {
   DEFAULT_TEXT_PROVIDER,
   imageModelSchema,
   imageQualitySchema,
+  STORY_GENERATIONS,
   textProviderSchema,
   type ImageModel,
   type ImageQuality,
   type Settings,
+  type StoryGeneration,
+  type StoryModels,
   type TextProvider,
 } from "./schema";
 
@@ -25,6 +28,17 @@ const IMAGE_MODEL_KEY = "imageModel";
 const IMAGE_QUALITY_KEY = "imageQuality";
 const TEXT_PROVIDER_KEY = "textProvider";
 const SHOW_MODEL_KEY = "showModel";
+const USE_MODEL_OVERRIDES_KEY = "useModelOverrides";
+
+/** `Setting`-Key für den Anbieter einer Story-Erzeugung, z. B. `storyModel.plot`. */
+function storyModelKey(generation: StoryGeneration): string {
+  return `storyModel.${generation}`;
+}
+
+/** Env-Vorbelegung je Story-Erzeugung, z. B. `STORY_MODEL_PLOT`. */
+function storyModelEnv(generation: StoryGeneration): string | undefined {
+  return process.env[`STORY_MODEL_${generation.toUpperCase()}`];
+}
 
 /** Boolean aus dem Key-Value-Store ("true"/"false"); null bei Unbekanntem. */
 function parseBool(value: string | undefined | null): boolean | null {
@@ -62,6 +76,8 @@ export async function getSettings(): Promise<Settings> {
           IMAGE_QUALITY_KEY,
           TEXT_PROVIDER_KEY,
           SHOW_MODEL_KEY,
+          USE_MODEL_OVERRIDES_KEY,
+          ...STORY_GENERATIONS.map((g) => storyModelKey(g.value)),
         ],
       },
     },
@@ -95,7 +111,34 @@ export async function getSettings(): Promise<Settings> {
     parseBool(process.env.SHOW_MODEL) ??
     false;
 
-  return { imageModel, imageQuality, textProvider, showModel };
+  // Ob die Detaileinstellungen (Modell je Story-Erzeugung) greifen. Default aus,
+  // damit sich ohne Zutun nichts am Verhalten ändert. Gespeichert → Env → Default.
+  const useModelOverrides =
+    parseBool(byKey.get(USE_MODEL_OVERRIDES_KEY)) ??
+    parseBool(process.env.USE_MODEL_OVERRIDES) ??
+    false;
+
+  // Anbieter je Story-Erzeugung – vollständige Karte. Ein fehlender Eintrag
+  // fällt auf den globalen `textProvider` zurück, damit das Einschalten der
+  // Detaileinstellungen ohne weitere Wahl exakt dem globalen Modell entspricht
+  // (keine Überraschung). Gespeichert → Env (`STORY_MODEL_<GEN>`) → textProvider.
+  const storyModels = Object.fromEntries(
+    STORY_GENERATIONS.map((g) => [
+      g.value,
+      parseTextProvider(byKey.get(storyModelKey(g.value))) ??
+        parseTextProvider(storyModelEnv(g.value)) ??
+        textProvider,
+    ]),
+  ) as StoryModels;
+
+  return {
+    imageModel,
+    imageQuality,
+    textProvider,
+    showModel,
+    useModelOverrides,
+    storyModels,
+  };
 }
 
 /** Speichert einzelne Einstellungen und liefert den neuen Gesamtstand. */
@@ -104,6 +147,8 @@ export async function updateSettings(patch: {
   imageQuality?: ImageQuality;
   textProvider?: TextProvider;
   showModel?: boolean;
+  useModelOverrides?: boolean;
+  storyModels?: Partial<StoryModels>;
 }): Promise<Settings> {
   const writes: Array<[string, string]> = [];
   if (patch.imageModel) writes.push([IMAGE_MODEL_KEY, patch.imageModel]);
@@ -113,6 +158,15 @@ export async function updateSettings(patch: {
   // Boolean: explizit auf undefined prüfen, sonst würde `false` verschluckt.
   if (patch.showModel !== undefined)
     writes.push([SHOW_MODEL_KEY, String(patch.showModel)]);
+  if (patch.useModelOverrides !== undefined)
+    writes.push([USE_MODEL_OVERRIDES_KEY, String(patch.useModelOverrides)]);
+  // Nur die mitgeschickten Story-Erzeugungen schreiben (Teil-Update).
+  if (patch.storyModels) {
+    for (const g of STORY_GENERATIONS) {
+      const value = patch.storyModels[g.value];
+      if (value) writes.push([storyModelKey(g.value), value]);
+    }
+  }
 
   for (const [key, value] of writes) {
     await prisma.setting.upsert({

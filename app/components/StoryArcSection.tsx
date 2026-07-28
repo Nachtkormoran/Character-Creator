@@ -189,11 +189,13 @@ export function StoryArcSection({
   /** Transiente Modell-Anzeige der Kapitel-Prosa, Schlüssel `"stufe-kapitel"`. */
   storyTextModell?: Record<string, string>;
   /**
-   * Modell-Anbieter (`TEXT_PROVIDERS`-Wert) für Arc, Kapitel und Prosa – **pro
-   * Aufruf** wählbar; Default ist der in den Einstellungen gewählte.
+   * Modell-Anbieter für Arc, Kapitel und Prosa – **pro Aufruf** wählbar. `""` =
+   * „Standard laut Einstellungen" (Modell je Story-Erzeugung bzw. das globale
+   * Textmodell); ein konkreter Anbieter (`TEXT_PROVIDERS`-Wert) übersteuert nur
+   * diese Erzeugungen.
    */
-  provider: TextProvider;
-  onProviderChange: (p: TextProvider) => void;
+  provider: TextProvider | "";
+  onProviderChange: (p: TextProvider | "") => void;
 }) {
   const stufen = storyArc.stufen;
   const hatArc = stufen.length > 0;
@@ -436,18 +438,23 @@ export function StoryArcSection({
           </label>
           {/*
             Modell-Anbieter **für diesen Arc** – gilt für das Ableiten des Arcs,
-            die Kapitelableitung und die Story-Erzeugung. Default ist das in den
-            Einstellungen gewählte Modell (beim Laden vorbelegt); nicht gespeichert.
+            die Kapitelableitung und die Story-Erzeugung. „Standard" folgt der
+            Einstellungsseite (Modell je Story-Erzeugung bzw. das globale
+            Textmodell); ein konkreter Anbieter übersteuert nur diese Erzeugungen
+            und wird nicht gespeichert.
           */}
           <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
             Modell:
             <select
               value={provider}
-              onChange={(e) => onProviderChange(e.target.value as TextProvider)}
+              onChange={(e) =>
+                onProviderChange(e.target.value as TextProvider | "")
+              }
               disabled={disabled || busy}
-              title="Welches Textmodell Story Arc, Kapitel und Story-Prosa erzeugt. Default ist das in den Einstellungen gewählte Modell; die Wahl hier gilt nur für diese Erzeugungen und wird nicht gespeichert."
+              title="Welches Textmodell Story Arc, Kapitel und Story-Prosa erzeugt. „Standard&quot; folgt der Einstellungsseite; die Wahl hier gilt nur für diese Erzeugungen und wird nicht gespeichert."
               className={`${CHIP_BTN} bg-white dark:bg-white/5`}
             >
+              <option value="">Standard (Einstellungen)</option>
               {TEXT_PROVIDERS.map((p) => (
                 <option key={p.value} value={p.value}>
                   {p.label}

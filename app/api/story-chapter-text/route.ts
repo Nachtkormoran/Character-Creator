@@ -155,7 +155,7 @@ export async function POST(request: Request) {
       : systemBasis;
 
     const { client: openai, model, extraParams } =
-      await getTextClient(textProvider);
+      await getTextClient(textProvider, "chapterText");
     const completion = await openai.chat.completions.create({
       model,
       ...extraParams,

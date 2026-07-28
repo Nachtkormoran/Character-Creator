@@ -905,23 +905,68 @@ gespeichert → Env `SHOW_MODEL` → Default `false`, **keine Migration**). `upd
 prüft den Boolean **explizit auf `undefined`**, sonst verschluckte ein `if (patch.x)`
 den Wert `false`.
 
-**Modell-Selektor je Erzeugung** (Anbieter **pro Aufruf** wählen, statt der
-globalen Einstellung zu folgen): Zwei „Modell"-Selektoren – einer beim
-**Handlungsentwurf** (neben Erzählform/Ton, State `handlungProvider`), einer beim
-**Story Arc** (in den Arc-Parametern, State `arcProvider`); Letzterer gilt für
-Arc **und** Kapitelableitung **und** Story-Prosa. Beide werden beim Laden mit dem
-in den Einstellungen gewählten `textProvider` **vorbelegt** (Default) und sind
-**nicht gespeichert** (reine Lauf-Parameter, wie Ton/Erzählform). Technisch:
-`getTextClient(providerOverride?)` nimmt einen optionalen Anbieter – ist er ein
-gültiger `TEXT_PROVIDERS`-Wert, greift er (und `getSettings()` wird gar nicht
-gelesen), sonst fällt es auf die Einstellung zurück. Die vier Routen
-(`scenario-plot`, `scenario-arc`, `story-arc-chapters`, `story-chapter-text`)
-nehmen `textProvider` im Body (String ohne Allowlist – die Validierung sitzt in
-`getTextClient`) und reichen ihn durch; die Client-Helfer schicken ihn mit.
-*Gegen den Dev-Server geprüft* (Einstellung `gemini`): Override `openai` →
-`gpt-4o…`, `gemini` → `gemini-flash-lite…`, `mistral` → `mistral-small…`; ohne
-Override die Einstellung. Spielt mit `showModel` zusammen: Der Selektor **wählt**
-den Anbieter, die Anzeige **zeigt**, welches Modell tatsächlich lief.
+**Modell je Story-Erzeugung – zwei Ebenen: Einstellung (persistent) und
+Pro-Lauf-Selektor (transient).** Für die **vier** Story-Erzeugungen
+(Handlungsentwurf, Story Arc, Kapitelableitungen, Story-Erstellung) lässt sich
+das Textmodell **je Erzeugung getrennt** wählen; alle **übrigen**
+Text-Erzeugungen (Beschreibungen, Namen, Szenarien, Ansatzpunkte …) folgen
+weiter dem einen globalen `textProvider`.
+
+**Auflösung des Anbieters** in `getTextClient(providerOverride?, generation?)`
+(genau diese Reihenfolge):
+1. **Pro-Lauf-Override** – ein gültiger `TEXT_PROVIDERS`-Wert im Body gewinnt
+   (und `getSettings()` wird gar nicht gelesen).
+2. **Detaileinstellung** – kein Override **und** `useModelOverrides` an →
+   `storyModels[generation]` (die je-Erzeugung gewählte Einstellung).
+3. **Globaler `textProvider`** – sonst (kein Override, oder Detaileinstellungen
+   aus, oder keine `generation` übergeben). Das ist der Weg **aller anderen**
+   Routen, die `getTextClient()` **ohne** `generation` rufen.
+
+Die vier Routen reichen ihren `generation`-Schlüssel mit
+(`getTextClient(textProvider, "plot"|"arc"|"chapters"|"chapterText")`) und
+nehmen `textProvider` weiter im Body (String ohne Allowlist – die Validierung
+sitzt in `getTextClient`).
+
+**Einstellungsseite – „Modell je Story-Erzeugung"** (Abschnitt unter dem
+„Textmodell"): eine **Master-Checkbox** `useModelOverrides` (Default **aus**)
+*oberhalb* der Detaileinstellungen, darunter **vier Auswahlfelder** (je
+Erzeugung ein `TEXT_PROVIDERS`-Wert), die ausgegraut sind, solange die Checkbox
+aus ist. Aus → alle vier folgen dem globalen `textProvider` (Verhalten wie
+zuvor). Persistiert nach dem `Setting`-Key-Value-Muster **ohne Migration**:
+`useModelOverrides` (Boolean) und je Erzeugung `storyModel.<gen>`; Vorrang
+**gespeichert → Env (`STORY_MODEL_<GEN>`) → globaler `textProvider`**. Der
+Rückfall auf `textProvider` (statt auf einen festen Default) sorgt dafür, dass
+das **Einschalten** der Checkbox ohne weitere Wahl exakt dem globalen Modell
+entspricht – keine Überraschung. `updateSettings` prüft `useModelOverrides`
+explizit gegen `undefined` (sonst verschluckte `if (patch.x)` den Wert `false`,
+wie bei `showModel`) und schreibt von `storyModels` nur die **mitgeschickten**
+Schlüssel (Teil-Update).
+
+**Pro-Lauf-Selektor** (nicht gespeichert, reine Lauf-Parameter): zwei „Modell"-
+Selektoren auf der Szenario-Seite – beim **Handlungsentwurf** (State
+`handlungProvider`) und beim **Story Arc** (State `arcProvider`; Letzterer deckt
+Arc **und** Kapitelableitung **und** Story-Prosa). Ihr Default ist jetzt
+**„Standard (Einstellungen)"** (leerer String `""`, **nicht** mehr aus
+`textProvider` vorbelegt): dann geht **kein** Override in den Body, und die
+Auflösung greift auf die Detaileinstellung bzw. das globale Modell (Stufe 2/3).
+Erst ein **konkreter** Anbieter im Selektor übersteuert – und zwar **nur diesen
+einen Lauf** (Stufe 1). So bleiben beide Ebenen widerspruchsfrei: die
+Einstellung setzt den Standard je Erzeugung, der Selektor weicht für einen
+Einzellauf davon ab.
+
+**Vorbereitet auf weitere Modelle und Erzeugungen:** Ein weiteres **Modell**
+kostet einen Eintrag in `TEXT_PROVIDERS` – alle Selektoren (Einstellungsseite
+**und** Pro-Lauf) ziehen automatisch mit. Eine weitere **Erzeugung** kostet
+einen Eintrag in `STORY_GENERATIONS` (Wert = `generation`-Schlüssel = Suffix des
+`Setting`-Keys) plus die Route, die ihren Schlüssel durchreicht; Menü der
+Einstellungsseite, der Resolver in `openai.ts` und das Lesen/Schreiben in
+`settings.ts` iterieren die Liste.
+
+*Gegen den Dev-Server geprüft:* GET liefert die neuen Felder (`storyModels`
+fällt für unbelegte Erzeugungen auf `textProvider` zurück); voller **und**
+einzelner (Teil-)PATCH persistieren; ein ungültiger Anbieter (`grok`) → **400**.
+Spielt mit `showModel` zusammen: Einstellung/Selektor **wählen** den Anbieter,
+die Anzeige **zeigt**, welches Modell tatsächlich lief.
 
 Das
 Badge (`variantBadge`) zeigt **Erzählform zuerst, dann Ton**, und zwar **auch die
@@ -1634,7 +1679,9 @@ Ergebnis geht in den Formular-State.
   gebaut – sonst verlören alte Sicherungen ihre Portraits. Vor dem Überschreiben entsteht eine `*.bak`-Kopie
   neben `dev.db` (in `.gitignore`).
 - `settings.ts` – serverseitiger Zugriff auf die `Setting`-Tabelle
-  (Key-Value: `imageModel`, `imageQuality`, `textProvider`, `showModel`). **Vorrang:
+  (Key-Value: `imageModel`, `imageQuality`, `textProvider`, `showModel`,
+  `useModelOverrides` und je Story-Erzeugung `storyModel.<gen>` – s. o. „Modell je
+  Story-Erzeugung"). **Vorrang:
   gespeicherter Wert → Env → Default.** Gespeicherte Werte stammen aus
   dem Browser und werden gegen die Allowlists `IMAGE_MODELS` / `IMAGE_QUALITIES`
   / `TEXT_PROVIDERS` geprüft. `textProvider` (`openai` | `gemini`, Env

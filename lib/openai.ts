@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { getSettings } from "./settings";
-import { textProviderSchema } from "./schema";
+import { textProviderSchema, type StoryGeneration } from "./schema";
 
 /**
  * Zentrale OpenAI-Clients. Werden ausschließlich serverseitig (in API-Routen)
@@ -121,21 +121,38 @@ export type TextExtraParams = Record<string, unknown>;
  * **nicht** an OpenAI gehen: `gpt-4o` lehnt ihn ab. Bei OpenAI bleibt das Objekt
  * daher leer.
  *
- * **`providerOverride`** erlaubt einer Route, den Anbieter **pro Aufruf** zu
- * wählen (Modell-Selektor beim Handlungsentwurf bzw. Story Arc), statt der
- * globalen Einstellung zu folgen. Nur ein gültiger Anbieter aus der Allowlist
- * greift; alles andere (leer, unbekannt) fällt auf die gespeicherte Einstellung
- * zurück. Ist der Override gültig, wird `getSettings()` gar nicht erst gelesen.
+ * **Auflösung des Anbieters (in dieser Reihenfolge):**
+ * 1. **`providerOverride`** – ein gültiger Anbieter aus der Allowlist erlaubt
+ *    einer Route, den Anbieter **pro Aufruf** zu wählen (Pro-Lauf-Selektor beim
+ *    Handlungsentwurf bzw. Story Arc). Greift er, wird `getSettings()` gar nicht
+ *    erst gelesen.
+ * 2. **`generation` + Detaileinstellungen** – ist kein Override gesetzt und die
+ *    Einstellung `useModelOverrides` an, gilt der in `storyModels[generation]`
+ *    gewählte Anbieter (Einstellungsseite, „Modell je Story-Erzeugung"). So
+ *    kann jede der vier Story-Erzeugungen ein eigenes Modell nutzen.
+ * 3. **Globaler `textProvider`** – sonst (kein Override, keine
+ *    Detaileinstellungen oder keine `generation`) wie bisher die eine
+ *    Textmodell-Einstellung. Das gilt für **alle übrigen** Text-Erzeugungen.
  */
-export async function getTextClient(providerOverride?: string): Promise<{
+export async function getTextClient(
+  providerOverride?: string,
+  generation?: StoryGeneration,
+): Promise<{
   client: OpenAI;
   model: string;
   extraParams: TextExtraParams;
 }> {
   const übersteuert = textProviderSchema.safeParse(providerOverride);
-  const textProvider = übersteuert.success
-    ? übersteuert.data
-    : (await getSettings()).textProvider;
+  let textProvider;
+  if (übersteuert.success) {
+    textProvider = übersteuert.data;
+  } else {
+    const settings = await getSettings();
+    textProvider =
+      generation && settings.useModelOverrides
+        ? settings.storyModels[generation]
+        : settings.textProvider;
+  }
   if (textProvider === "gemini") {
     return {
       client: getGemini(),

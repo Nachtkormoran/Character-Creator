@@ -140,6 +140,40 @@ export const textProviderSchema = z.enum(
 );
 
 /**
+ * **Die vier Story-Erzeugungen, für die sich das Textmodell einzeln festlegen
+ * lässt** (Einstellungsseite, „Modell je Story-Erzeugung"). Jede entspricht
+ * genau einer Route. Der `value` ist zugleich der `generation`-Schlüssel, den
+ * die Route an `getTextClient` reicht, und der Suffix des `Setting`-Keys
+ * (`storyModel.<value>`).
+ *
+ * **Vorbereitet auf weitere Einträge:** Menüs (Einstellungen), der Resolver in
+ * `openai.ts` und `settings.ts` iterieren diese Liste – eine weitere
+ * Erzeugung kostet nur einen Eintrag hier (und die Route, die ihren `value`
+ * durchreicht). Ebenso genügt für ein weiteres **Modell** ein Eintrag in
+ * `TEXT_PROVIDERS`; alle Selektoren ziehen automatisch mit.
+ */
+export const STORY_GENERATIONS = [
+  { value: "plot", label: "Handlungsentwurf" },
+  { value: "arc", label: "Story Arc" },
+  { value: "chapters", label: "Kapitelableitungen" },
+  { value: "chapterText", label: "Story-Erstellung" },
+] as const;
+
+export type StoryGeneration = (typeof STORY_GENERATIONS)[number]["value"];
+
+/** Anbieter je Story-Erzeugung (vollständige Karte, s. `STORY_GENERATIONS`). */
+export type StoryModels = Record<StoryGeneration, TextProvider>;
+
+/** Teil-Karte fürs Speichern (der Client darf einzelne Einträge ändern). */
+export const storyModelsSchema = z
+  .object(
+    Object.fromEntries(
+      STORY_GENERATIONS.map((g) => [g.value, textProviderSchema]),
+    ) as Record<StoryGeneration, typeof textProviderSchema>,
+  )
+  .partial();
+
+/**
  * Was der Client schicken darf – hier greift die Allowlist.
  */
 export const settingsPatchSchema = z.object({
@@ -150,6 +184,12 @@ export const settingsPatchSchema = z.object({
   // Kapitel-Prosa) das verwendete Modell mit angezeigt wird. Reine Anzeige,
   // Default aus.
   showModel: z.boolean(),
+  // Ob die Detaileinstellungen (Modell je Story-Erzeugung, s. u.) überhaupt
+  // greifen. Aus → alle vier Story-Erzeugungen folgen dem globalen
+  // `textProvider` wie bisher.
+  useModelOverrides: z.boolean(),
+  // Anbieter je Story-Erzeugung; wirkt nur bei `useModelOverrides: true`.
+  storyModels: storyModelsSchema,
 });
 
 /**
@@ -163,6 +203,17 @@ export interface Settings {
   textProvider: TextProvider;
   /** Modell bei den Story-Erzeugungen mit anzeigen (reine Anzeige, Default aus). */
   showModel: boolean;
+  /**
+   * Ob die Detaileinstellungen `storyModels` verwendet werden. Aus (Default) →
+   * alle Story-Erzeugungen folgen dem globalen `textProvider`.
+   */
+  useModelOverrides: boolean;
+  /**
+   * Anbieter je Story-Erzeugung – **vollständige** Karte (fehlende Einträge
+   * füllt `settings.ts` beim Lesen mit dem globalen `textProvider` auf). Wirkt
+   * nur bei `useModelOverrides: true`.
+   */
+  storyModels: StoryModels;
 }
 
 /** Steht das Modell in der Auswahlliste (oder kommt es aus der Env)? */

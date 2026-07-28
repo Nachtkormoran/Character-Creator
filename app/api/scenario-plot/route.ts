@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     }));
 
     const { client: openai, model, extraParams } =
-      await getTextClient(textProvider);
+      await getTextClient(textProvider, "plot");
     const completion = await openai.chat.completions.create({
       model,
       ...extraParams,

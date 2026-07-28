@@ -35,7 +35,6 @@ import {
   DEFAULT_KAPITEL_LAENGE,
   DEFAULT_STORY_FORM,
   DEFAULT_STORY_TONE,
-  DEFAULT_TEXT_PROVIDER,
   DEFAULT_WERKFORM,
   MAX_NEUE_PLOT_PERSONEN,
   MAX_PLOT_VARIANTS,
@@ -215,17 +214,17 @@ export default function ScenarioDetailPage({
    */
   const [showModel, setShowModel] = useState(false);
   /**
-   * Modell-Anbieter je Erzeugung – **pro Aufruf** wählbar (Selektor), Default ist
-   * der in den Einstellungen gewählte Anbieter (in der Settings-Ladung unten
-   * gesetzt). `handlungProvider` steuert den Handlungsentwurf, `arcProvider` den
+   * Modell-Anbieter je Erzeugung – **pro Aufruf** wählbar (Selektor). Der
+   * leere String `""` bedeutet **„Standard laut Einstellungen"**: dann greift
+   * die Wahl auf der Einstellungsseite (Modell je Story-Erzeugung, sonst das
+   * globale Textmodell). Ein konkreter Anbieter übersteuert das nur für diesen
+   * Lauf. `handlungProvider` steuert den Handlungsentwurf, `arcProvider` den
    * Story Arc **samt** Kapitelableitung und Story-Erzeugung. Nicht gespeichert.
    */
-  const [handlungProvider, setHandlungProvider] = useState<TextProvider>(
-    DEFAULT_TEXT_PROVIDER,
+  const [handlungProvider, setHandlungProvider] = useState<TextProvider | "">(
+    "",
   );
-  const [arcProvider, setArcProvider] = useState<TextProvider>(
-    DEFAULT_TEXT_PROVIDER,
-  );
+  const [arcProvider, setArcProvider] = useState<TextProvider | "">("");
   /**
    * **Transiente** Modell-Anzeige für die Kapitel-Ableitung je Station (Index →
    * Modellname). Anders als bei Entwurf/Arc nicht in den Metadaten persistiert –
@@ -790,9 +789,8 @@ export default function ScenarioDetailPage({
     getSettings()
       .then((s) => {
         setShowModel(s.showModel);
-        // Selektoren auf den eingestellten Anbieter vorbelegen (Default).
-        setHandlungProvider(s.textProvider);
-        setArcProvider(s.textProvider);
+        // Die Selektoren bleiben auf „Standard" (""), damit die auf der
+        // Einstellungsseite gewählten Modelle je Story-Erzeugung greifen.
       })
       .catch(() => {});
   }, []);
@@ -1986,21 +1984,23 @@ export default function ScenarioDetailPage({
               </select>
             </label>
             {/*
-              Modell-Anbieter **nur für diesen Entwurf** – Default ist der in den
-              Einstellungen gewählte (beim Laden vorbelegt). Übersteuert die
-              globale Einstellung ausschließlich für „✨ Neu erzeugen" hier.
+              Modell-Anbieter **nur für diesen Entwurf**. „Standard" (Default)
+              folgt der Einstellungsseite (Modell je Story-Erzeugung bzw. das
+              globale Textmodell); ein konkreter Anbieter übersteuert das nur für
+              „✨ Neu erzeugen" hier.
             */}
             <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70">
               <span>Modell:</span>
               <select
                 value={handlungProvider}
                 onChange={(e) =>
-                  setHandlungProvider(e.target.value as TextProvider)
+                  setHandlungProvider(e.target.value as TextProvider | "")
                 }
                 disabled={saving || generatingField !== null}
-                title="Welches Textmodell diesen Handlungsentwurf erzeugt. Default ist das in den Einstellungen gewählte Modell; die Wahl hier gilt nur für den Entwurf und wird nicht gespeichert."
+                title="Welches Textmodell diesen Handlungsentwurf erzeugt. „Standard&quot; folgt der Einstellungsseite; die Wahl hier gilt nur für den Entwurf und wird nicht gespeichert."
                 className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
               >
+                <option value="">Standard (Einstellungen)</option>
                 {TEXT_PROVIDERS.map((p) => (
                   <option key={p.value} value={p.value}>
                     {p.label}

@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     const { min, max } = kapitelSpanne(anzahl);
 
     const { client: openai, model, extraParams } =
-      await getTextClient(textProvider);
+      await getTextClient(textProvider, "chapters");
     const prompt = buildStoryArcChaptersPrompt(stufe, {
       kreativ,
       sparks: kreativ ? randomSparks(1, 2) : undefined,

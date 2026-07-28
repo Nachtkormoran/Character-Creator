@@ -136,7 +136,7 @@ export async function POST(request: Request) {
     }));
 
     const { client: openai, model, extraParams } =
-      await getTextClient(textProvider);
+      await getTextClient(textProvider, "arc");
     // Bei „kreativ" ein paar zufällige Impulse ziehen – jeder Lauf andere.
     const sparks = kreativ ? randomSparks() : undefined;
     const prompt = buildStoryArcPrompt(
