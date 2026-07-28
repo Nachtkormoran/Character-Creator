@@ -35,6 +35,7 @@ import {
   DEFAULT_KAPITEL_LAENGE,
   DEFAULT_STORY_FORM,
   DEFAULT_STORY_TONE,
+  DEFAULT_TEXT_PROVIDER,
   DEFAULT_WERKFORM,
   MAX_NEUE_PLOT_PERSONEN,
   MAX_PLOT_VARIANTS,
@@ -42,6 +43,7 @@ import {
   SCENARIO_LABELS,
   STORY_FORMS,
   STORY_TONES,
+  TEXT_PROVIDERS,
   normalizeScenarioDetails,
   variantBadge,
   type ArcFormat,
@@ -50,6 +52,7 @@ import {
   type KapitelLaenge,
   type StoryForm,
   type StoryTone,
+  type TextProvider,
   type Werkform,
   type GeneratedCharacter,
   type PlotPerson,
@@ -86,6 +89,7 @@ const LEER_META: VariantMeta = {
   favorit: false,
   quelle: "",
   modell: "",
+  werkform: "",
 };
 
 /**
@@ -210,6 +214,18 @@ export default function ScenarioDetailPage({
    * nur die Anzeige, nicht die Erzeugung. Default aus, bis die Einstellung geladen ist.
    */
   const [showModel, setShowModel] = useState(false);
+  /**
+   * Modell-Anbieter je Erzeugung – **pro Aufruf** wählbar (Selektor), Default ist
+   * der in den Einstellungen gewählte Anbieter (in der Settings-Ladung unten
+   * gesetzt). `handlungProvider` steuert den Handlungsentwurf, `arcProvider` den
+   * Story Arc **samt** Kapitelableitung und Story-Erzeugung. Nicht gespeichert.
+   */
+  const [handlungProvider, setHandlungProvider] = useState<TextProvider>(
+    DEFAULT_TEXT_PROVIDER,
+  );
+  const [arcProvider, setArcProvider] = useState<TextProvider>(
+    DEFAULT_TEXT_PROVIDER,
+  );
   /**
    * **Transiente** Modell-Anzeige für die Kapitel-Ableitung je Station (Index →
    * Modellname). Anders als bei Entwurf/Arc nicht in den Metadaten persistiert –
@@ -726,6 +742,7 @@ export default function ScenarioDetailPage({
           handlungNeuePersonen,
           handlungNeuePersonenWunsch,
           handlungForm,
+          handlungProvider,
         );
         // Kurzer Titel für die Reiter-Leiste. Scheitert der Aufruf, bleibt er
         // leer – der Reiter zeigt dann „Entwurf N", der Entwurf entsteht trotzdem.
@@ -748,6 +765,8 @@ export default function ScenarioDetailPage({
             favorit: false,
             quelle: "",
             modell: model,
+            // Handlungsentwürfe kennen keine Werkform – leer.
+            werkform: "",
           },
         ]);
       } else {
@@ -769,7 +788,12 @@ export default function ScenarioDetailPage({
   // Scheitert der Aufruf, bleibt es beim Default aus.
   useEffect(() => {
     getSettings()
-      .then((s) => setShowModel(s.showModel))
+      .then((s) => {
+        setShowModel(s.showModel);
+        // Selektoren auf den eingestellten Anbieter vorbelegen (Default).
+        setHandlungProvider(s.textProvider);
+        setArcProvider(s.textProvider);
+      })
       .catch(() => {});
   }, []);
 
@@ -1080,6 +1104,7 @@ export default function ScenarioDetailPage({
         form: arcParams.form,
         // Nur die **aktiven** Figuren (reiner Text); sind keine aktiv, leer.
         figuren: aktiveFiguren(details.figuren),
+        textProvider: arcProvider,
       });
       // Titel für die Reiter-Leiste – aus einer Zusammenfassung der Stationen
       // (Titel + Beschreibung). Scheitert er, bleibt er leer („Arc N").
@@ -1109,6 +1134,8 @@ export default function ScenarioDetailPage({
           favorit: false,
           quelle,
           modell: model,
+          // Werkform zum Erzeugungszeitpunkt an der Arc-Variante festhalten.
+          werkform: arcParams.werkform,
         },
       ]);
     } catch (e) {
@@ -1142,6 +1169,7 @@ export default function ScenarioDetailPage({
           anzahl: arcParams.kapitelAnzahl,
           ton: arcParams.ton,
           form: arcParams.form,
+          textProvider: arcProvider,
         },
       );
       setKapitelModell((m) => ({ ...m, [stufeIndex]: model }));
@@ -1198,6 +1226,7 @@ export default function ScenarioDetailPage({
           form: arcParams.form,
           kapitelLaenge: arcParams.kapitelLaenge,
           werkform: arcParams.werkform,
+          textProvider: arcProvider,
         },
       );
       setStoryTextModell((m) => ({
@@ -1956,6 +1985,29 @@ export default function ScenarioDetailPage({
                 ))}
               </select>
             </label>
+            {/*
+              Modell-Anbieter **nur für diesen Entwurf** – Default ist der in den
+              Einstellungen gewählte (beim Laden vorbelegt). Übersteuert die
+              globale Einstellung ausschließlich für „✨ Neu erzeugen" hier.
+            */}
+            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70">
+              <span>Modell:</span>
+              <select
+                value={handlungProvider}
+                onChange={(e) =>
+                  setHandlungProvider(e.target.value as TextProvider)
+                }
+                disabled={saving || generatingField !== null}
+                title="Welches Textmodell diesen Handlungsentwurf erzeugt. Default ist das in den Einstellungen gewählte Modell; die Wahl hier gilt nur für den Entwurf und wird nicht gespeichert."
+                className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              >
+                {TEXT_PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           {/*
@@ -2168,6 +2220,8 @@ export default function ScenarioDetailPage({
         showModel={showModel}
         kapitelModell={kapitelModell}
         storyTextModell={storyTextModell}
+        provider={arcProvider}
+        onProviderChange={setArcProvider}
       />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-4 dark:border-white/10">

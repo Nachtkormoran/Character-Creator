@@ -55,6 +55,9 @@ const bodySchema = z.object({
   // Erzählform (Krimi, Liebe, …) – als String ohne Allowlist (unbekannt =
   // kein Erzählform-Block, `formHint` gibt "").
   form: z.string().trim().max(40).optional().default(""),
+  // Modell-Anbieter für **diesen** Aufruf (Selektor beim Handlungsentwurf).
+  // Leer/unbekannt → die Einstellung greift (s. `getTextClient`).
+  textProvider: z.string().trim().max(40).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -79,6 +82,7 @@ export async function POST(request: Request) {
       neuePersonen,
       neuePersonenWunsch,
       form,
+      textProvider,
     } = parsed.data;
 
     const rows = await prisma.character.findMany({
@@ -124,7 +128,8 @@ export async function POST(request: Request) {
       isProtagonist: r.isProtagonist,
     }));
 
-    const { client: openai, model, extraParams } = await getTextClient();
+    const { client: openai, model, extraParams } =
+      await getTextClient(textProvider);
     const completion = await openai.chat.completions.create({
       model,
       ...extraParams,

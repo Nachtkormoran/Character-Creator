@@ -61,6 +61,9 @@ const bodySchema = z.object({
   kapitelLaenge: z.string().trim().max(40).optional().default(""),
   // Werkform: prägt den Prosastil (verdichtet ↔ ausladend).
   werkform: z.string().trim().max(40).optional().default(""),
+  // Modell-Anbieter für **diesen** Aufruf (Selektor beim Story Arc – gilt auch
+  // für die Story-Erzeugung). Leer/unbekannt → die Einstellung greift.
+  textProvider: z.string().trim().max(40).optional().default(""),
 });
 
 /** Zerlegt einen Namen in kleingeschriebene Wortteile (für den Abgleich). */
@@ -94,6 +97,7 @@ export async function POST(request: Request) {
       kreativ,
       kapitelLaenge,
       werkform,
+      textProvider,
     } = parsed.data;
 
     // Der Index muss in die Liste zeigen.
@@ -150,7 +154,8 @@ export async function POST(request: Request) {
       ? `${systemBasis} Dein Ton durchzieht die ganze Szene, auch die Beschreibungen: ${hint}`
       : systemBasis;
 
-    const { client: openai, model, extraParams } = await getTextClient();
+    const { client: openai, model, extraParams } =
+      await getTextClient(textProvider);
     const completion = await openai.chat.completions.create({
       model,
       ...extraParams,

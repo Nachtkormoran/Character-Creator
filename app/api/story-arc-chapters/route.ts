@@ -49,6 +49,9 @@ const bodySchema = z.object({
   ton: z.string().trim().max(40).optional().default(""),
   // Erzählform (Krimi, Liebe, …) – als String ohne Allowlist.
   form: z.string().trim().max(40).optional().default(""),
+  // Modell-Anbieter für **diesen** Aufruf (Selektor beim Story Arc – gilt auch
+  // für die Kapitelableitung). Leer/unbekannt → die Einstellung greift.
+  textProvider: z.string().trim().max(40).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -62,10 +65,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const { stufe, kreativ, anzahl, ton, form } = parsed.data;
+    const { stufe, kreativ, anzahl, ton, form, textProvider } = parsed.data;
     const { min, max } = kapitelSpanne(anzahl);
 
-    const { client: openai, model, extraParams } = await getTextClient();
+    const { client: openai, model, extraParams } =
+      await getTextClient(textProvider);
     const prompt = buildStoryArcChaptersPrompt(stufe, {
       kreativ,
       sparks: kreativ ? randomSparks(1, 2) : undefined,

@@ -764,6 +764,13 @@ export interface VariantMeta {
    */
   quelle: string;
   /**
+   * **Werkform** (`WERKFORMEN`-Wert, nur bei Story Arcs): die zum
+   * Erzeugungszeitpunkt gewählte Werkform (`kurzgeschichte`/`novelle`/`roman`/
+   * `frei`). Bei Handlungsentwurf-Varianten leer. Wie `form`/`ton` ein
+   * Lauf-Parameter, der hier an der Variante festgehalten wird.
+   */
+  werkform: string;
+  /**
    * **Verwendetes Textmodell** zum Erzeugungszeitpunkt (z. B. `gpt-4o` oder
    * `mistral-small-latest`). Wird nur angezeigt, wenn die Einstellung
    * `showModel` an ist. Leer bei Altbeständen und von Hand angelegten Varianten.
@@ -778,6 +785,7 @@ export const variantMetaSchema = z.object({
   favorit: z.boolean().optional().default(false),
   quelle: z.string().trim().max(200).optional().default(""),
   modell: z.string().trim().max(120).optional().default(""),
+  werkform: z.string().trim().max(40).optional().default(""),
 });
 
 /**
@@ -796,6 +804,7 @@ export function normalizeMetaList(raw: unknown, laenge: number): VariantMeta[] {
       favorit: typeof o.favorit === "boolean" ? o.favorit : false,
       quelle: typeof o.quelle === "string" ? o.quelle : "",
       modell: typeof o.modell === "string" ? o.modell : "",
+      werkform: typeof o.werkform === "string" ? o.werkform : "",
     };
   });
 }
@@ -1217,6 +1226,16 @@ export const DEFAULT_WERKFORM: Werkform = "frei";
 /** Der Prosastil-Hinweis einer Werkform (leer bei `frei`/unbekannt). */
 export function werkformStil(value: string): string {
   return WERKFORMEN.find((w) => w.value === value)?.stil ?? "";
+}
+
+/**
+ * Anzeige-Label einer Werkform für die Arc-Reiter. Bewusst **ohne** die Dashes
+ * des Auswahl-Labels („— frei —") – für die Reiter-Leiste genügt das nackte Wort.
+ * Leer bei unbekanntem Wert (dann zeigt der Reiter nichts).
+ */
+export function werkformLabel(value: string): string {
+  if (value === "frei") return "frei";
+  return WERKFORMEN.find((w) => w.value === value)?.label ?? "";
 }
 
 /**

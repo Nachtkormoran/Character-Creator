@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { getSettings } from "./settings";
+import { textProviderSchema } from "./schema";
 
 /**
  * Zentrale OpenAI-Clients. Werden ausschließlich serverseitig (in API-Routen)
@@ -119,13 +120,22 @@ export type TextExtraParams = Record<string, unknown>;
  * zugleich Token (wichtig fürs Minuten-Limit im Free-Tier). Der Parameter darf
  * **nicht** an OpenAI gehen: `gpt-4o` lehnt ihn ab. Bei OpenAI bleibt das Objekt
  * daher leer.
+ *
+ * **`providerOverride`** erlaubt einer Route, den Anbieter **pro Aufruf** zu
+ * wählen (Modell-Selektor beim Handlungsentwurf bzw. Story Arc), statt der
+ * globalen Einstellung zu folgen. Nur ein gültiger Anbieter aus der Allowlist
+ * greift; alles andere (leer, unbekannt) fällt auf die gespeicherte Einstellung
+ * zurück. Ist der Override gültig, wird `getSettings()` gar nicht erst gelesen.
  */
-export async function getTextClient(): Promise<{
+export async function getTextClient(providerOverride?: string): Promise<{
   client: OpenAI;
   model: string;
   extraParams: TextExtraParams;
 }> {
-  const { textProvider } = await getSettings();
+  const übersteuert = textProviderSchema.safeParse(providerOverride);
+  const textProvider = übersteuert.success
+    ? übersteuert.data
+    : (await getSettings()).textProvider;
   if (textProvider === "gemini") {
     return {
       client: getGemini(),

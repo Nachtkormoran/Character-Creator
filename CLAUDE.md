@@ -824,7 +824,7 @@ statt bloß „Entwurf 1/2/3", die einander nicht unterscheidbar waren. Das gilt
 **für Handlungsentwurf und Story Arc** gleich (`StoryArcSection` bekommt die
 Arc-Metadaten als Prop). Die Daten liegen in einer **parallelen `meta`-Liste**
 je Variantensatz: `plotVariants`/`storyArcVariants` heißen jetzt
-`{ items, aktiv, meta }` mit `meta[i] = VariantMeta { titel, form, ton, favorit, quelle, modell }`,
+`{ items, aktiv, meta }` mit `meta[i] = VariantMeta { titel, form, ton, favorit, quelle, modell, werkform }`,
 **index-gleich** zu `items`. Bewusst parallel und **nicht** in die Einträge
 eingebettet: So bleiben `plotVariants.items` ein `string[]` und
 `storyArcVariants.items` ein `StoryArc[]` – Altbestände **und alte
@@ -865,6 +865,15 @@ Beim Ableiten hält der Arc das **Label des aktiven Entwurfs** als Schnappschuss
 bleibt am Arc stehen, woraus er entstand. Nur bei Arcs (bei Handlungsentwürfen
 leer). Altbestände ohne `quelle` zeigen keinen Quellhinweis.
 
+**Story-Arc-Reiter zeigen zusätzlich die gewählte Werkform** (`meta[…].werkform`):
+Beim Ableiten wird `arcParams.werkform` an der Variante festgehalten (wie `form`/
+`ton`/`quelle`) und auf der zweiten Reiter-Zeile eingeblendet – aber **nur eine
+konkrete Form** (Kurzgeschichte/Novelle/Roman) über `werkformLabel`; `frei` (keine
+Werkform) und Altbestände (leer) bleiben draußen, damit der Reiter ruhig bleibt.
+`werkformLabel` gibt bewusst das nackte Wort ohne die Auswahl-Dashes („— frei —").
+Nur bei Arcs (Handlungsentwürfe setzen `werkform: ""`). Rückwärtskompatibel wie
+die übrigen `meta`-Felder (`normalizeMetaList` füllt fehlende auf `""`).
+
 **Story Arcs kopieren** (`arcKopieren` / `onArcKopieren`, Knopf „⧉ Kopieren" in der
 Arc-Reiter-Leiste): eine **tiefe Kopie** des aktiven Arcs (`JSON.parse(JSON.stringify)`,
 samt Stationen und Kapiteln), angehängt und aktiv geschaltet – Titel + „(Kopie)",
@@ -895,6 +904,24 @@ Die Einstellung folgt dem `Setting`-Key-Value-Muster (Key `showModel`, Vorrang
 gespeichert → Env `SHOW_MODEL` → Default `false`, **keine Migration**). `updateSettings`
 prüft den Boolean **explizit auf `undefined`**, sonst verschluckte ein `if (patch.x)`
 den Wert `false`.
+
+**Modell-Selektor je Erzeugung** (Anbieter **pro Aufruf** wählen, statt der
+globalen Einstellung zu folgen): Zwei „Modell"-Selektoren – einer beim
+**Handlungsentwurf** (neben Erzählform/Ton, State `handlungProvider`), einer beim
+**Story Arc** (in den Arc-Parametern, State `arcProvider`); Letzterer gilt für
+Arc **und** Kapitelableitung **und** Story-Prosa. Beide werden beim Laden mit dem
+in den Einstellungen gewählten `textProvider` **vorbelegt** (Default) und sind
+**nicht gespeichert** (reine Lauf-Parameter, wie Ton/Erzählform). Technisch:
+`getTextClient(providerOverride?)` nimmt einen optionalen Anbieter – ist er ein
+gültiger `TEXT_PROVIDERS`-Wert, greift er (und `getSettings()` wird gar nicht
+gelesen), sonst fällt es auf die Einstellung zurück. Die vier Routen
+(`scenario-plot`, `scenario-arc`, `story-arc-chapters`, `story-chapter-text`)
+nehmen `textProvider` im Body (String ohne Allowlist – die Validierung sitzt in
+`getTextClient`) und reichen ihn durch; die Client-Helfer schicken ihn mit.
+*Gegen den Dev-Server geprüft* (Einstellung `gemini`): Override `openai` →
+`gpt-4o…`, `gemini` → `gemini-flash-lite…`, `mistral` → `mistral-small…`; ohne
+Override die Einstellung. Spielt mit `showModel` zusammen: Der Selektor **wählt**
+den Anbieter, die Anzeige **zeigt**, welches Modell tatsächlich lief.
 
 Das
 Badge (`variantBadge`) zeigt **Erzählform zuerst, dann Ton**, und zwar **auch die

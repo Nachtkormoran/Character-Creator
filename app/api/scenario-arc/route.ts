@@ -69,6 +69,9 @@ const bodySchema = z.object({
   // Gefüllt: sie treten als zusätzliche Besetzung hinzu und dürfen die
   // Stationen-Namen tragen. Leer = wie bisher. Gedeckelt wie das Feld selbst.
   figuren: z.string().trim().max(3000).optional().default(""),
+  // Modell-Anbieter für **diesen** Aufruf (Selektor beim Story Arc – gilt für
+  // Arc, Kapitel und Prosa). Leer/unbekannt → die Einstellung greift.
+  textProvider: z.string().trim().max(40).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -93,6 +96,7 @@ export async function POST(request: Request) {
       ton,
       form,
       figuren,
+      textProvider,
     } = parsed.data;
     const anzahl = arcStationen(laenge);
 
@@ -131,7 +135,8 @@ export async function POST(request: Request) {
       isProtagonist: r.isProtagonist,
     }));
 
-    const { client: openai, model, extraParams } = await getTextClient();
+    const { client: openai, model, extraParams } =
+      await getTextClient(textProvider);
     // Bei „kreativ" ein paar zufällige Impulse ziehen – jeder Lauf andere.
     const sparks = kreativ ? randomSparks() : undefined;
     const prompt = buildStoryArcPrompt(

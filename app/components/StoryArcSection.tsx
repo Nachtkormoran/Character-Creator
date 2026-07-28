@@ -11,8 +11,10 @@ import {
   KAPITEL_LAENGEN,
   STORY_FORMS,
   STORY_TONES,
+  TEXT_PROVIDERS,
   WERKFORMEN,
   variantBadge,
+  werkformLabel,
   werkformPresets,
   type ArcFormat,
   type ArcLength,
@@ -22,6 +24,7 @@ import {
   type StoryArc,
   type StoryForm,
   type StoryTone,
+  type TextProvider,
   type VariantMeta,
   type Werkform,
 } from "@/lib/schema";
@@ -104,6 +107,8 @@ export function StoryArcSection({
   showModel,
   kapitelModell,
   storyTextModell,
+  provider,
+  onProviderChange,
 }: {
   storyArc: StoryArc;
   onChange: (arc: StoryArc) => void;
@@ -183,6 +188,12 @@ export function StoryArcSection({
   kapitelModell?: Record<number, string>;
   /** Transiente Modell-Anzeige der Kapitel-Prosa, Schlüssel `"stufe-kapitel"`. */
   storyTextModell?: Record<string, string>;
+  /**
+   * Modell-Anbieter (`TEXT_PROVIDERS`-Wert) für Arc, Kapitel und Prosa – **pro
+   * Aufruf** wählbar; Default ist der in den Einstellungen gewählte.
+   */
+  provider: TextProvider;
+  onProviderChange: (p: TextProvider) => void;
 }) {
   const stufen = storyArc.stufen;
   const hatArc = stufen.length > 0;
@@ -423,6 +434,27 @@ export function StoryArcSection({
               ))}
             </select>
           </label>
+          {/*
+            Modell-Anbieter **für diesen Arc** – gilt für das Ableiten des Arcs,
+            die Kapitelableitung und die Story-Erzeugung. Default ist das in den
+            Einstellungen gewählte Modell (beim Laden vorbelegt); nicht gespeichert.
+          */}
+          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+            Modell:
+            <select
+              value={provider}
+              onChange={(e) => onProviderChange(e.target.value as TextProvider)}
+              disabled={disabled || busy}
+              title="Welches Textmodell Story Arc, Kapitel und Story-Prosa erzeugt. Default ist das in den Einstellungen gewählte Modell; die Wahl hier gilt nur für diese Erzeugungen und wird nicht gespeichert."
+              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+            >
+              {TEXT_PROVIDERS.map((p) => (
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
@@ -450,16 +482,30 @@ export function StoryArcSection({
               ton: "",
               favorit: false,
               quelle: "",
+              modell: "",
+              werkform: "",
             };
             const titel = meta.titel.trim() || `Arc ${i + 1}`;
             const badge = variantBadge(meta);
+            // Werkform zum Erzeugungszeitpunkt – nur eine **konkrete** Form
+            // (Kurzgeschichte/Novelle/Roman) kommt in den Reiter; „frei" (keine
+            // Werkform) und Altbestände (leer) bleiben draußen.
+            const werkform =
+              meta.werkform && meta.werkform !== "frei"
+                ? werkformLabel(meta.werkform)
+                : "";
             const stationen = `${arc.stufen.length} ${
               arc.stufen.length === 1 ? "Station" : "Stationen"
             }`;
             // Quell-Handlungsentwurf (Schnappschuss vom Ableiten); leer bei
             // Altbeständen. Kommt auf die zweite Zeile des Reiters.
             const quelle = meta.quelle.trim();
-            const zeile2 = [badge, stationen, quelle && `aus „${quelle}“`]
+            const zeile2 = [
+              badge,
+              werkform,
+              stationen,
+              quelle && `aus „${quelle}“`,
+            ]
               .filter(Boolean)
               .join(" · ");
             return (

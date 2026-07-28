@@ -835,6 +835,11 @@ export function generateScenarioPlot(
   neuePersonenWunsch = "",
   /** Erzählform (`STORY_FORMS`-Wert). Leer/`allround` = gemischt wie bisher. */
   form = "",
+  /**
+   * Modell-Anbieter für **diesen** Aufruf (`TEXT_PROVIDERS`-Wert). Leer =
+   * die Einstellung greift (Standard).
+   */
+  textProvider = "",
 ) {
   return postJson<{ handlung: string; characters: number; model: string }>(
     "/api/scenario-plot",
@@ -849,6 +854,7 @@ export function generateScenarioPlot(
       neuePersonen,
       neuePersonenWunsch,
       form,
+      textProvider,
     },
   );
 }
@@ -897,6 +903,8 @@ export function generateStoryArc(
      * Besetzung in den Arc eingehen. Leer = wie bisher.
      */
     figuren?: string;
+    /** Modell-Anbieter für diesen Aufruf (`TEXT_PROVIDERS`). Leer = Einstellung. */
+    textProvider?: string;
   } = {},
 ) {
   return postJson<{ storyArc: StoryArc; model: string }>("/api/scenario-arc", {
@@ -923,6 +931,8 @@ export function generateStoryArcChapters(
     ton?: string;
     /** Erzählform (`STORY_FORMS`-Wert). Leer/`allround` = ohne Erzählform-Block. */
     form?: string;
+    /** Modell-Anbieter für diesen Aufruf (`TEXT_PROVIDERS`). Leer = Einstellung. */
+    textProvider?: string;
   } = {},
 ) {
   return postJson<{ kapitel: Kapitel[]; model: string }>("/api/story-arc-chapters", {
@@ -956,6 +966,8 @@ export function generateChapterText(
     kapitelLaenge?: string;
     /** Werkform (`WERKFORMEN`-Wert) – prägt den Prosastil. */
     werkform?: string;
+    /** Modell-Anbieter für diesen Aufruf (`TEXT_PROVIDERS`). Leer = Einstellung. */
+    textProvider?: string;
   } = {},
 ) {
   return postJson<{ text: string; model: string }>("/api/story-chapter-text", {
