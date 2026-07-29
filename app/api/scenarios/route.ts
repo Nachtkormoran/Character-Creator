@@ -22,8 +22,10 @@ const createSchema = z.object({
 export async function GET() {
   const rows = await prisma.scenario.findMany({
     orderBy: { name: "asc" },
-    omit: { imageData: true },
-    include: { _count: { select: { characters: true } } },
+    include: {
+      images: { orderBy: { createdAt: "desc" }, omit: { imageData: true } },
+      _count: { select: { characters: true } },
+    },
   });
   return NextResponse.json({ scenarios: rows.map(serializeScenario) });
 }
@@ -46,8 +48,10 @@ export async function POST(request: Request) {
           ? JSON.stringify(parsed.data.details)
           : null,
       },
-      omit: { imageData: true },
-      include: { _count: { select: { characters: true } } },
+      include: {
+        images: { orderBy: { createdAt: "desc" }, omit: { imageData: true } },
+        _count: { select: { characters: true } },
+      },
     });
     return NextResponse.json({ scenario: serializeScenario(row) });
   } catch (err) {

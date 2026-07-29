@@ -74,6 +74,7 @@ import {
 import {
   primaryImage,
   type StoredCharacter,
+  type StoredImage,
   type StoredScenario,
 } from "@/lib/serialize";
 import { AddCharacterToScenarioModal } from "../../components/AddCharacterToScenarioModal";
@@ -385,13 +386,12 @@ export default function ScenarioDetailPage({
   // -------------------------------------------------------------------------
 
   /**
-   * Das **gespeicherte** Bild als Thumbnail (oder `null`). Die gesamte
-   * Bild-Bedienung (Erzeugen, Hochladen, Löschen, Exportieren, Vollbild) liegt
-   * in `ScenarioImageModal`; die Detailseite zeigt nur das Thumbnail und den
-   * Knopf, der die Ansicht öffnet. Das Modal meldet ein geändertes Bild über
-   * `onChange` zurück, damit das Thumbnail hier aktuell bleibt.
+   * Die **gespeicherten** Weltbilder (ohne Originale). Wie beim Charakter kann
+   * ein Szenario mehrere Bilder haben; das Primärbild zeigt die Detailseite an,
+   * die gesamte Bedienung liegt in `ScenarioImageModal`. Das Modal meldet das
+   * geänderte Szenario über `onChange` zurück, damit die Liste hier aktuell bleibt.
    */
-  const [thumbnail, setThumbnail] = useState<string | null>(null);
+  const [bilder, setBilder] = useState<StoredImage[]>([]);
   const [bildModalOffen, setBildModalOffen] = useState(false);
 
   /** Ob das „Charakter hinzufügen"-Modal (bestehende Figur zuordnen) offen ist. */
@@ -875,7 +875,7 @@ export default function ScenarioDetailPage({
         setArcAktiv(scenario.storyArcVariants.aktiv);
         setArcMeta(scenario.storyArcVariants.meta);
         setCharacters(characters);
-        setThumbnail(scenario.thumbnail);
+        setBilder(scenario.images);
         setSaved(
           JSON.stringify({
             name: scenario.name,
@@ -1066,6 +1066,8 @@ export default function ScenarioDetailPage({
       },
     }) !== saved;
   const nameValid = name.trim().length > 0;
+  // Das anzuzeigende Weltbild – das Primärbild (wie beim Charakter abgeleitet).
+  const weltbildVorschau = primaryImage({ images: bilder })?.thumbnail ?? null;
   // Für die Reiter-Leiste: die Entwürfe im aktuellen (womöglich ungespeicherten)
   // Stand. Die Leiste erscheint erst ab zwei – bei einem gibt es nichts zu
   // wählen, und der Handlungsentwurf steht ohnehin im Feld darunter.
@@ -1484,9 +1486,9 @@ export default function ScenarioDetailPage({
           },
         },
         mitCharakteren ? characters : [],
-        // Das Weltbild ist unabhängig vom bearbeiteten Stand (eigene Route,
-        // sofort gespeichert) – gibt es ein Thumbnail, gibt es ein Original.
-        { scenarioId: id, vorhanden: !!thumbnail },
+        // Die Weltbilder sind unabhängig vom bearbeiteten Stand (eigene Route,
+        // sofort gespeichert) – `buildScenarioFile` holt je Bild das Original.
+        { scenarioId: id, images: bilder },
         // Ohne Häkchen „mit Bildern" bleibt Weltbild + Charakter-Bilder weg.
         !mitBildern,
       );
@@ -1655,17 +1657,21 @@ export default function ScenarioDetailPage({
             Bild, kein Bedienfeld.
           */}
           <div className="order-1 flex flex-col gap-3 md:order-2">
-            <span className="text-sm font-medium">Weltbild</span>
+            <span className="text-sm font-medium">
+              {bilder.length > 1 ? `Weltbilder (${bilder.length})` : "Weltbild"}
+            </span>
 
             <button
               type="button"
               onClick={() => setBildModalOffen(true)}
-              title={thumbnail ? "Weltbild verwalten" : "Weltbild hinzufügen"}
+              title={
+                bilder.length > 0 ? "Weltbilder verwalten" : "Weltbild hinzufügen"
+              }
               className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] transition hover:border-black/25 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/25"
             >
-              {thumbnail ? (
+              {weltbildVorschau ? (
                 <Image
-                  src={thumbnail}
+                  src={weltbildVorschau}
                   alt={`Weltbild von ${name}`}
                   fill
                   sizes="240px"
@@ -1677,6 +1683,11 @@ export default function ScenarioDetailPage({
                   🏞️
                 </div>
               )}
+              {bilder.length > 1 && (
+                <span className="absolute top-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
+                  +{bilder.length - 1}
+                </span>
+              )}
             </button>
 
             <button
@@ -1684,7 +1695,9 @@ export default function ScenarioDetailPage({
               onClick={() => setBildModalOffen(true)}
               className="w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
             >
-              {thumbnail ? "🖼️ Weltbild verwalten" : "🏞️ Weltbild hinzufügen"}
+              {bilder.length > 0
+                ? "🖼️ Weltbilder verwalten"
+                : "🏞️ Weltbild hinzufügen"}
             </button>
           </div>
         </div>
@@ -2512,8 +2525,8 @@ export default function ScenarioDetailPage({
           scenarioId={id}
           name={name}
           details={details}
-          thumbnail={thumbnail}
-          onChange={setThumbnail}
+          images={bilder}
+          onChange={(s) => setBilder(s.images)}
           onClose={() => setBildModalOffen(false)}
         />
       )}

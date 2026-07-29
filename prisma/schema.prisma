@@ -68,18 +68,13 @@ model Scenario {
   // Optional – Altbestände haben nur den einen `storyArc`.
   storyArcVariants String?
 
-  // **Ein** Weltbild je Szenario (Establishing-Shot des Ortes, ohne Figuren) –
-  // anders als beim Charakter, der beliebig viele Bilder mit Primärmarkierung
-  // hat. Ein Szenario ist eine Stimmung, kein Steckbrief; ein repräsentatives
-  // Bild genügt, und die Mehrbild-Maschinerie (eigene Tabelle, `isPrimary`)
-  // wäre hier Aufwand ohne Gewinn. Deshalb direkt als Spalten, wie der
-  // Charakter es vor der Mehrbild-Umstellung hielt.
-  //
-  // `imageData` ist das Original (~2 MB Base64), `thumbnail` die kleine
-  // WebP-Fassung für die Anzeige. **Keine Listen-Route liefert `imageData`
-  // mit** (`omit`) – dieselbe Regel wie bei `CharacterImage`.
-  imageData  String?
-  thumbnail  String?
+  // Beliebig viele Weltbilder je Szenario (Establishing-Shots des Ortes, ohne
+  // Figuren); genau eines davon ist das Primärbild. Analog zu den
+  // Charakter-Bildern (`CharacterImage`) in eine eigene Tabelle ausgelagert.
+  // Vorher hielt das Szenario **ein** Bild direkt als Spalten `imageData` +
+  // `thumbnail`; die sind mit der Mehrbild-Umstellung entfallen (die Migration
+  // hat vorhandene Weltbilder als je ein Primärbild in `ScenarioImage` überführt).
+  images     ScenarioImage[]
 
   characters Character[]
 }
@@ -149,4 +144,31 @@ model CharacterImage {
   isPrimary   Boolean  @default(false)
 
   @@index([characterId])
+}
+
+// Ein einzelnes Weltbild eines Szenarios (erzeugt oder hochgeladen).
+//
+// Wortgleich zu `CharacterImage`, nur am Szenario: Ein Szenario kann mehrere
+// Bilder haben; das mit `isPrimary` markierte wird überall groß angezeigt
+// (Übersichtskarte, Detailseite, Export). Dass es **genau eines** gibt,
+// garantiert die Datenbank nicht – das stellt die API sicher (jedes Setzen
+// läuft in einer Transaktion, die zuerst alle anderen zurücksetzt). Zur
+// Sicherheit fällt die Auswahl beim Lesen auf das neueste Bild zurück.
+model ScenarioImage {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+
+  scenarioId  String
+  scenario    Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  // Das Original als Data-URL (base64), ~2 MB.
+  imageData   String
+
+  // Verkleinerte Fassung (640 px, WebP) als Data-URL – nur für die Anzeige.
+  // Optional, damit Bilder ohne Thumbnail weiter funktionieren.
+  thumbnail   String?
+
+  isPrimary   Boolean  @default(false)
+
+  @@index([scenarioId])
 }

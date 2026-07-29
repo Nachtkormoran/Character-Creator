@@ -1,8 +1,4 @@
-import type {
-  Character,
-  CharacterImage,
-  Scenario,
-} from "@/app/generated/prisma/client";
+import type { Character, Scenario } from "@/app/generated/prisma/client";
 import {
   normalizeInputGenre,
   normalizePlotVariants,
@@ -33,9 +29,18 @@ export interface StoredImage {
   isPrimary: boolean;
 }
 
-/** Bild-Zeile, bei der `imageData` fehlen darf. */
-type ImageRow = Omit<CharacterImage, "imageData" | "characterId"> & {
+/**
+ * Bild-Zeile, bei der `imageData` fehlen darf. Bewusst **strukturell** (nicht an
+ * `CharacterImage` gebunden): dieselbe Form haben `CharacterImage` und
+ * `ScenarioImage`, und `serializeImage` liest ohnehin nur diese Felder. So teilen
+ * sich beide denselben Serialisierer.
+ */
+type ImageRow = {
+  id: string;
+  createdAt: Date;
   imageData?: string | null;
+  thumbnail: string | null;
+  isPrimary: boolean;
 };
 
 export function serializeImage(row: ImageRow): StoredImage {
@@ -155,22 +160,18 @@ export interface StoredScenario {
    */
   storyArcVariants: StoryArcVariants;
   /**
-   * Vorschau des Weltbilds (WebP, ~40 KB) oder `null`. Das Original
-   * (`imageData`, ~2 MB) reist **nie** in einer Antwort mit – es wird bei
-   * Bedarf einzeln über `GET /api/scenarios/[id]/image` geholt (Vollbild,
-   * Export), genau wie bei den Charakter-Bildern.
+   * Alle Weltbilder, neueste zuerst – **ohne** `imageData`. Genau wie bei den
+   * Charakteren: die Originale sind je ~2 MB, das Original holt die Anzeige bei
+   * Bedarf einzeln über `GET /api/scenarios/[id]/images/[imageId]`. Das
+   * anzuzeigende (Primär-)Bild leitet `primaryImage(scenario)` ab.
    */
-  thumbnail: string | null;
+  images: StoredImage[];
   count: number;
 }
 
-/**
- * `imageData` ist bewusst optional: Alle Abfragen `omit`ten es (es ist groß),
- * die Zeile trägt es dann gar nicht. `serializeScenario` liest es ohnehin nie –
- * der Typ macht nur sichtbar, dass die Spalte hier nicht erwartet wird.
- */
-type ScenarioRow = Omit<Scenario, "imageData"> & {
-  imageData?: string | null;
+/** Szenario-Zeile mit optional mitgeladenen Bild-Metadaten (ohne `imageData`). */
+type ScenarioRow = Scenario & {
+  images?: ImageRow[];
   _count?: { characters: number };
 };
 
@@ -204,7 +205,7 @@ export function serializeScenario(row: ScenarioRow): StoredScenario {
     plotVariants,
     storyArc,
     storyArcVariants,
-    thumbnail: row.thumbnail ?? null,
+    images: (row.images ?? []).map(serializeImage),
     count: row._count?.characters ?? 0,
   };
 }

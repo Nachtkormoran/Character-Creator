@@ -60,6 +60,27 @@ export async function POST(request: Request) {
       );
     }
 
+    // Die Weltbilder aus der Datei. Neue Dateien tragen eine `images`-Liste;
+    // ältere (vor der Mehrbild-Umstellung) das eine `imageData`/`thumbnail` –
+    // das wird zum einzigen, primären Bild. Genau ein Primärbild erzwingen
+    // (Regel aus `scenarioImages.ts`); ohne Markierung gewinnt das erste.
+    const weltbilder =
+      scenario.images && scenario.images.length > 0
+        ? scenario.images
+        : scenario.imageData
+          ? [
+              {
+                imageData: scenario.imageData,
+                thumbnail: scenario.thumbnail ?? null,
+                isPrimary: true,
+              },
+            ]
+          : [];
+    const weltbildPrimaer = Math.max(
+      0,
+      weltbilder.findIndex((b) => b.isPrimary),
+    );
+
     const row = await prisma.$transaction(async (tx) => {
       const angelegt = await tx.scenario.create({
         data: {
@@ -79,9 +100,14 @@ export async function POST(request: Request) {
           storyArcVariants: scenario.storyArcVariants
             ? JSON.stringify(scenario.storyArcVariants)
             : null,
-          // Das Weltbild direkt als Spalten (ein Bild je Szenario).
-          imageData: scenario.imageData ?? null,
-          thumbnail: scenario.thumbnail ?? null,
+          // Die Weltbilder als eigene Tabelle (analog zu den Charakter-Bildern).
+          images: {
+            create: weltbilder.map((b, i) => ({
+              imageData: b.imageData,
+              thumbnail: b.thumbnail ?? null,
+              isPrimary: i === weltbildPrimaer,
+            })),
+          },
         },
       });
 
@@ -125,7 +151,10 @@ export async function POST(request: Request) {
 
       return tx.scenario.findUniqueOrThrow({
         where: { id: angelegt.id },
-        include: { _count: { select: { characters: true } } },
+        include: {
+          images: { orderBy: { createdAt: "desc" }, omit: { imageData: true } },
+          _count: { select: { characters: true } },
+        },
       });
     });
 

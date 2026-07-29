@@ -28,8 +28,24 @@ import {
 /** Erkennungsmerkmal im Dateikopf – schützt davor, irgendein JSON einzulesen. */
 export const SCENARIO_FILE_KIND = "charakter-creator/scenario";
 
-/** Version des Formats. Erhöhen, sobald sich die Struktur bricht. */
+/**
+ * Version des Formats. **Ohne Sprung** um `images` erweitert: Das Feld ist
+ * optional, alte Dateien (mit `imageData`/`thumbnail`) lesen unverändert, und
+ * ältere Programmstände überlesen `images` in neuen Dateien. Ein Sprung hätte
+ * hier nur ältere Dateien abgelehnt – dieselbe Überlegung wie bei `storyHooks`.
+ */
 export const SCENARIO_FILE_VERSION = 1;
+
+/**
+ * Ein einzelnes Weltbild in der Datei – dieselbe Form wie ein Charakter-Bild:
+ * Original als Data-URL, optionale Vorschau, Primärmarkierung. Ohne Markierung
+ * gewinnt beim Import das erste Bild.
+ */
+const scenarioImagePayloadSchema = z.object({
+  imageData: z.string(),
+  thumbnail: z.string().nullable().optional(),
+  isPrimary: z.boolean().optional().default(false),
+});
 
 export const scenarioFileSchema = z.object({
   kind: z.literal(SCENARIO_FILE_KIND),
@@ -61,12 +77,17 @@ export const scenarioFileSchema = z.object({
      *   Überlegung wie `plotVariants`. Ohne sie überlebte nur der aktive über
      *   `storyArc`. Fehlt das Feld (alte Dateien), faltet der Import den einen
      *   `storyArc` zur einzigen Variante.
-     * - `imageData`/`thumbnail`: das **Weltbild** (Original ~2 MB + Vorschau).
-     *   Anders als bei den Charakteren gibt es genau eins, direkt am Szenario.
+     * - `images`: **alle Weltbilder** (Originale ~2 MB + Vorschauen), seit ein
+     *   Szenario – wie ein Charakter – mehrere Bilder haben kann.
+     * - `imageData`/`thumbnail`: das **einzelne** Weltbild älterer Dateien (vor
+     *   der Mehrbild-Umstellung). Bleibt für die Rückwärts-Lesbarkeit erhalten;
+     *   der Import faltet es zum einzigen, primären Bild. Neue Exporte schreiben
+     *   stattdessen `images`.
      */
     plotVariants: plotVariantsSchema.optional(),
     storyArc: storyArcStoredSchema.optional(),
     storyArcVariants: storyArcVariantsSchema.optional(),
+    images: z.array(scenarioImagePayloadSchema).optional(),
     imageData: z.string().optional(),
     thumbnail: z.string().optional(),
   }),

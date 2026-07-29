@@ -17,8 +17,9 @@ export const maxDuration = 120;
  *
  * **Persistiert nichts** – wie alle Erzeugen-Routen. Das Ergebnis geht als
  * Data-URL zurück; gespeichert wird es erst über
- * `PUT /api/scenarios/[id]/image`. So kann man ein Bild ansehen und verwerfen,
- * ohne dass es am Szenario hängt.
+ * `POST /api/scenarios/[id]/images` (das Weltbild wird dann ein weiteres Bild
+ * des Szenarios). So kann man ein Bild ansehen und verwerfen, ohne dass es am
+ * Szenario hängt.
  *
  * Die Festlegungen kommen **aus dem Request**, nicht über die Szenario-Id: in
  * der Detailansicht können sie ungespeichert bearbeitet sein, und wer gerade

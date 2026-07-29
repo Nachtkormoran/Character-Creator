@@ -16,7 +16,7 @@ import {
   normalizeScenarioDetails,
   type ScenarioDetails,
 } from "@/lib/schema";
-import type { StoredScenario } from "@/lib/serialize";
+import { primaryImage, type StoredScenario } from "@/lib/serialize";
 import { genreLabel } from "@/lib/templates";
 import { ScenarioFields } from "../components/ScenarioFields";
 import { RandomScenarioModal } from "../components/RandomScenarioModal";
@@ -526,10 +526,10 @@ export default function ScenariosPage() {
                   href={`/scenarios/${s.id}`}
                   className="flex items-center gap-4 rounded-xl border border-black/10 bg-white p-4 transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
                 >
-                  {s.thumbnail && (
+                  {primaryImage(s)?.thumbnail && (
                     <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-black/[0.03] dark:bg-white/[0.03]">
                       <Image
-                        src={s.thumbnail}
+                        src={primaryImage(s)!.thumbnail!}
                         alt=""
                         fill
                         sizes="56px"

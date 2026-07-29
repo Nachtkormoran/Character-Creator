@@ -28,7 +28,7 @@ import type {
   StoryArcVariants,
   StoryHookAnchor,
 } from "./schema";
-import type { StoredCharacter, StoredScenario } from "./serialize";
+import type { StoredCharacter, StoredImage, StoredScenario } from "./serialize";
 import type { InputField } from "./prompts";
 
 /**
@@ -434,12 +434,12 @@ export async function buildScenarioFile(
   },
   characters: StoredCharacter[],
   /**
-   * Das Weltbild reist über sein Original, nicht das Thumbnail – wie bei den
-   * Charakter-Bildern. Die aufrufende Seite kennt nur die `scenarioId` und ob
-   * ein Bild existiert; das Original holt diese Funktion einzeln nach
-   * (`getScenarioImage`), damit die Seite es nicht vorhalten muss.
+   * Die Weltbilder reisen über ihre Originale, nicht die Thumbnails – wie bei
+   * den Charakter-Bildern. Die aufrufende Seite übergibt die `scenarioId` und
+   * die Bild-Metadaten (ohne Originale); diese Funktion holt jedes Original
+   * einzeln nach (`getScenarioImage`), damit die Seite sie nicht vorhalten muss.
    */
-  bild?: { scenarioId: string; vorhanden: boolean },
+  bild?: { scenarioId: string; images: StoredImage[] },
   /**
    * **Ohne Bilder** exportieren (Default `false` = mit Bildern): dann bleibt das
    * **Weltbild** weg **und** jeder Charakter kommt bildlos in die Datei. Die
@@ -447,12 +447,22 @@ export async function buildScenarioFile(
    */
   ohneBilder = false,
 ): Promise<ScenarioFile> {
-  // Das Weltbild nur holen, wenn es eines gibt **und** Bilder gewünscht sind.
-  let imageData: string | undefined;
-  let thumbnail: string | undefined;
-  if (!ohneBilder && bild?.vorhanden) {
-    imageData = await getScenarioImage(bild.scenarioId);
-    thumbnail = (await safeThumbnail(imageData)) ?? undefined;
+  // Die Weltbilder nur holen, wenn es welche gibt **und** Bilder gewünscht sind.
+  // Nacheinander (nicht `Promise.all`): mehrere ~2-MB-Originale gleichzeitig im
+  // Speicher zu halten wäre unnötige Spitzenlast – dieselbe Überlegung wie bei
+  // den Charakteren unten.
+  let images:
+    | { imageData: string; thumbnail?: string | null; isPrimary: boolean }[]
+    | undefined;
+  if (!ohneBilder && bild && bild.images.length > 0) {
+    images = [];
+    for (const img of bild.images) {
+      images.push({
+        imageData: await getScenarioImage(bild.scenarioId, img.id),
+        thumbnail: img.thumbnail ?? undefined,
+        isPrimary: img.isPrimary,
+      });
+    }
   }
 
   return {
@@ -476,7 +486,7 @@ export async function buildScenarioFile(
       scenario.storyArcVariants.items.length > 0
         ? { storyArcVariants: scenario.storyArcVariants }
         : {}),
-      ...(imageData ? { imageData, thumbnail } : {}),
+      ...(images && images.length > 0 ? { images } : {}),
     },
     // Nacheinander statt `Promise.all`: Jeder Charakter zieht seine
     // Bild-Originale einzeln, und mehrere Figuren gleichzeitig legten
@@ -1068,9 +1078,9 @@ export async function generateScenarioName(
 // --- Szenario-Bild --------------------------------------------------------
 
 /**
- * Erzeugt das Weltbild eines Szenarios (ohne Figuren) und liefert es als
+ * Erzeugt ein Weltbild eines Szenarios (ohne Figuren) und liefert es als
  * Data-URL. **Persistiert nichts** – gespeichert wird erst über
- * `saveScenarioImage`. Die Festlegungen gehen im aktuellen, womöglich
+ * `addScenarioImage`. Die Festlegungen gehen im aktuellen, womöglich
  * ungespeicherten Stand mit.
  */
 export function generateScenarioImage(
@@ -1091,16 +1101,16 @@ export function generateScenarioImage(
 }
 
 /**
- * Speichert (oder ersetzt) das Weltbild eines Szenarios. Das Thumbnail entsteht
- * hier im Client (`safeThumbnail`), damit keine Aufrufstelle es vergessen kann –
- * derselbe Weg wie bei `saveCharacter`/`addCharacterImage`.
+ * Hängt ein weiteres Weltbild an das Szenario. Es wird dabei zum Primärbild –
+ * genau wie beim Charakter (`addCharacterImage`). Das Thumbnail entsteht hier im
+ * Client (`safeThumbnail`), damit keine Aufrufstelle es vergessen kann.
  */
-export async function saveScenarioImage(
+export async function addScenarioImage(
   id: string,
   imageData: string,
 ): Promise<StoredScenario> {
-  const res = await fetch(`/api/scenarios/${id}/image`, {
-    method: "PUT",
+  const res = await fetch(`/api/scenarios/${id}/images`, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       imageData,
@@ -1112,19 +1122,43 @@ export async function saveScenarioImage(
   return data.scenario as StoredScenario;
 }
 
-export async function deleteScenarioImage(id: string): Promise<StoredScenario> {
-  const res = await fetch(`/api/scenarios/${id}/image`, { method: "DELETE" });
+export async function setPrimaryScenarioImage(
+  id: string,
+  imageId: string,
+): Promise<StoredScenario> {
+  const res = await fetch(`/api/scenarios/${id}/images/${imageId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isPrimary: true }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Auswahl fehlgeschlagen.");
+  return data.scenario as StoredScenario;
+}
+
+export async function deleteScenarioImage(
+  id: string,
+  imageId: string,
+): Promise<StoredScenario> {
+  const res = await fetch(`/api/scenarios/${id}/images/${imageId}`, {
+    method: "DELETE",
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Löschen fehlgeschlagen.");
   return data.scenario as StoredScenario;
 }
 
 /**
- * Holt das Original des Weltbilds (~2 MB) – der einzige Weg daran, wie
+ * Holt das Original eines Weltbilds (~2 MB) – der einzige Weg daran, wie
  * `getImage` beim Charakter. Für Vollbild und Export.
  */
-export async function getScenarioImage(id: string): Promise<string> {
-  const res = await fetch(`/api/scenarios/${id}/image`, { cache: "no-store" });
+export async function getScenarioImage(
+  id: string,
+  imageId: string,
+): Promise<string> {
+  const res = await fetch(`/api/scenarios/${id}/images/${imageId}`, {
+    cache: "no-store",
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Bild laden fehlgeschlagen.");
   return data.imageData as string;

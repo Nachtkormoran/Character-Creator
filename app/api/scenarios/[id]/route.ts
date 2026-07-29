@@ -53,8 +53,10 @@ export async function GET(_request: Request, { params }: Context) {
   const { id } = await params;
   const row = await prisma.scenario.findUnique({
     where: { id },
-    omit: { imageData: true },
-    include: { _count: { select: { characters: true } } },
+    include: {
+      images: { orderBy: { createdAt: "desc" }, omit: { imageData: true } },
+      _count: { select: { characters: true } },
+    },
   });
   if (!row) {
     return NextResponse.json(
@@ -123,8 +125,10 @@ export async function PATCH(request: Request, { params }: Context) {
     const row = await prisma.scenario.update({
       where: { id },
       data,
-      omit: { imageData: true },
-      include: { _count: { select: { characters: true } } },
+      include: {
+        images: { orderBy: { createdAt: "desc" }, omit: { imageData: true } },
+        _count: { select: { characters: true } },
+      },
     });
     return NextResponse.json({ scenario: serializeScenario(row) });
   } catch {

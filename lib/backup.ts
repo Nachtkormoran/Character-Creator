@@ -89,6 +89,7 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
     let scenarios: Array<Record<string, unknown>>;
     let settings: Array<Record<string, unknown>>;
     let images: Array<Record<string, unknown>>;
+    let scenarioImages: Array<Record<string, unknown>>;
     try {
       const tableRows = await source.$queryRawUnsafe<Array<{ name: string }>>(
         "SELECT name FROM sqlite_master WHERE type='table'",
@@ -137,6 +138,23 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
               characterId: c.id,
               imageData: c.imageData,
               thumbnail: c.thumbnail ?? null,
+              isPrimary: true,
+            }));
+
+      // Weltbilder analog: Neue Sicherungen tragen die Tabelle `ScenarioImage`;
+      // ältere (vor der Mehrbild-Umstellung) hatten das eine Weltbild noch als
+      // Spalten `Scenario.imageData`/`thumbnail` – daraus wird je ein
+      // Primärbild gebaut, damit auch ältere Sicherungen ihre Weltbilder behalten.
+      scenarioImages = tables.has("ScenarioImage")
+        ? await source.$queryRawUnsafe("SELECT * FROM ScenarioImage")
+        : scenarios
+            .filter((s) => s.imageData)
+            .map((s) => ({
+              id: randomUUID(),
+              createdAt: s.createdAt,
+              scenarioId: s.id,
+              imageData: s.imageData,
+              thumbnail: s.thumbnail ?? null,
               isPrimary: true,
             }));
     } finally {
@@ -199,6 +217,19 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
           },
         }),
       ),
+      // Weltbilder nach den Szenarien – sie verweisen per scenarioId darauf.
+      ...scenarioImages.map((i) =>
+        prisma.scenarioImage.create({
+          data: {
+            id: i.id as string,
+            createdAt: new Date(i.createdAt as string | number),
+            scenarioId: i.scenarioId as string,
+            imageData: i.imageData as string,
+            thumbnail: (i.thumbnail as string | null) ?? null,
+            isPrimary: Boolean(i.isPrimary),
+          },
+        }),
+      ),
       ...settings.map((s) =>
         prisma.setting.create({
           data: {
@@ -212,7 +243,8 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
 
     return {
       characters: characters.length,
-      images: images.length,
+      // Alle Bilder zusammen – Charakter- und Weltbilder.
+      images: images.length + scenarioImages.length,
       scenarios: scenarios.length,
       settings: settings.length,
       safetyCopy: path.basename(safetyCopy),

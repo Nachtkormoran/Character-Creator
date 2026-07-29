@@ -140,14 +140,16 @@ als eines, das immer dasselbe ist.
   seiner Charaktere** (ohne Bild-Originale, nur Thumbnails – wie die
   Charakter-Liste); PATCH ist ein Teil-Update von `name`, `details`,
   `plotVariants` (die Handlungsentwürfe, s. u.) und `storyArcVariants` (die
-  Story Arcs, s. u. „Story Arc"). **Das Szenario-Bild nicht** – es hat eine
-  eigene Route (s. u.).
-- `GET|PUT|DELETE /api/scenarios/[id]/image` – das **eine** Weltbild eines
-  Szenarios. GET ist der einzige Weg ans Original (Vollbild, Export), PUT
-  setzt/ersetzt es (`imageData` + `thumbnail`), DELETE entfernt es; PUT/DELETE
-  geben das aktualisierte Szenario zurück (ohne `imageData`). Bewusst getrennt
-  vom `PATCH` oben, weil ein Bild ~2 MB ist und nicht bei jedem Namensspeichern
-  mitreisen soll.
+  Story Arcs, s. u. „Story Arc"). **Die Szenario-Bilder nicht** – die haben
+  eigene Routen (s. u.).
+- `POST /api/scenarios/[id]/images` – Weltbild hinzufügen (wird zum Primärbild).
+- `GET|PATCH|DELETE /api/scenarios/[id]/images/[imageId]` – **wortgleich zu den
+  Charakter-Bild-Routen**: GET ist der einzige Weg ans Original (Vollbild,
+  Export), PATCH `{ isPrimary: true }` wählt das Primärbild, DELETE löscht;
+  PATCH/DELETE geben das aktualisierte Szenario zurück (mit Bildliste, ohne
+  `imageData`). Bewusst getrennt vom `PATCH` oben, weil ein Bild ~2 MB ist und
+  nicht bei jedem Namensspeichern mitreisen soll (s. u. „Mehrere Bilder pro
+  Szenario").
 - `GET|PATCH /api/settings` – App-Einstellungen (`imageModel`, `imageQuality`).
 - `GET|POST /api/backup` – Datenbank sichern / wiederherstellen. **POST
   ersetzt den gesamten Bestand** (Bestätigung passiert in der UI).
@@ -190,19 +192,21 @@ weiterspielen soll.
 **In der Datei steckt das ganze Szenario, nicht nur Name und Festlegungen:**
 neben `details` auch **alle Handlungsentwürfe** (`plotVariants` samt aktivem
 Index – ohne sie überlebte nur der aktive über `details.handlung`), der
-**Story Arc** (`storyArc` samt Kapiteln) und das **Weltbild** (`imageData` +
-`thumbnail`, Original über `getScenarioImage` nachgeholt wie die
-Charakter-Bilder). Alle drei sind im Schema **optional und ohne
+**Story Arc** (`storyArc` samt Kapiteln) und die **Weltbilder** (als `images`-
+Array, Originale + Vorschauen, je Bild über `getScenarioImage` nachgeholt wie die
+Charakter-Bilder). Alle sind im Schema **optional und ohne
 Versionssprung** ergänzt – dieselbe Überlegung wie bei `storyHooks` in
 `characterFile.ts`: Alte Dateien lesen unverändert (die Felder fehlen
 folgenlos), und `serializeScenario` füllt beim Import auf (eine Variante aus
-`details.handlung`, leerer Arc, kein Bild). Der Export gibt den **bearbeiteten**
-Stand von Varianten und Arc mit (wie die Festlegungen); das Weltbild ist davon
-unabhängig (eigene Route, sofort gespeichert). *Round-Trip gegen den
+`details.handlung`, leerer Arc, keine Bilder). Ältere Dateien mit einem einzelnen
+`imageData`/`thumbnail` (vor der Mehrbild-Umstellung) liest der Import weiter und
+faltet sie zum Primärbild. Der Export gibt den **bearbeiteten**
+Stand von Varianten und Arc mit (wie die Festlegungen); die Weltbilder sind davon
+unabhängig (eigene Routen, sofort gespeichert). *Round-Trip gegen den
 Dev-Server geprüft* (Testdaten entfernt): Datei mit Varianten/Arc+Kapiteln/Bild
 spielt sie alle wieder ein, aktive Variante bleibt konsistent, Bild-Original
-kommt über `GET …/image` zurück; eine Datei ohne die Felder fällt sauber auf die
-Vorgaben zurück.
+kommt über `GET …/images/[imageId]` zurück; eine Datei ohne die Felder fällt
+sauber auf die Vorgaben zurück.
 
 Die Charaktere stecken als `characterPayloadSchema` darin – **dieselbe Form wie
 in einer Einzeldatei, nur ohne deren Kopf**. Dafür wurde die Nutzlast aus
@@ -286,59 +290,70 @@ einzelnen Kachel, damit jedes Bild einzeln herunterladbar ist – bei mehr als
 einem Bild bekommt die Datei ihre Position angehängt (`Name_2.png`), sonst
 überschrieben sich die Downloads gegenseitig.
 
-**Ein Bild pro Szenario (Weltbild):** Das bewusste Gegenteil zum Charakter. Ein
-Szenario hat **genau ein** Bild, direkt als Spalten `imageData` + `thumbnail`
-am `Scenario` (kein eigenes `ScenarioImage`, keine `isPrimary`-Logik). Ein
-Szenario ist eine **Stimmung, kein Steckbrief**; ein repräsentatives Bild
-genügt, und die Mehrbild-Maschinerie wäre hier Aufwand ohne Gewinn – so, wie
-der Charakter es vor der Mehrbild-Umstellung hielt. Wie dort liefert **keine
-Listen-Route `imageData`** (`omit`), nur das Thumbnail; das Original holt
-`GET …/image` einzeln (Vollbild).
+**Mehrere Bilder pro Szenario (Weltbilder):** Seit der Mehrbild-Umstellung
+**wortgleich zum Charakter** – ein Szenario hat beliebig viele Weltbilder in
+einer eigenen Tabelle `ScenarioImage` (`imageData`, `thumbnail`, `isPrimary`,
+`onDelete: Cascade`), genau eines ist `isPrimary` und wird überall groß gezeigt
+(Übersichtskarte, Detailseite, Export). Davor hielt das Szenario **ein** Bild
+direkt als Spalten `imageData` + `thumbnail` am `Scenario`; die sind mit der
+Umstellung entfallen (Migration `20260729192000_scenario_images` hat vorhandene
+Weltbilder als je ein Primärbild nach `ScenarioImage` überführt, **bevor** die
+Spalten fielen – nach dem Muster von `add_character_images`). Wie beim Charakter
+liefert **keine Listen-Route `imageData`** (`omit`), nur das Thumbnail; das
+Original holt `GET …/images/[imageId]` einzeln (Vollbild, Export).
 
-Das Bild zeigt die **Welt, keine Figuren** – ein Establishing-Shot des Ortes.
+Die serverseitigen Bild-Operationen liegen in **`lib/scenarioImages.ts`** – der
+Zwilling von `characterImages.ts`, und aus demselben Grund zusammen: Sie halten
+die Regel, die die DB nicht erzwingt (**genau ein `isPrimary` pro Szenario**),
+jede Änderung in einer Transaktion, die zuerst alle anderen zurücksetzt; Löschen
+des Primärbilds lässt das neueste verbliebene nachrücken. `primaryImage(scenario)`
+(aus `serialize.ts`, generisch über `{ images }`) leitet das anzuzeigende Bild ab
+– bei fehlender Markierung fällt es aufs neueste zurück.
+
+Die Bild-Routen spiegeln die Charakter-Routen:
+- `POST /api/scenarios/[id]/images` – Bild hinzufügen (wird zum Primärbild).
+- `GET|PATCH|DELETE /api/scenarios/[id]/images/[imageId]` – **GET** ist der
+  einzige Weg ans Original, **PATCH** `{ isPrimary: true }` wählt das Primärbild,
+  **DELETE** löscht; die schreibenden Routen geben das aktualisierte Szenario
+  (mit Bildliste, ohne Originale) zurück.
+
+Die Bilder zeigen die **Welt, keine Figuren** – ein Establishing-Shot des Ortes.
 Nicht nur, weil das die Wahl war, sondern weil ein Szenario für viele Figuren
 zugleich gilt und keine einzelne es bebildern sollte. `buildScenarioImagePrompt`
 baut den Prompt aus `ScenarioDetails` (Ort trägt das Motiv, Zeit + Genre die
 Epoche über `BILDWELTEN`, Beschreibung die Stimmung; **Regeln gehen nicht ein** –
 Technikstand ist selten ein Bildmotiv). Das „**keine Personen**" steht betont und
-doppelt im Prompt: Bild-Modelle setzen sonst reflexhaft einen Menschen als Anker
-in die Szene. Stehen mehrere Schauplätze im Ort-Feld, wählt das Modell **einen**
-Blick, statt sie zu collagieren. Die **Stilauswahl ist dieselbe wie beim
-Charakter** (`IMAGE_STYLES`), die Stiltexte sind aber auf eine Szene statt ein
-Portrait gemünzt (die „Skizze" ist hier eine Landschaftsstudie, keine Büste).
+doppelt im Prompt (abschaltbar über die Checkbox **„ohne Menschen"**, Default an);
+Bild-Modelle setzen sonst reflexhaft einen Menschen als Anker in die Szene.
+Stehen mehrere Schauplätze im Ort-Feld, wählt das Modell **einen** Blick, statt
+sie zu collagieren. Die **Stilauswahl ist dieselbe wie beim Charakter**
+(`IMAGE_STYLES`), die Stiltexte sind aber auf eine Szene statt ein Portrait
+gemünzt (die „Skizze" ist hier eine Landschaftsstudie, keine Büste).
 
-Die Route `POST /api/scenario-image` **persistiert nichts** (wie alle
+Die Route `POST /api/scenario-image` (Erzeugung) **persistiert nichts** (wie alle
 Erzeugen-Routen) und liest die Festlegungen **aus dem Request** – in der
-Detailansicht können sie ungespeichert bearbeitet sein. Die UI führt Erzeugtes
-und Hochgeladenes zuerst als **Kandidat** (ungespeichert): Erst „Als
-Weltbild speichern" ersetzt das vorhandene Bild über
-`PUT …/image`. So zerstört ein probeweises „Neu erzeugen" das gute alte Bild
-nicht, bis eins gefällt. Das Speichern des Bildes ist **unabhängig** vom
-„Änderungen speichern" der Festlegungen (eigene Route, sofort). Daneben ein
-Stichwörter-Feld (`extraPrompt`, Perspektive/Lichtstimmung, nicht gespeichert).
-Auf den Übersichtskarten unter `/scenarios` erscheint das Thumbnail links.
+Detailansicht können sie ungespeichert bearbeitet sein. **Kein Kandidaten-Flow
+mehr** (der schützte früher das eine, unersetzliche Bild): Erzeugtes und
+Hochgeladenes wird wie beim Charakter **direkt** über `POST …/images` als weiteres
+Bild angehängt und zum Primärbild – ein probeweiser Lauf zerstört das alte Bild
+nicht, es steht als weitere Kachel daneben. Daneben ein Stichwörter-Feld
+(`extraPrompt`, Perspektive/Lichtstimmung, nicht gespeichert). Auf den
+Übersichtskarten unter `/scenarios` erscheint das **Primär-Thumbnail** links
+(`primaryImage(s)?.thumbnail`).
 
 **Die Bild-Bedienung liegt in einer eigenen Ansicht** (`ScenarioImageModal`) –
-das Gegenstück zur `CharacterImagesModal` und bewusst so herausgezogen wie beim
-Charakter: In der Detailansicht blieb sonst neben der Weltbeschreibung eine
-Spalte voller Schalter statt eines Bildes. Die Detailseite zeigt jetzt **nur**
-das Thumbnail (Klick öffnet die Ansicht) und einen Knopf „🖼️ Weltbild
-verwalten" bzw. „🏞️ Weltbild hinzufügen"; **alles andere** (Stil, Stichwörter,
-Erzeugen, Hochladen, Kandidat → Übernehmen/Verwerfen, Löschen, **Exportieren**,
-Vollbild) liegt im Modal. Das Modal hält seinen eigenen Zustand (Kandidat,
-Stil, Busy) und meldet ein geändertes gespeichertes Bild über `onChange` an die
-Seite, damit deren Thumbnail aktuell bleibt.
+das Gegenstück zur `CharacterImagesModal`, jetzt ebenfalls eine **Kachelgalerie**:
+je Kachel Primär setzen, Exportieren, Löschen, Vollbild; darunter „Neues
+Weltbild" (Stil, Stichwörter, „ohne Menschen", Erzeugen, Hochladen). Die
+Detailseite zeigt nur das Primär-Thumbnail (mit „+N"-Badge bei mehreren) und
+einen Knopf „🖼️ Weltbilder verwalten" bzw. „🏞️ Weltbild hinzufügen". Das Modal
+bekommt die Bildliste als Prop und meldet das geänderte Szenario über `onChange`
+zurück (die Seite übernimmt `scenario.images`).
 
-Der **Bild-Export** sitzt hier (nicht an einer Kachel wie beim Charakter, es
-gibt nur eins): Er holt das **Original** über `GET …/image` und lädt es über
-`downloadImage` als `Name_Weltbild.png`. Ohne Positionszusatz – ein Szenario
-hat genau ein Bild.
-
-**Datenmodell bleibt einbildig** – die Ansicht wurde herausgezogen, `Scenario`
-trägt weiterhin **ein** `imageData` + `thumbnail` (kein `ScenarioImage`, keine
-`isPrimary`-Logik). Das Modal ist aber der Ort, an dem später eine Kachelgalerie
-entstünde, wenn das Szenario auf mehrere Bilder umgestellt wird (dann analog zu
-`CharacterImages`/`CharacterImagesModal`).
+Der **Bild-Export** sitzt jetzt **an der einzelnen Kachel** (wie beim Charakter,
+seit es mehrere sind): Er holt das **Original** über `GET …/images/[imageId]` und
+lädt es über `downloadImage` als `Name_Weltbild.png`; bei mehr als einem Bild
+bekommt die Datei ihre Position angehängt (`Name_Weltbild_2.png`).
 
 **Ebenen/Esc:** Die Szenario-Detailseite ist eine **echte Seite**, kein Modal –
 `ScenarioImageModal` ist damit die **erste** Overlay-Ebene (`z-70`) und bekommt
@@ -351,12 +366,11 @@ braucht es hier **nicht** – ohne einen `backdrop-blur`-Vorfahren bezieht sich 
 `fixed` der Ansicht aufs Sichtfenster (die Falle aus der Galerie entsteht nur in
 der Modal-Verschachtelung dort).
 
-Das Weltbild **ist** inzwischen Teil der Szenario-Exportdatei
-(`scenarioFile.ts`, s. u. „Szenarien exportieren") – als `imageData` +
-`thumbnail`, geholt über `getScenarioImage`. **Noch nicht dabei** (möglicher
-Folgeschritt): das Weltbild im **Charakter-PDF**. Und das Datenmodell ist wie
-oben gesagt noch einbildig – die getrennte Ansicht ist die Vorbereitung darauf,
-nicht die Umstellung selbst.
+Die Weltbilder **sind** Teil der Szenario-Exportdatei (`scenarioFile.ts`, s. u.
+„Szenarien exportieren") – als **`images`-Array** (Originale + Vorschauen),
+je Bild über `getScenarioImage` geholt. Ältere Dateien mit einzelnem
+`imageData`/`thumbnail` lesen weiter (der Import faltet sie zum Primärbild).
+**Noch nicht dabei** (möglicher Folgeschritt): das Weltbild im **Charakter-PDF**.
 
 **Text neu erzeugen & Ansatzpunkte:** Zwei Knöpfe in der Detailansicht der
 Galerie, beide **nur dort** – sie setzen einen fertigen Charakter voraus.
@@ -1654,16 +1668,21 @@ Ergebnis geht in den Formular-State.
 - `visualDetails.ts` – separater LLM-Aufruf, der aus dem langen Beschreibungstext
   nur bildrelevante Details extrahiert (bei `includeTextDetails`).
 - `prisma.ts` – Prisma-Client-Singleton **mit better-sqlite3 Driver-Adapter**.
-- `characterImages.ts` – **alle** serverseitigen Bild-Operationen
-  (`loadCharacter(s)`, `addImage`, `setPrimaryImage`, `deleteImage`). Sie liegen
-  zusammen, weil sie eine Regel halten müssen, die die DB nicht erzwingt:
-  **genau ein Bild pro Charakter ist `isPrimary`**. Jede Änderung läuft in einer
-  Transaktion, die zuerst alle anderen Markierungen entfernt. Löschen des
+- `characterImages.ts` – **alle** serverseitigen Bild-Operationen eines
+  Charakters (`loadCharacter(s)`, `addImage`, `setPrimaryImage`, `deleteImage`).
+  Sie liegen zusammen, weil sie eine Regel halten müssen, die die DB nicht
+  erzwingt: **genau ein Bild pro Charakter ist `isPrimary`**. Jede Änderung läuft
+  in einer Transaktion, die zuerst alle anderen Markierungen entfernt. Löschen des
   Primärbilds lässt das neueste verbliebene nachrücken.
+- `scenarioImages.ts` – der **Zwilling** davon fürs Szenario (`loadScenario`,
+  `addScenarioImage`, `setPrimaryScenarioImage`, `deleteScenarioImage`), wortgleich
+  und aus demselben Grund: **genau ein Weltbild ist `isPrimary`** (s. o. „Mehrere
+  Bilder pro Szenario").
 - `serialize.ts` – DB-Zeile ↔ Client-Form (`StoredCharacter`, `StoredImage`,
-  `StoredScenario`). `primaryImage(c)` leitet das anzuzeigende Bild ab – bewusst
-  abgeleitet statt als eigenes Feld mitgeschickt, sonst läge das Thumbnail des
-  Primärbilds doppelt in jeder Antwort (Listen-Antwort: 465 KB statt 914 KB).
+  `StoredScenario`). `primaryImage(x)` (generisch über `{ images }`, also für
+  Charakter **und** Szenario) leitet das anzuzeigende Bild ab – bewusst abgeleitet
+  statt als eigenes Feld mitgeschickt, sonst läge das Thumbnail des Primärbilds
+  doppelt in jeder Antwort (Listen-Antwort: 465 KB statt 914 KB).
 - `client.ts` – **einziger** Weg, wie Client-Komponenten die API ansprechen
   (typisierte fetch-Helfer für Generierung, CRUD, Umbenennen, Bild/Inhalt
   aktualisieren, Szenarien).
@@ -1674,9 +1693,11 @@ Ergebnis geht in den Formular-State.
   Verbindung, ein Dateitausch im Betrieb würde sie ins Leere laufen lassen.
   Gelesen wird die hochgeladene Datei über einen **zweiten PrismaClient** mit
   `$queryRawUnsafe('SELECT *')`, damit auch ältere Schema-Stände mit fehlenden
-  Spalten funktionieren. Fehlt die Tabelle `CharacterImage` (Sicherung von vor
-  der Mehrbild-Umstellung), wird aus `Character.imageData` je ein Primärbild
-  gebaut – sonst verlören alte Sicherungen ihre Portraits. Vor dem Überschreiben entsteht eine `*.bak`-Kopie
+  Spalten funktionieren. Fehlt die Tabelle `CharacterImage` bzw. `ScenarioImage`
+  (Sicherung von vor der jeweiligen Mehrbild-Umstellung), wird aus
+  `Character.imageData` bzw. `Scenario.imageData` je ein Primärbild gebaut – sonst
+  verlören alte Sicherungen ihre Bilder. Neue Sicherungen tragen beide Tabellen und
+  werden mit eingespielt. Vor dem Überschreiben entsteht eine `*.bak`-Kopie
   neben `dev.db` (in `.gitignore`).
 - `settings.ts` – serverseitiger Zugriff auf die `Setting`-Tabelle
   (Key-Value: `imageModel`, `imageQuality`, `textProvider`, `showModel`,
@@ -1810,14 +1831,16 @@ geöffnete Bilder-Ansicht hat bewusst **keinen** eigenen Esc-Handler (es schlie�
 `CharacterImage`
 (`imageData` als Base64-Data-URL, `thumbnail` als verkleinerte Fassung davon,
 `isPrimary`; `onDelete: Cascade` – Bilder gehen mit dem Charakter),
-`Scenario` (`details` als JSON-String, dazu **ein** Weltbild direkt als
-`imageData` + `thumbnail` am Szenario – anders als der Charakter, der eine eigene
-Bildtabelle hat; `plotVariants` als JSON-String für die Handlungsentwürfe
-`{ items, aktiv, meta }` und `storyArcVariants` als JSON-String für die Story
-Arcs `{ items, aktiv, meta }` (`meta` = Reiter-Titel/Form/Ton je Variante),
-beide eigene Spalten neben `details` wie `storyHooks` neben
+`Scenario` (`details` als JSON-String; `plotVariants` als JSON-String für die
+Handlungsentwürfe `{ items, aktiv, meta }` und `storyArcVariants` als JSON-String
+für die Story Arcs `{ items, aktiv, meta }` (`meta` = Reiter-Titel/Form/Ton je
+Variante), beide eigene Spalten neben `details` wie `storyHooks` neben
 `traits` – s. o. „Mehrere Entwürfe je Szenario" und „Story Arc"; `onDelete:
-SetNull` – beim Löschen des Szenarios bleiben Charaktere erhalten) und `Setting`
+SetNull` – beim Löschen des Szenarios bleiben Charaktere erhalten),
+`ScenarioImage` (die Weltbilder – **wortgleich zu `CharacterImage`**: `imageData`,
+`thumbnail`, `isPrimary`, `onDelete: Cascade`; früher hielt das Szenario **ein**
+Bild direkt als Spalten `imageData` + `thumbnail`, s. o. „Mehrere Bilder pro
+Szenario") und `Setting`
 (Key-Value für App-Einstellungen). SQLite lokal.
 
 ## Nicht-offensichtliche Fallstricke
