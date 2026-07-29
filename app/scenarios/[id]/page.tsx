@@ -13,6 +13,7 @@ import {
   generateScenarioDescription,
   generateScenarioField,
   generateScenarioFigures,
+  generateScenarioName,
   generateScenarioPlot,
   generateStoryArc,
   generateStoryTitle,
@@ -22,12 +23,14 @@ import {
   getSettings,
   listScenarios,
   updateCharacterContent,
+  updateCharacterGenre,
   updateCharacterProtagonist,
   updateCharacterScenario,
   updateScenario,
 } from "@/lib/client";
 import { downloadBlob, safeFileName } from "@/lib/download";
 import { scenarioFileName } from "@/lib/scenarioFile";
+import { GENRE_TEMPLATES } from "@/lib/templates";
 import {
   DEFAULT_ARC_FORMAT,
   DEFAULT_ARC_LENGTH,
@@ -75,6 +78,7 @@ import {
 } from "@/lib/serialize";
 import { AddCharacterToScenarioModal } from "../../components/AddCharacterToScenarioModal";
 import { CharacterDetailModal } from "../../components/CharacterDetailModal";
+import { GenreSyncModal } from "../../components/GenreSyncModal";
 import { PlotPersonModal } from "../../components/PlotPersonModal";
 import { ScenarioFields } from "../../components/ScenarioFields";
 import { ScenarioImageModal } from "../../components/ScenarioImageModal";
@@ -109,6 +113,11 @@ export default function ScenarioDetailPage({
   const router = useRouter();
 
   const [name, setName] = useState("");
+  // KI-Namensvorschlag aus den Welt-Feldern (Beschreibung/Ort/Zeit/Regeln).
+  // Der Name geht in den Bearbeitungs-Zustand; gespeichert wird über „Änderungen
+  // speichern" wie jede andere Namensänderung. Nicht gespeichert: nur Busy/Fehler.
+  const [nameBusy, setNameBusy] = useState(false);
+  const [nameFehler, setNameFehler] = useState<string | null>(null);
   const [details, setDetails] = useState<ScenarioDetails>(
     normalizeScenarioDetails({}),
   );
@@ -236,6 +245,17 @@ export default function ScenarioDetailPage({
     {},
   );
   const [characters, setCharacters] = useState<StoredCharacter[]>([]);
+  /**
+   * Rückfrage nach einer Genre-Änderung: Soll das neue Genre auch auf die
+   * zugeordneten Figuren übertragen werden? `betroffen` sind die Figuren mit
+   * abweichendem Genre (Snapshot zum Änderungszeitpunkt). Null = keine Rückfrage.
+   */
+  const [genreSync, setGenreSync] = useState<{
+    genre: string;
+    betroffen: StoredCharacter[];
+  } | null>(null);
+  const [genreSyncBusy, setGenreSyncBusy] = useState(false);
+  const [genreSyncFehler, setGenreSyncFehler] = useState<string | null>(null);
   /**
    * Der angeklickte Charakter – öffnet dasselbe Detail-Modal wie in der
    * Galerie (`CharacterDetailModal`, dort herausgelöst), aber **hier in der
@@ -865,6 +885,71 @@ export default function ScenarioDetailPage({
   }
 
   /**
+   * Genre-Änderung an den Festlegungen abfangen: Wird das Genre auf ein
+   * **anderes, nicht-leeres** Genre gesetzt und tragen zugeordnete Figuren ein
+   * abweichendes Genre, öffnet sich die Rückfrage `GenreSyncModal`. Der
+   * Feld-Wert selbst wird immer übernommen (`setDetails`) – die Übertragung auf
+   * die Figuren ist davon unabhängig und nur auf Bestätigung. Ein Wechsel auf
+   * „— keins —" fragt nicht (den Figuren ein leeres Genre aufzudrücken hieße,
+   * sie auf „Gegenwart" zurückzustufen).
+   */
+  function festlegungenAendern(next: ScenarioDetails) {
+    if (
+      next.genre &&
+      next.genre !== details.genre &&
+      characters.some((c) => c.input.genre !== next.genre)
+    ) {
+      const betroffen = characters.filter((c) => c.input.genre !== next.genre);
+      setGenreSyncFehler(null);
+      setGenreSync({ genre: next.genre, betroffen });
+    }
+    setDetails(next);
+  }
+
+  /**
+   * Das neue Genre auf die betroffenen Figuren übertragen (Teil-PATCH je Figur,
+   * nur das Genre). Sofort persistiert – unabhängig vom „Änderungen speichern"
+   * der Festlegungen, wie die übrigen Figuren-Operationen dieser Seite.
+   */
+  async function genreUebertragen() {
+    if (!genreSync || genreSyncBusy) return;
+    setGenreSyncBusy(true);
+    setGenreSyncFehler(null);
+    try {
+      const aktualisiert = await Promise.all(
+        genreSync.betroffen.map((c) => updateCharacterGenre(c.id, genreSync.genre)),
+      );
+      const beiId = new Map(aktualisiert.map((c) => [c.id, c]));
+      setCharacters((cs) => cs.map((c) => beiId.get(c.id) ?? c));
+      setSelectedChar((sel) => (sel ? beiId.get(sel.id) ?? sel : sel));
+      setGenreSync(null);
+    } catch (e) {
+      setGenreSyncFehler(e instanceof Error ? e.message : "Übertragen fehlgeschlagen.");
+    } finally {
+      setGenreSyncBusy(false);
+    }
+  }
+
+  /**
+   * Namen aus den Welt-Feldern (Beschreibung/Ort/Zeit/Regeln) per KI erzeugen.
+   * Der Vorschlag geht ins Namensfeld (Bearbeitungs-Zustand → `dirty`); die
+   * Route persistiert nichts, gespeichert wird über „Änderungen speichern".
+   */
+  async function nameErzeugen() {
+    if (nameBusy) return;
+    setNameBusy(true);
+    setNameFehler(null);
+    try {
+      const vorschlag = await generateScenarioName(details);
+      if (vorschlag) setName(vorschlag);
+    } catch (e) {
+      setNameFehler(e instanceof Error ? e.message : "Name fehlgeschlagen.");
+    } finally {
+      setNameBusy(false);
+    }
+  }
+
+  /**
    * Zuordnung ändern. Wird der Charakter einem **anderen** Szenario (oder
    * keinem) zugewiesen, gehört er nicht mehr hierher – dann fällt seine Kachel
    * weg und das Modal schließt. Bleibt er bei diesem Szenario, wird er nur
@@ -1409,12 +1494,43 @@ export default function ScenarioDetailPage({
         >
           ← Szenarien
         </Link>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          aria-label="Name des Szenarios"
-          className="mt-1 -mx-2 w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-3xl font-semibold tracking-tight outline-none transition hover:border-black/15 focus:border-black/40 dark:hover:border-white/15 dark:focus:border-white/40"
-        />
+        <div className="mt-1 -mx-2 flex items-center gap-1">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            aria-label="Name des Szenarios"
+            className="w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-3xl font-semibold tracking-tight outline-none transition hover:border-black/15 focus:border-black/40 dark:hover:border-white/15 dark:focus:border-white/40"
+          />
+          {/*
+            KI-Name aus Beschreibung/Ort/Zeit/Regeln. Ersetzt das Feld (geht in
+            den Bearbeitungs-Zustand, „Verwerfen" holt den alten Namen zurück).
+            Gesperrt, solange keins der vier Felder etwas hergibt.
+          */}
+          <button
+            type="button"
+            onClick={nameErzeugen}
+            disabled={
+              saving ||
+              nameBusy ||
+              !(
+                details.beschreibung.trim() ||
+                details.ort.trim() ||
+                details.zeit.trim() ||
+                details.regeln.trim()
+              )
+            }
+            title="Namen aus Beschreibung, Ort, Zeit und Regeln erzeugen"
+            aria-label="Namen per KI erzeugen"
+            className="shrink-0 rounded-md border border-black/15 px-2.5 py-1.5 text-lg transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+          >
+            {nameBusy ? "…" : "✨"}
+          </button>
+        </div>
+        {nameFehler && (
+          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+            {nameFehler}
+          </p>
+        )}
       </div>
 
       {dirty && (
@@ -1533,7 +1649,7 @@ export default function ScenarioDetailPage({
         </h2>
         <ScenarioFields
           details={details}
-          onChange={setDetails}
+          onChange={festlegungenAendern}
           disabled={saving}
           fields={["genre", "ort", "zeit", "regeln"]}
           generatable={ERZEUGBAR}
@@ -2353,6 +2469,22 @@ export default function ScenarioDetailPage({
               [...gs, scenario].sort((a, b) => a.name.localeCompare(b.name)),
             )
           }
+        />
+      )}
+
+      {genreSync && (
+        <GenreSyncModal
+          genreLabel={(() => {
+            const g = GENRE_TEMPLATES.find((t) => t.id === genreSync.genre);
+            return g ? `${g.emoji} ${g.label}` : genreSync.genre;
+          })()}
+          anzahl={genreSync.betroffen.length}
+          busy={genreSyncBusy}
+          fehler={genreSyncFehler}
+          onConfirm={genreUebertragen}
+          onClose={() => {
+            if (!genreSyncBusy) setGenreSync(null);
+          }}
         />
       )}
     </div>

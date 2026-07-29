@@ -620,6 +620,26 @@ export async function updateCharacterContent(
   return data.character as StoredCharacter;
 }
 
+/**
+ * Ändert **nur das Genre** eines Charakters (Teil-PATCH `{ genre }`). Anders als
+ * `updateCharacterContent` reist kein Text/Merkmal mit – die Route liest die
+ * gespeicherten Vorgaben, setzt darin nur das Genre und schreibt zurück. Gebaut
+ * für „Genre des Szenarios auf die zugeordneten Figuren übertragen".
+ */
+export async function updateCharacterGenre(
+  id: string,
+  genre: string,
+): Promise<StoredCharacter> {
+  const res = await fetch(`/api/characters/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ genre }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Speichern fehlgeschlagen.");
+  return data.character as StoredCharacter;
+}
+
 export async function deleteCharacter(id: string): Promise<void> {
   const res = await fetch(`/api/characters/${id}`, { method: "DELETE" });
   if (!res.ok) {
@@ -1018,6 +1038,26 @@ export async function deleteScenario(id: string): Promise<void> {
   }
 }
 
+/**
+ * Erzeugt einen **Namen für ein Szenario** aus seinen Welt-Feldern
+ * (Beschreibung, Ort, Zeit, Regeln) – Freitext wie `generateStoryTitle`.
+ * **Persistiert nichts**; der Aufrufer setzt den Namen ins Feld und speichert
+ * ihn über „Änderungen speichern". Die Festlegungen gehen im aktuellen,
+ * womöglich ungespeicherten Stand mit.
+ */
+export async function generateScenarioName(
+  details: ScenarioDetails,
+): Promise<string> {
+  const res = await fetch("/api/scenario-name", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ details }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || "Name fehlgeschlagen.");
+  return (data.name as string) ?? "";
+}
+
 // --- Szenario-Bild --------------------------------------------------------
 
 /**
@@ -1029,7 +1069,12 @@ export async function deleteScenario(id: string): Promise<void> {
 export function generateScenarioImage(
   details: ScenarioDetails,
   imageStyle: string,
-  options: { extraPrompt?: string; referenceImages?: string[] } = {},
+  options: {
+    extraPrompt?: string;
+    referenceImages?: string[];
+    /** Bild ohne Figuren (Default an). Aus = „keine Personen" fällt weg. */
+    ohneMenschen?: boolean;
+  } = {},
 ) {
   return postJson<{ imageData: string }>("/api/scenario-image", {
     details,

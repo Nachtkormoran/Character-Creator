@@ -537,7 +537,7 @@ export const SCENARIO_MAXLENGTHS = {
   regeln: 4000,
   beschreibung: 4000,
   figuren: 3000,
-  handlung: 4000,
+  handlung: 5500,
   handlungselemente: 3000,
 } as const;
 

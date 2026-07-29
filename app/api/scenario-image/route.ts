@@ -29,6 +29,10 @@ const bodySchema = z.object({
   details: scenarioDetailsSchema,
   imageStyle: z.string().default(DEFAULT_IMAGE_STYLE),
   extraPrompt: z.string().max(1000).optional(),
+  // Ob das Bild ohne Figuren entstehen soll (Checkbox „ohne Menschen").
+  // Default an = bisheriges Verhalten; aus = die „keine Personen"-Vorgabe
+  // fällt aus dem Prompt.
+  ohneMenschen: z.boolean().optional().default(true),
   // Stil-/Motivvorlagen als Data-URLs – wie bei `generate-image`.
   referenceImages: z
     .array(z.string().max(12_000_000))
@@ -47,10 +51,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const { details, imageStyle, extraPrompt, referenceImages } = parsed.data;
+    const { details, imageStyle, extraPrompt, referenceImages, ohneMenschen } =
+      parsed.data;
 
     const prompt = buildScenarioImagePrompt(details, imageStyle, {
       extraPrompt,
+      ohneMenschen,
     });
 
     const { imageModel, imageQuality } = await getSettings();

@@ -59,6 +59,9 @@ export function ScenarioImageModal({
   const [kandidat, setKandidat] = useState<string | null>(null);
   const [stil, setStil] = useState<string>(DEFAULT_IMAGE_STYLE);
   const [stichwoerter, setStichwoerter] = useState("");
+  // Default an = bisheriges Verhalten (Welt ohne Figuren). Aus = das Modell
+  // darf Menschen zeigen. Reiner Lauf-Parameter, nicht gespeichert.
+  const [ohneMenschen, setOhneMenschen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -91,6 +94,7 @@ export function ScenarioImageModal({
     try {
       const { imageData } = await generateScenarioImage(details, stil, {
         extraPrompt: stichwoerter.trim() || undefined,
+        ohneMenschen,
       });
       setKandidat(imageData);
     } catch (e) {
@@ -306,6 +310,20 @@ export function ScenarioImageModal({
                   className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
                 />
               </div>
+
+              <label
+                className="flex cursor-pointer items-start gap-2 text-sm text-foreground/70"
+                title="An (Standard): das Weltbild zeigt keine Figuren. Aus: das Modell darf Menschen in die Szene setzen. Wird nicht gespeichert."
+              >
+                <input
+                  type="checkbox"
+                  checked={ohneMenschen}
+                  onChange={(e) => setOhneMenschen(e.target.checked)}
+                  disabled={busy}
+                  className="mt-0.5"
+                />
+                <span>ohne Menschen</span>
+              </label>
 
               <button
                 type="button"

@@ -672,6 +672,36 @@ Antworte mit nichts als dem Titel.`;
 }
 
 /**
+ * Baut den Prompt für den **Namen eines Szenarios** – ein Name für die Welt
+ * einer Geschichte, damit ein Szenario nicht „Neues Szenario" heißen muss.
+ *
+ * Zuschnitt wie `buildStoryTitlePrompt`/`buildNamePrompt`: **Freitext**, wenige
+ * Wörter, kein JSON. Grundlage sind bewusst nur **Beschreibung, Ort, Zeit und
+ * Regeln** – die Welt-Felder. **Genre, Figuren und Handlung** gehen nicht ein:
+ * ein Szenario-Name benennt den Ort/die Stimmung, nicht die Gattung oder eine
+ * einzelne Geschichte darin. Leere Felder bleiben weg; ist alles leer, bittet
+ * der Prompt um einen offenen, stimmungsvollen Namen.
+ */
+export function buildScenarioNamePrompt(details: ScenarioDetails): string {
+  const felder = [
+    ["Beschreibung", details.beschreibung],
+    ["Ort", details.ort],
+    ["Zeit", details.zeit],
+    ["Regeln", details.regeln],
+  ]
+    .map(([label, wert]) => [label, wert.trim()] as const)
+    .filter(([, wert]) => wert)
+    .map(([label, wert]) => `${label}: ${wert}`)
+    .join("\n");
+
+  return `Gib einen **kurzen, treffenden Namen** für das folgende Szenario – die Welt, in der eine Geschichte spielt. Zwei bis fünf Wörter, kein ganzer Satz, kein Punkt am Ende, keine Anführungszeichen. Der Name soll die Welt auf einen Blick wiedererkennbar machen – ein Ort, ein Motiv oder eine Stimmung –, keine allgemeine Gattung.
+
+${felder || "(keine näheren Angaben – erfinde einen stimmungsvollen, offenen Namen)"}
+
+Antworte mit nichts als dem Namen.`;
+}
+
+/**
  * Baut den Prompt für den **Story Arc** – die dramaturgische Zerlegung eines
  * Handlungsentwurfs in eine geordnete Folge von Stationen (Fünfakter).
  *
@@ -2123,6 +2153,9 @@ Form der Antwort: **eine Figur je Zeile**, durch Zeilenumbrüche getrennt. Keine
  * sondern weil ein Szenario für viele Figuren zugleich gilt und keine einzelne
  * es bebildern sollte. Das „keine Personen" steht daher betont und mehrfach im
  * Prompt: Bild-Modelle setzen sonst reflexhaft einen Menschen in die Szene.
+ * Über `options.ohneMenschen` (Default an) lässt sich das abschalten – dann
+ * fallen beide „keine Personen"-Stellen weg und der Prompt bleibt zur Frage der
+ * Figuren neutral (fordert Menschen aber nicht aktiv ein).
  *
  * Wiederverwendet wird die Welt-Karte `BILDWELTEN` (Genre → Epoche, Umgebung,
  * Beispielorte) und dieselbe **Stilauswahl** wie beim Charakter
@@ -2142,8 +2175,12 @@ Form der Antwort: **eine Figur je Zeile**, durch Zeilenumbrüche getrennt. Keine
 export function buildScenarioImagePrompt(
   details: ScenarioDetails,
   imageStyle: string,
-  options: { extraPrompt?: string } = {},
+  options: { extraPrompt?: string; ohneMenschen?: boolean } = {},
 ): string {
+  // Default an: die Welt ohne Figuren zeigen (bisheriges Verhalten). Aus =
+  // die „keine Personen"-Einschränkung fällt aus dem Prompt; das Modell darf
+  // dann Menschen setzen, wird aber nicht dazu aufgefordert.
+  const ohneMenschen = options.ohneMenschen ?? true;
   const welt = BILDWELTEN[details.genre ?? ""] ?? BILDWELTEN[DEFAULT_GENRE];
 
   // Ort und Beschreibung tragen das Motiv bzw. die Stimmung, dürfen aber lang
@@ -2173,10 +2210,18 @@ export function buildScenarioImagePrompt(
     : "";
 
   // „Keine Personen" doppelt: einmal als Bildinhalt, einmal als Rahmen. Das
-  // Modell setzt sonst gern eine einzelne Figur als „Anker" in die Szene.
-  return `Establishing shot of a place — the world of a story, depicted as an empty scene with NO people. ${stil}
+  // Modell setzt sonst gern eine einzelne Figur als „Anker" in die Szene. Beide
+  // Stellen fallen weg, wenn `ohneMenschen` aus ist – dann bleibt der Prompt zur
+  // Frage der Figuren neutral (fordert sie aber nicht aktiv).
+  const openerMenschen = ohneMenschen
+    ? ", depicted as an empty scene with NO people"
+    : "";
+  const framingMenschen = ohneMenschen
+    ? " Absolutely NO people, NO characters, NO figures, NO portraits, NO crowds — an unpopulated scene."
+    : "";
+  return `Establishing shot of a place — the world of a story${openerMenschen}. ${stil}
 ${setzung || `- A ${welt.umgebung} (e.g. ${welt.orte})\n`}${extraBlock}
 Show a single, coherent view of this world — if several locations are described, choose ONE fitting vantage point rather than combining them. Convey the era through architecture, materials, vehicles and objects.
 
-Framing: wide environmental / landscape composition, the place itself is the subject, with atmospheric depth. Absolutely NO people, NO characters, NO figures, NO portraits, NO crowds — an unpopulated scene. No text, no watermark, no labels.`;
+Framing: wide environmental / landscape composition, the place itself is the subject, with atmospheric depth.${framingMenschen} No text, no watermark, no labels.`;
 }
