@@ -38,6 +38,10 @@ const bodySchema = z.object({
   // „weiterspinnen": eine vollständige Geschichte (bis zum Ende) statt einer
   // offenen Ausgangslage. Unabhängig von `basis`.
   weiterspinnen: z.boolean().optional().default(false),
+  // „fortsetzen": den vorhandenen Entwurf (`basis`) fortführen und **nur die
+  // Fortsetzung** liefern – der Client hängt sie an. Braucht `basis`; ohne
+  // fällt es auf das gewöhnliche Verhalten zurück.
+  fortsetzen: z.boolean().optional().default(false),
   // Ton und Sprache – nicht gespeichert. Ohne Allowlist als String: ein
   // unbekannter Wert liefert bloß keinen Ton-Block (`toneHint` gibt "").
   ton: z.string().trim().max(40).optional().default(""),
@@ -78,6 +82,7 @@ export async function POST(request: Request) {
       zusatz,
       basis,
       weiterspinnen,
+      fortsetzen,
       ton,
       neuePersonen,
       neuePersonenWunsch,
@@ -136,9 +141,11 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content: weiterspinnen
-            ? "Du bist Dramaturg. Du entwirfst vollständige Geschichten – von der Ausgangslage bis zu einem Ende – und antwortest ausschließlich mit dem Entwurf selbst."
-            : "Du bist Dramaturg. Du entwirfst Ausgangslagen, aus denen sich Geschichten entwickeln, und antwortest ausschließlich mit dem Entwurf selbst.",
+          content: fortsetzen
+            ? "Du bist Dramaturg. Du setzt einen vorhandenen Handlungsentwurf nahtlos fort und antwortest ausschließlich mit der Fortsetzung – ohne den bisherigen Text zu wiederholen."
+            : weiterspinnen
+              ? "Du bist Dramaturg. Du entwirfst vollständige Geschichten – von der Ausgangslage bis zu einem Ende – und antwortest ausschließlich mit dem Entwurf selbst."
+              : "Du bist Dramaturg. Du entwirfst Ausgangslagen, aus denen sich Geschichten entwickeln, und antwortest ausschließlich mit dem Entwurf selbst.",
         },
         {
           role: "user",
@@ -153,6 +160,7 @@ export async function POST(request: Request) {
             neuePersonen,
             neuePersonenWunsch,
             form,
+            fortsetzen,
           ),
         },
       ],

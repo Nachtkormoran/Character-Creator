@@ -803,6 +803,53 @@ export default function ScenarioDetailPage({
     }
   }
 
+  /**
+   * **Den aktiven Handlungsentwurf fortsetzen** – anders als „✨ Neu erzeugen"
+   * kein neuer Reiter, sondern der vorhandene Text im Feld wächst weiter. Die
+   * Route bekommt den aktuellen Text als `basis` und liefert **nur die
+   * Fortsetzung**; die wird an `details.handlung` angehängt (die live-Wahrheit
+   * der aktiven Variante). Geht damit in `dirty` – gespeichert wird über
+   * „Änderungen speichern". Nutzt dieselben Lauf-Parameter wie „Neu erzeugen"
+   * (Ton, Erzählform, Weiterspinnen, neue Personen, Modell, Stichwörter).
+   */
+  async function handlungFortsetzen() {
+    if (generatingField || saving) return;
+    if (!details.handlung.trim()) return;
+    setGeneratingField("handlung");
+    setSaveError(null);
+    try {
+      const { handlung: fortsetzung } = await generateScenarioPlot(
+        id,
+        name.trim(),
+        {
+          ...details,
+          figuren: aktiveFiguren(details.figuren),
+          handlungselemente: aktiveEintraege(details.handlungselemente),
+        },
+        zusatz.handlung ?? "",
+        details.handlung, // basis = der fortzusetzende Text
+        handlungWeiterspinnen,
+        handlungTon,
+        handlungNeuePersonen,
+        handlungNeuePersonenWunsch,
+        handlungForm,
+        handlungProvider,
+        true, // fortsetzen
+      );
+      const neu = fortsetzung.trim();
+      if (neu) {
+        setDetails((d) => ({
+          ...d,
+          handlung: `${d.handlung.trimEnd()}\n\n${neu}`,
+        }));
+      }
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setGeneratingField(null);
+    }
+  }
+
   // Anzeige-Einstellung laden (ob das verwendete Modell mit angezeigt wird).
   // Scheitert der Aufruf, bleibt es beim Default aus.
   useEffect(() => {
@@ -2233,6 +2280,27 @@ export default function ScenarioDetailPage({
           }
           hideLabel
         />
+
+        {/*
+          Entwurf fortsetzen – anders als „✨ Neu erzeugen" (neuer Reiter) wächst
+          der vorhandene Text im Feld weiter: die KI knüpft ans Ende an, die
+          Fortsetzung wird angehängt. Nur sichtbar, wenn ein Entwurf da ist.
+        */}
+        {details.handlung.trim() && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={handlungFortsetzen}
+              disabled={saving || generatingField !== null}
+              title="Knüpft an das Ende des aktuellen Entwurfs an und schreibt weiter. Die Fortsetzung wird an den vorhandenen Text angehängt (nicht als neuer Reiter). Nutzt Ton, Erzählform, „Weiterspinnen“ und die Stichwörter wie „Neu erzeugen“."
+              className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              {generatingField === "handlung"
+                ? "Setze fort …"
+                : "⏩ Entwurf fortsetzen"}
+            </button>
+          </div>
+        )}
 
         {/*
           Personen aus dem Handlungsentwurf – direkt unter dem Feld, weil sie

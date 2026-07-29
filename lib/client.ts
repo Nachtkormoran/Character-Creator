@@ -860,6 +860,12 @@ export function generateScenarioPlot(
    * die Einstellung greift (Standard).
    */
   textProvider = "",
+  /**
+   * **Entwurf fortsetzen** statt neu erzeugen: `basis` (der vorhandene Entwurf)
+   * wird fortgeführt, und die Antwort ist **nur die Fortsetzung** – der Aufrufer
+   * hängt sie an den vorhandenen Text an. Braucht `basis`.
+   */
+  fortsetzen = false,
 ) {
   return postJson<{ handlung: string; characters: number; model: string }>(
     "/api/scenario-plot",
@@ -870,6 +876,7 @@ export function generateScenarioPlot(
       zusatz,
       basis,
       weiterspinnen,
+      fortsetzen,
       ton,
       neuePersonen,
       neuePersonenWunsch,
