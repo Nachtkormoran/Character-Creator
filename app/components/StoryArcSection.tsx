@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import Image from "next/image";
 import {
   ARC_FORMATS,
   ARC_LENGTHS,
@@ -107,6 +108,10 @@ export function StoryArcSection({
   onArcKopieren,
   onArcLoeschen,
   onAlleArcsLoeschen,
+  coverCharaktere,
+  onArcCover,
+  onArcAlsBuch,
+  weltbild,
   showModel,
   kapitelModell,
   storyTextModell,
@@ -187,6 +192,25 @@ export function StoryArcSection({
   /** Alle Arcs auf einmal löschen. */
   onAlleArcsLoeschen: () => void;
   /**
+   * Charaktere des Szenarios – für den **Cover-Picker** eines Buches. Als Cover
+   * wählbar sind das Weltbild (Standard) oder das Porträt eines dieser Charaktere.
+   */
+  coverCharaktere: {
+    id: string;
+    name: string;
+    thumbnail: string | null;
+    isProtagonist: boolean;
+  }[];
+  /** Das Cover des Arcs `i` setzen (`""` = Weltbild, `"char:<id>"` = Porträt). */
+  onArcCover: (i: number, cover: string) => void;
+  /**
+   * Den Arc `i` als Buch in der Bibliothek an-/abwählen (`meta.alsBuch`). Erst
+   * wenn dies an ist **und** der Arc Prosa hat, erscheint er unter `/library`.
+   */
+  onArcAlsBuch: (i: number, alsBuch: boolean) => void;
+  /** Primär-Weltbild-Thumbnail des Szenarios – Vorschau der „Weltbild"-Kachel im Cover-Picker. */
+  weltbild?: string | null;
+  /**
    * Einstellung „Verwendetes Modell anzeigen". Bei `true` wird bei Arc,
    * Kapitel-Ableitung und Kapitel-Prosa das erzeugende Modell mit angezeigt.
    */
@@ -217,6 +241,15 @@ export function StoryArcSection({
     s.kapitel.some((k) => k.text.trim() !== ""),
   );
   const buchTitel = arcMeta[arcAktiv]?.titel?.trim() || `Arc ${arcAktiv + 1}`;
+
+  // Cover-Picker des aktiven Arcs: offen/zu, aktueller Wert und ein Label dafür.
+  const [coverOffen, setCoverOffen] = useState(false);
+  const aktivesCover = arcMeta[arcAktiv]?.cover ?? "";
+  const coverCharakter = aktivesCover.startsWith("char:")
+    ? coverCharaktere.find((c) => c.id === aktivesCover.slice(5))
+    : undefined;
+  const coverLabel = coverCharakter ? coverCharakter.name : "Weltbild";
+  const aktivAlsBuch = arcMeta[arcAktiv]?.alsBuch ?? false;
 
   // Welche Kapitel-Prosatexte ausgeklappt sind, nach „Station.Kapitel"-Schlüssel.
   // Rein darstellend – der Text selbst lebt im Arc, nicht hier.
@@ -317,17 +350,44 @@ export function StoryArcSection({
               ? `Dramaturgische Zerlegung – abgeleitet aus ${quelleLabel}.`
               : "Die dramaturgische Zerlegung des Handlungsentwurfs in Stationen."}
           </p>
-          {/* Buch-Reader: erscheint nur, wenn mindestens ein Kapitel Prosa hat –
-              sonst gäbe es nichts zu lesen. */}
-          {hatLesbareKapitel && (
-            <button
-              type="button"
-              onClick={() => setReaderOffen(true)}
-              title="Die erzeugten Kapitel ablenkungsfrei als Buch lesen"
-              className="mt-2 rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
-            >
-              📖 Als Buch lesen
-            </button>
+          {/* Buch-Knöpfe: lesen (nur bei Prosa) und Cover wählen (bei jedem Arc). */}
+          {hatArc && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {hatLesbareKapitel && (
+                <button
+                  type="button"
+                  onClick={() => setReaderOffen(true)}
+                  title="Die erzeugten Kapitel ablenkungsfrei als Buch lesen"
+                  className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+                >
+                  📖 Als Buch lesen
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setCoverOffen((o) => !o)}
+                disabled={disabled || busy}
+                title="Titelbild dieses Buches in der Bibliothek wählen (Weltbild oder ein Charakterporträt)"
+                className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              >
+                🖼️ Cover: {coverLabel}
+              </button>
+              {/* Ob dieser Arc überhaupt als Buch in der Bibliothek erscheint –
+                  Default aus. Ein frisch abgeleiteter Arc ist ein Arbeitsstand. */}
+              <label
+                title="Diesen Story Arc als Buch in der Bibliothek anzeigen (nur mit mindestens einem ausformulierten Kapitel)"
+                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+              >
+                <input
+                  type="checkbox"
+                  checked={aktivAlsBuch}
+                  disabled={disabled || busy}
+                  onChange={(e) => onArcAlsBuch(arcAktiv, e.target.checked)}
+                  className="h-4 w-4 accent-current disabled:opacity-50"
+                />
+                📚 In Bibliothek
+              </label>
+            </div>
           )}
         </div>
 
@@ -493,6 +553,89 @@ export function StoryArcSection({
         </div>
       </div>
 
+      {/* Cover-Picker des aktiven Arcs: Weltbild (Standard) oder ein
+          Charakterporträt. Setzt `meta[aktiv].cover` (geht in „Änderungen
+          speichern"); wirkt aufs Titelbild in der Bibliothek. */}
+      {coverOffen && hatArc && (
+        <div className="mt-3 rounded-lg border border-black/10 bg-black/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03]">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-medium text-foreground/60">
+              Cover für „{buchTitel}“ (Bibliothek)
+            </span>
+            <button
+              type="button"
+              onClick={() => setCoverOffen(false)}
+              aria-label="Cover-Auswahl schließen"
+              className="px-1 text-foreground/50 transition hover:text-foreground"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {/* Weltbild – der Standard. */}
+            <CoverKachel
+              ausgewaehlt={aktivesCover === ""}
+              onClick={() => {
+                onArcCover(arcAktiv, "");
+                setCoverOffen(false);
+              }}
+              label="Weltbild"
+            >
+              {weltbild ? (
+                <Image
+                  src={weltbild}
+                  alt=""
+                  fill
+                  sizes="72px"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <span className="flex h-full items-center justify-center text-2xl opacity-60">
+                  🏞️
+                </span>
+              )}
+            </CoverKachel>
+
+            {coverCharaktere.map((c) => {
+              const wert = `char:${c.id}`;
+              return (
+                <CoverKachel
+                  key={c.id}
+                  ausgewaehlt={aktivesCover === wert}
+                  onClick={() => {
+                    onArcCover(arcAktiv, wert);
+                    setCoverOffen(false);
+                  }}
+                  label={c.name}
+                  markierung={c.isProtagonist ? "⭐" : undefined}
+                >
+                  {c.thumbnail ? (
+                    <Image
+                      src={c.thumbnail}
+                      alt=""
+                      fill
+                      sizes="72px"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <span className="flex h-full items-center justify-center text-2xl opacity-30">
+                      🧑
+                    </span>
+                  )}
+                </CoverKachel>
+              );
+            })}
+          </div>
+          {coverCharaktere.length === 0 && (
+            <p className="mt-2 text-xs text-foreground/50">
+              Noch keine Charaktere im Szenario – als Cover dient das Weltbild.
+            </p>
+          )}
+        </div>
+      )}
+
       {/*
         Reiter-Leiste über der Zeitleiste: zwischen mehreren Story Arcs
         umschalten – genau wie bei den Handlungsentwürfen. Erscheint ab einem
@@ -519,6 +662,8 @@ export function StoryArcSection({
               quelle: "",
               modell: "",
               werkform: "",
+              cover: "",
+              alsBuch: false,
             };
             const titel = meta.titel.trim() || `Arc ${i + 1}`;
             const badge = variantBadge(meta);
@@ -1209,5 +1354,46 @@ export function StoryArcSection({
         />
       )}
     </section>
+  );
+}
+
+/** Eine wählbare Cover-Kachel im Picker: Vorschau + Label, Ring bei Auswahl. */
+function CoverKachel({
+  ausgewaehlt,
+  onClick,
+  label,
+  markierung,
+  children,
+}: {
+  ausgewaehlt: boolean;
+  onClick: () => void;
+  label: string;
+  markierung?: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-pressed={ausgewaehlt}
+      className={`flex w-[72px] flex-col overflow-hidden rounded-md border text-left transition ${
+        ausgewaehlt
+          ? "border-foreground ring-2 ring-foreground/60"
+          : "border-black/15 hover:border-black/40 dark:border-white/15 dark:hover:border-white/40"
+      }`}
+    >
+      <div className="relative aspect-square w-full bg-black/[0.04] dark:bg-white/[0.04]">
+        {children}
+        {markierung && (
+          <span className="absolute top-0.5 right-0.5 text-xs drop-shadow">
+            {markierung}
+          </span>
+        )}
+      </div>
+      <span className="truncate px-1.5 py-1 text-[11px] text-foreground/70">
+        {label}
+      </span>
+    </button>
   );
 }

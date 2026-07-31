@@ -827,6 +827,22 @@ export interface VariantMeta {
    * `showModel` an ist. Leer bei Altbeständen und von Hand angelegten Varianten.
    */
   modell: string;
+  /**
+   * **Cover-Bild** eines Buches (nur bei Story Arcs): steuert das Titelbild in
+   * der Bibliothek. Leer = das Primär-Weltbild des Szenarios (Standard). Sonst
+   * ein Verweis `"char:<characterId>"` auf einen Charakter, dessen Primärporträt
+   * als Cover dient (Referenz statt Bild-Id, damit das Cover aktuell bleibt, wenn
+   * das Porträt neu erzeugt wird). Bei Handlungsentwurf-Varianten leer.
+   */
+  cover: string;
+  /**
+   * **Als Buch in der Bibliothek zeigen** (nur bei Story Arcs): Erst wenn dies
+   * `true` ist, erscheint der Arc – sofern er mindestens ein ausformuliertes
+   * Kapitel hat – als Buch unter `/library`. Default `false`: ein frisch
+   * abgeleiteter Arc ist ein Arbeitsstand, kein fertiges Buch, und soll die
+   * Bibliothek nicht von selbst füllen. Bei Handlungsentwurf-Varianten leer/false.
+   */
+  alsBuch: boolean;
 }
 
 export const variantMetaSchema = z.object({
@@ -837,6 +853,8 @@ export const variantMetaSchema = z.object({
   quelle: z.string().trim().max(200).optional().default(""),
   modell: z.string().trim().max(120).optional().default(""),
   werkform: z.string().trim().max(40).optional().default(""),
+  cover: z.string().trim().max(200).optional().default(""),
+  alsBuch: z.boolean().optional().default(false),
 });
 
 /**
@@ -856,6 +874,8 @@ export function normalizeMetaList(raw: unknown, laenge: number): VariantMeta[] {
       quelle: typeof o.quelle === "string" ? o.quelle : "",
       modell: typeof o.modell === "string" ? o.modell : "",
       werkform: typeof o.werkform === "string" ? o.werkform : "",
+      cover: typeof o.cover === "string" ? o.cover : "",
+      alsBuch: typeof o.alsBuch === "boolean" ? o.alsBuch : false,
     };
   });
 }
@@ -1340,12 +1360,14 @@ export const storyArcSchema = z.object({
   stufen: z.array(arcStufeSchema),
 });
 
-/** Ein Kapitel – Überschrift und zwei bis drei Sätze, was darin passiert. */
+/** Ein Kapitel – Überschrift und eine ausführliche Zusammenfassung, was darin passiert. */
 export const kapitelSchema = z.object({
   titel: z.string().describe("Kurze Überschrift des Kapitels (2–6 Wörter)"),
   inhalt: z
     .string()
-    .describe("Zwei bis drei Sätze, was in diesem Kapitel passiert"),
+    .describe(
+      "Was in diesem Kapitel passiert – als ausgearbeiteter Fließtext, mindestens 600 Zeichen (etwa fünf bis acht Sätze): konkret und lückenlos, welche Figuren wie beteiligt sind und wie sich die Lage verschiebt.",
+    ),
 });
 
 /** Die Antwort der Kapitel-Route – umschließendes Objekt (Structured Output). */

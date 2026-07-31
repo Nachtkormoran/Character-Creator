@@ -94,6 +94,8 @@ const LEER_META: VariantMeta = {
   quelle: "",
   modell: "",
   werkform: "",
+  cover: "",
+  alsBuch: false,
 };
 
 /**
@@ -649,6 +651,40 @@ export default function ScenarioDetailPage({
   }
 
   /**
+   * Das **Cover** eines Story Arcs setzen (`""` = Weltbild, `"char:<id>"` =
+   * Charakterporträt). Steuert das Titelbild in der Bibliothek; geht wie Titel/
+   * Favorit in `dirty` ein und wird über „Änderungen speichern" abgelegt.
+   */
+  function arcCoverSetzen(i: number, cover: string) {
+    if (arcBusy || saving) return;
+    const items = aktuelleArcs();
+    if (i < 0 || i >= items.length) return;
+    const meta = ausgerichtet(arcMeta, items.length);
+    setArcMeta(meta.map((m, k) => (k === i ? { ...m, cover } : m)));
+  }
+
+  /**
+   * Den Story Arc `i` als **Buch in der Bibliothek** an-/abwählen
+   * (`meta.alsBuch`, Default aus). Wie Cover/Titel/Favorit ein Metadaten-Belang:
+   * geht in `dirty` ein und wird über „Änderungen speichern" abgelegt.
+   */
+  function arcAlsBuchSetzen(i: number, alsBuch: boolean) {
+    if (arcBusy || saving) return;
+    const items = aktuelleArcs();
+    if (i < 0 || i >= items.length) return;
+    const meta = ausgerichtet(arcMeta, items.length);
+    setArcMeta(meta.map((m, k) => (k === i ? { ...m, alsBuch } : m)));
+  }
+
+  /** Charaktere in der Form, die der Cover-Picker braucht (Name, Porträt, Protagonist). */
+  const coverCharaktere = characters.map((c) => ({
+    id: c.id,
+    name: c.character.name,
+    thumbnail: primaryImage(c)?.thumbnail ?? null,
+    isProtagonist: c.isProtagonist,
+  }));
+
+  /**
    * Einen bestehenden Story Arc **kopieren** – eine eigenständige Kopie des
    * Arcs am Index `i` (tiefe Kopie samt Stationen und Kapiteln), angehängt und
    * aktiv geschaltet. Der Titel bekommt „(Kopie)", Form/Ton/Quelle reisen mit,
@@ -672,6 +708,8 @@ export default function ScenarioDetailPage({
       ...q,
       titel: q.titel.trim() ? `${q.titel.trim()} (Kopie)` : "",
       favorit: false,
+      // Die Kopie ist ein frischer Arbeitsstand – nicht automatisch ein Buch.
+      alsBuch: false,
     };
     setArcVarianten([...items, kopie]);
     setArcAktiv(items.length);
@@ -823,6 +861,10 @@ export default function ScenarioDetailPage({
             modell: model,
             // Handlungsentwürfe kennen keine Werkform – leer.
             werkform: "",
+            // Cover ist ein Buch-/Arc-Belang; Handlungsentwürfe tragen keins.
+            cover: "",
+            // „Als Buch" ist ein Arc-Belang; Handlungsentwürfe tragen es nicht.
+            alsBuch: false,
           },
         ]);
       } else {
@@ -1305,6 +1347,10 @@ export default function ScenarioDetailPage({
           modell: model,
           // Werkform zum Erzeugungszeitpunkt an der Arc-Variante festhalten.
           werkform: arcParams.werkform,
+          // Cover wählt man später in der Story-Arc-Sektion; Default = Weltbild.
+          cover: "",
+          // Frisch abgeleitet ist ein Arbeitsstand: erst per Häkchen ein Buch.
+          alsBuch: false,
         },
       ]);
     } catch (e) {
@@ -2453,6 +2499,10 @@ export default function ScenarioDetailPage({
         onArcKopieren={arcKopieren}
         onArcLoeschen={arcLoeschen}
         onAlleArcsLoeschen={alleArcsLoeschen}
+        coverCharaktere={coverCharaktere}
+        onArcCover={arcCoverSetzen}
+        onArcAlsBuch={arcAlsBuchSetzen}
+        weltbild={weltbildVorschau}
         showModel={showModel}
         kapitelModell={kapitelModell}
         storyTextModell={storyTextModell}

@@ -976,21 +976,29 @@ export function buildStoryArcChaptersPrompt(
     ton?: string;
     /** **Erzählform** (`STORY_FORMS`-Wert). Leer/`allround` = ohne Block. */
     form?: string;
+    /**
+     * **Mindestlänge der Zusammenfassung je Kapitel** in Zeichen. Als prüfbarer
+     * Endzustand im Prompt – knappe Modelle (etwa Gemini) liefern sonst zu kurze
+     * Zusammenfassungen. Default 600 (s. `MIN_KAPITEL_LEN` in der Route).
+     */
+    minZeichen?: number;
   } = {},
 ): string {
   const kreativ = !!options.kreativ;
   const min = options.min ?? 2;
   const max = options.max ?? 3;
+  const minZeichen = options.minZeichen ?? 600;
   const anzahlText = `${min} bis ${max} Kapitel`;
   const figuren = stufe.figuren.filter((f) => f.trim());
   const figurenZeile =
     figuren.length > 0 ? `\nBeteiligte Figuren: ${figuren.join(", ")}.` : "";
 
-  // Kreativ: länger und ausgemalt, mit erlaubter Detailerfindung; sonst knapp
-  // und rein zerlegend.
+  // Kreativ: ausgemalt, mit erlaubter Detailerfindung; sonst rein zerlegend.
+  // Beide fordern eine **ausführliche** Zusammenfassung (Mindestlänge unten) –
+  // eine knappe Satzzahl reicht Gemini als Ausrede für zu kurze Texte.
   const satzVorgabe = kreativ
-    ? "drei bis fünf Sätzen, die die Handlung des Kapitels konkret ausmalen"
-    : "zwei bis drei Sätzen, die sagen, was in dem Kapitel passiert";
+    ? "mehreren Sätzen, die die Handlung des Kapitels konkret ausmalen"
+    : "mehreren Sätzen, die konkret sagen, was in dem Kapitel passiert";
 
   const ausarbeitung = kreativ
     ? "- **Arbeite aus.** Bleib im Rahmen der Station (kein neues Großereignis, keine neuen Hauptfiguren, kein anderer Ausgang), aber fülle sie mit konkreten Details: ein Bild, ein Sinneseindruck, eine kleine Handlung, ein Satz Dialog, eine innere Regung. Die Kapitel dürfen erzählerisch atmen und Zwischentöne setzen."
@@ -1018,6 +1026,7 @@ Jedes Kapitel besteht aus:
 Anforderungen:
 ${ausarbeitung}
 - Jedes Kapitel trägt die Handlung ein Stück weiter; keine zwei, die dasselbe sagen.
+- Am Ende muss die Zusammenfassung **jedes** Kapitels mindestens ${minZeichen} Zeichen lang sein – lieber ausführlich und konkret als knapp. Zu kurze Kapitel sind unbrauchbar.
 - Alles auf Deutsch, ohne Nummerierung und ohne Aufzählungszeichen im Text.
 ${formHinweis(options.form)}${tonHinweis(options.ton)}${sparksBlock}`;
 }

@@ -167,12 +167,38 @@ export interface StoredScenario {
    */
   images: StoredImage[];
   count: number;
+  /**
+   * **Schlanke Zusammenfassung der zugeordneten Charaktere** – nur in der
+   * Listen-Antwort (`GET /api/scenarios`) gefüllt, damit die Bibliothek ein als
+   * Cover gewähltes Charakterporträt (`VariantMeta.cover = "char:<id>"`) auflösen
+   * kann, ohne die vollen Charaktere zu laden. In der Detail-Antwort fehlt es
+   * (dort kommen die vollständigen Charaktere separat).
+   */
+  characters?: StoredScenarioCharacter[];
 }
+
+/** Nur, was die Bibliothek fürs Cover braucht: Name, Protagonist-Flag, Thumbnail. */
+export interface StoredScenarioCharacter {
+  id: string;
+  name: string | null;
+  isProtagonist: boolean;
+  /** Thumbnail des Primärbilds (ohne `imageData`); `null`, wenn bildlos. */
+  thumbnail: string | null;
+}
+
+/** Zeilenform einer mitgeladenen Charakter-Zusammenfassung (nur Primär-Thumbnail). */
+type CharacterSummaryRow = {
+  id: string;
+  name: string | null;
+  isProtagonist: boolean;
+  images?: { thumbnail: string | null }[];
+};
 
 /** Szenario-Zeile mit optional mitgeladenen Bild-Metadaten (ohne `imageData`). */
 type ScenarioRow = Scenario & {
   images?: ImageRow[];
   _count?: { characters: number };
+  characters?: CharacterSummaryRow[];
 };
 
 export function serializeScenario(row: ScenarioRow): StoredScenario {
@@ -207,5 +233,12 @@ export function serializeScenario(row: ScenarioRow): StoredScenario {
     storyArcVariants,
     images: (row.images ?? []).map(serializeImage),
     count: row._count?.characters ?? 0,
+    // Nur gesetzt, wenn die Zeile die Zusammenfassung mitbrachte (Listen-Route).
+    characters: row.characters?.map((c) => ({
+      id: c.id,
+      name: c.name,
+      isProtagonist: c.isProtagonist,
+      thumbnail: c.images?.[0]?.thumbnail ?? null,
+    })),
   };
 }

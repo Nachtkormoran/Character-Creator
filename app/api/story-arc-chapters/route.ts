@@ -68,6 +68,12 @@ export async function POST(request: Request) {
     const { stufe, kreativ, anzahl, ton, form, textProvider } = parsed.data;
     const { min, max } = kapitelSpanne(anzahl);
 
+    // Jede Kapitel-Zusammenfassung soll ausführlich sein – mindestens 600
+    // Zeichen. Wie die Stationen-Mindestlänge (`MIN_STUFE_LEN`) dreifach
+    // abgesichert: Prompt als prüfbarer Endzustand, Feld-`describe()` und – hier
+    // – ein Wiederholversuch, der zu kurze Kapitel zählt.
+    const MIN_KAPITEL_LEN = 600;
+
     const { client: openai, model, extraParams } =
       await getTextClient(textProvider, "chapters");
     const prompt = buildStoryArcChaptersPrompt(stufe, {
@@ -77,6 +83,7 @@ export async function POST(request: Request) {
       max,
       ton,
       form,
+      minZeichen: MIN_KAPITEL_LEN,
     });
 
     const versuch = () =>
@@ -96,12 +103,28 @@ export async function POST(request: Request) {
         temperature: kreativ ? 0.9 : 0.5,
       });
 
+    // Zählt Kapitel mit zu kurzer Zusammenfassung (< MIN_KAPITEL_LEN Zeichen).
+    const zuKurz = (e: z.infer<typeof kapitelListeSchema>) =>
+      e.kapitel.filter((k) => k.inhalt.trim().length < MIN_KAPITEL_LEN).length;
+
     let ergebnis = (await versuch()).choices[0]?.message.parsed;
-    if (ergebnis && hatKaputteZeichen(ergebnis)) {
+    // Ein Wiederholversuch bei kaputten Umlauten **oder** wenn ein Kapitel zu
+    // kurz ist. Danach die bessere Antwort behalten: kaputte Zeichen sind
+    // unbrauchbar und schlagen die Längenfrage, sonst gewinnt die mit weniger
+    // zu kurzen Kapiteln (bei Gleichstand bleibt die erste).
+    if (ergebnis && (hatKaputteZeichen(ergebnis) || zuKurz(ergebnis) > 0)) {
       console.warn(
-        "story-arc-chapters: fehlerhafte Zeichenkodierung, zweiter Versuch.",
+        "story-arc-chapters: Nachbesserung nötig (kaputte Zeichen oder Kapitel < 600 Zeichen), zweiter Versuch.",
       );
-      ergebnis = (await versuch()).choices[0]?.message.parsed;
+      const zweit = (await versuch()).choices[0]?.message.parsed;
+      if (zweit) {
+        const erstKaputt = hatKaputteZeichen(ergebnis);
+        const zweitKaputt = hatKaputteZeichen(zweit);
+        if (erstKaputt && !zweitKaputt) ergebnis = zweit;
+        else if (!erstKaputt && !zweitKaputt && zuKurz(zweit) < zuKurz(ergebnis))
+          ergebnis = zweit;
+        else if (erstKaputt && zweitKaputt) ergebnis = zweit;
+      }
     }
 
     if (!ergebnis) {

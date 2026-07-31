@@ -48,6 +48,8 @@ const LEERE_META: VariantMeta = {
   quelle: "",
   modell: "",
   werkform: "",
+  cover: "",
+  alsBuch: false,
 };
 
 const controlClass =
@@ -91,8 +93,11 @@ function buecherAus(scenarios: StoredScenario[]): Buch[] {
           kapitelFertig: fertig,
         };
       })
-      // Nur Bücher, die etwas zu lesen bieten.
-      .filter((b) => b.kapitelFertig > 0),
+      // Nur Bücher, die als Buch freigegeben **und** lesbar sind: Der Arc muss
+      // ausdrücklich „Als Buch anzeigen" (`meta.alsBuch`) tragen und mindestens
+      // ein ausformuliertes Kapitel haben. Ein frisch abgeleiteter Arc bleibt
+      // sonst ein Arbeitsstand und füllt die Bibliothek nicht von selbst.
+      .filter((b) => b.meta.alsBuch && b.kapitelFertig > 0),
   );
 }
 
@@ -259,6 +264,22 @@ const COVER_THEMES = [
   "from-[#4a4227] to-[#282213]", // Olivgold
 ] as const;
 
+/**
+ * Das Cover-Thumbnail eines Buches: `meta.cover = "char:<id>"` → das
+ * Porträt-Thumbnail dieses Charakters (aus der Szenario-Zusammenfassung), sonst
+ * das Primär-Weltbild. Fällt zurück aufs Weltbild, wenn der Charakter fehlt oder
+ * bildlos ist (z. B. gelöscht/nach Reload).
+ */
+function coverThumbnail(buch: Buch): string | null {
+  const cv = buch.meta.cover ?? "";
+  if (cv.startsWith("char:")) {
+    const id = cv.slice(5);
+    const c = buch.scenario.characters?.find((x) => x.id === id);
+    if (c?.thumbnail) return c.thumbnail;
+  }
+  return primaryImage(buch.scenario)?.thumbnail ?? null;
+}
+
 function coverThema(schluessel: string): string {
   let h = 0;
   for (let i = 0; i < schluessel.length; i++) {
@@ -279,7 +300,7 @@ function BuchKarte({
   buch: Buch;
   onOeffnen: () => void;
 }) {
-  const cover = primaryImage(buch.scenario)?.thumbnail;
+  const cover = coverThumbnail(buch);
   const werkform =
     buch.meta.werkform && buch.meta.werkform !== "frei"
       ? werkformLabel(buch.meta.werkform)
@@ -311,8 +332,9 @@ function BuchKarte({
           />
         )}
 
-        {/* Abdunkelung unten, damit der Titel auf jedem Cover lesbar bleibt. */}
-        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
+        {/* Nur ein schmaler Verlauf **unten hinter dem Titel** – das Coverbild
+            selbst bleibt unverdeckt (kein Schleier über der ganzen Fläche). */}
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/70 to-transparent" />
 
         {/* Buchrücken: dunkler Streifen links + feiner Lichtkant. */}
         <span className="pointer-events-none absolute inset-y-0 left-0 w-[8%] min-w-[6px] bg-gradient-to-r from-black/45 to-transparent" />
