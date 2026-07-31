@@ -8,6 +8,8 @@ import {
   KAPITEL_COUNTS,
   kapitelListeSchema,
   kapitelSpanne,
+  MAX_KAPITEL_PRO_STUFE,
+  splitKapitelSegmente,
 } from "@/lib/schema";
 import { randomSparks } from "@/lib/storyArcSparks";
 
@@ -68,6 +70,18 @@ export async function POST(request: Request) {
     const { stufe, kreativ, anzahl, ton, form, textProvider } = parsed.data;
     const { min, max } = kapitelSpanne(anzahl);
 
+    // Kapitelgrenzen (`---`) in der Beschreibung → feste Abschnitte. Ab zwei
+    // Abschnitten gilt der Segment-Modus: genau ein Kapitel je Abschnitt, die
+    // gewählte Kapitelzahl wird ignoriert. Auf die Speichergrenze gedeckelt.
+    const segmente = splitKapitelSegmente(stufe.beschreibung).slice(
+      0,
+      MAX_KAPITEL_PRO_STUFE,
+    );
+    const segmentModus = segmente.length >= 2;
+    // Wie viele Kapitel am Ende höchstens durchgelassen werden: im Segment-Modus
+    // genau die Abschnittszahl, sonst die Obergrenze der gewählten Spanne.
+    const effektivMax = segmentModus ? segmente.length : max;
+
     // Jede Kapitel-Zusammenfassung soll ausführlich sein – mindestens 600
     // Zeichen. Wie die Stationen-Mindestlänge (`MIN_STUFE_LEN`) dreifach
     // abgesichert: Prompt als prüfbarer Endzustand, Feld-`describe()` und – hier
@@ -84,6 +98,7 @@ export async function POST(request: Request) {
       ton,
       form,
       minZeichen: MIN_KAPITEL_LEN,
+      segmente,
     });
 
     const versuch = () =>
@@ -143,11 +158,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // Nur Kapitel mit Inhalt, und höchstens so viele wie gewählt (die gewählte
-    // Obergrenze ist ≤ MAX_KAPITEL_PRO_STUFE, hält also auch die Speichergrenze).
+    // Nur Kapitel mit Inhalt, und höchstens so viele wie zulässig: im
+    // Segment-Modus genau die Abschnittszahl, sonst die gewählte Obergrenze
+    // (≤ MAX_KAPITEL_PRO_STUFE, hält also auch die Speichergrenze).
     const kapitel = ergebnis.kapitel
       .filter((k) => k.titel.trim() || k.inhalt.trim())
-      .slice(0, max);
+      .slice(0, effektivMax);
 
     return NextResponse.json({ kapitel, model });
   } catch (err) {

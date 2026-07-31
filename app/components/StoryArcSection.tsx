@@ -7,9 +7,11 @@ import {
   ARC_LENGTHS,
   ARC_PHASES,
   KAPITEL_COUNTS,
+  KAPITEL_TRENNER,
   MAX_ARC_STUFEN,
   MAX_KAPITEL_PRO_STUFE,
   KAPITEL_LAENGEN,
+  splitKapitelSegmente,
   STORY_FORMS,
   STORY_TONES,
   TEXT_PROVIDERS,
@@ -302,6 +304,42 @@ export function StoryArcSection({
   function figurEntfernen(i: number, k: number) {
     stufeAendern(i, {
       figuren: stufen[i].figuren.filter((_, x) => x !== k),
+    });
+  }
+
+  /** DOM-`id` des Beschreibungsfelds der Station `i` (für das Einfügen am Cursor). */
+  const stufeFeldId = (i: number) => `arc-stufe-beschr-${i}`;
+
+  /**
+   * Eine Kapitelgrenze (`---`) **an der Cursorposition** in die Stationsbeschreibung
+   * einfügen. Der Trenner muss auf einer eigenen Zeile stehen, daher werden nur
+   * dort Umbrüche ergänzt, wo noch keiner ist. Der Cursor landet hinter dem
+   * eingefügten Trenner; eine etwaige Auswahl bleibt unangetastet (Einfügen an
+   * ihrem Anfang).
+   */
+  function kapitelgrenzeEinfuegen(i: number) {
+    if (disabled) return;
+    const feld = document.getElementById(
+      stufeFeldId(i),
+    ) as HTMLTextAreaElement | null;
+    const text = stufen[i].beschreibung;
+    const pos = feld?.selectionStart ?? text.length;
+    const davor = text.slice(0, pos);
+    const danach = text.slice(pos);
+    const nlDavor = davor.length > 0 && !davor.endsWith("\n");
+    const nlDanach = danach.length > 0 && !danach.startsWith("\n");
+    const einschub = `${nlDavor ? "\n" : ""}${KAPITEL_TRENNER}${nlDanach ? "\n" : ""}`;
+    stufeAendern(i, { beschreibung: davor + einschub + danach });
+    // Nach dem Re-Render Fokus und Cursor hinter den Trenner setzen.
+    const neuePos = davor.length + einschub.length;
+    requestAnimationFrame(() => {
+      const f = document.getElementById(
+        stufeFeldId(i),
+      ) as HTMLTextAreaElement | null;
+      if (f) {
+        f.focus();
+        f.setSelectionRange(neuePos, neuePos);
+      }
     });
   }
 
@@ -967,6 +1005,11 @@ export function StoryArcSection({
           {stufen.map((s, i) => {
             const stil = PHASE_STYLE[s.phase];
             const kapitelLaeuft = kapitelBusy === i;
+            // Kapitelgrenzen (`---`) in der Beschreibung → feste Abschnitte. Ab
+            // zwei Abschnitten gilt der Segment-Modus: genau ein Kapitel je
+            // Abschnitt, die Kapitelzahl-Wahl greift dann nicht.
+            const segmentZahl = splitKapitelSegmente(s.beschreibung).length;
+            const hatSegmente = segmentZahl >= 2;
             return (
               <li
                 key={i}
@@ -1059,12 +1102,33 @@ export function StoryArcSection({
                   />
 
                   <AutoTextarea
+                    id={stufeFeldId(i)}
                     value={s.beschreibung}
                     onChange={(v) => stufeAendern(i, { beschreibung: v })}
                     ariaLabel={`Beschreibung der Station ${i + 1}`}
                     placeholder="Was in dieser Station geschieht …"
                     className="text-sm text-foreground/80"
                   />
+
+                  {/* Kapitelgrenze am Cursor einfügen. Der `---`-Trenner teilt die
+                      Beschreibung in feste Abschnitte, aus denen beim Ableiten je
+                      genau ein Kapitel wird. */}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <button
+                      type="button"
+                      onClick={() => kapitelgrenzeEinfuegen(i)}
+                      disabled={disabled}
+                      title="Eine Kapitelgrenze (---) an der Cursorposition einfügen. Jeder so abgetrennte Abschnitt wird beim Ableiten zu genau einem Kapitel."
+                      className={CHIP_BTN}
+                    >
+                      ➕ Kapitelgrenze
+                    </button>
+                    {hatSegmente && (
+                      <span className="text-xs text-foreground/50">
+                        ergibt {segmentZahl} Kapitel (feste Grenzen)
+                      </span>
+                    )}
+                  </div>
 
                   {s.figuren.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1109,9 +1173,15 @@ export function StoryArcSection({
                               kapitelAnzahl: e.target.value as KapitelCount,
                             })
                           }
-                          disabled={disabled || kapitelBusy !== null}
+                          // Bei festen Kapitelgrenzen (`---`) entscheidet die
+                          // Abschnittszahl – die Anzahl-Wahl wäre wirkungslos.
+                          disabled={disabled || kapitelBusy !== null || hatSegmente}
                           aria-label="Anzahl der Kapitel je Ableiten"
-                          title="Wie viele Kapitel erzeugt werden – gilt für alle Stationen"
+                          title={
+                            hatSegmente
+                              ? "Wirkungslos: Diese Station hat feste Kapitelgrenzen (---) – die Abschnittszahl bestimmt die Kapitelzahl."
+                              : "Wie viele Kapitel erzeugt werden – gilt für alle Stationen"
+                          }
                           className={CHIP_BTN}
                         >
                           {KAPITEL_COUNTS.map((k) => (
@@ -1129,9 +1199,11 @@ export function StoryArcSection({
                             !s.beschreibung.trim()
                           }
                           title={
-                            s.beschreibung.trim()
-                              ? "Zerlegt diese Station in Kapitel"
-                              : "Erst die Beschreibung der Station füllen"
+                            !s.beschreibung.trim()
+                              ? "Erst die Beschreibung der Station füllen"
+                              : hatSegmente
+                                ? `Erzeugt genau ${segmentZahl} Kapitel entlang der gesetzten Grenzen`
+                                : "Zerlegt diese Station in Kapitel"
                           }
                           className={CHIP_BTN}
                         >

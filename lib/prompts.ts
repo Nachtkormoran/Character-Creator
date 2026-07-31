@@ -982,12 +982,21 @@ export function buildStoryArcChaptersPrompt(
      * Zusammenfassungen. Default 600 (s. `MIN_KAPITEL_LEN` in der Route).
      */
     minZeichen?: number;
+    /**
+     * **Vorgegebene Abschnitte** aus den `---`-Kapitelgrenzen der Beschreibung.
+     * Bei ≥ 2 Einträgen schaltet der Prompt in den **Segment-Modus**: genau ein
+     * Kapitel je Abschnitt, in Reihenfolge, ohne Zusammenfassen oder feineres
+     * Teilen. Leer/ein Eintrag → modellgesteuerte Zerlegung wie bisher.
+     */
+    segmente?: string[];
   } = {},
 ): string {
   const kreativ = !!options.kreativ;
   const min = options.min ?? 2;
   const max = options.max ?? 3;
   const minZeichen = options.minZeichen ?? 600;
+  const segmente = options.segmente ?? [];
+  const segmentModus = segmente.length >= 2;
   const anzahlText = `${min} bis ${max} Kapitel`;
   const figuren = stufe.figuren.filter((f) => f.trim());
   const figurenZeile =
@@ -1010,6 +1019,36 @@ export function buildStoryArcChaptersPrompt(
           .map((s) => `- ${s}`)
           .join("\n")}\n`
       : "";
+
+  // Segment-Modus: Die Beschreibung ist bereits per `---` in feste Abschnitte
+  // geteilt. Jeder Abschnitt wird zu **genau einem** Kapitel – die Grenzen sind
+  // vorgegeben, das Modell fasst nicht zusammen und teilt nicht feiner. Als
+  // prüfbarer Endzustand formuliert (die Erfahrung aus den Szenariofeldern: eine
+  // am Ergebnis prüfbare Bedingung hält besser als eine Verfahrensanweisung).
+  if (segmentModus) {
+    const abschnitte = segmente
+      .map((s, i) => `Abschnitt ${i + 1}:\n${s}`)
+      .join("\n\n");
+    return `Formuliere die folgende Station eines Story Arcs zu **genau ${segmente.length} Kapiteln** aus.
+
+Station: ${stufe.titel.trim() || "(ohne Titel)"}${figurenZeile}
+
+Die Station ist bereits in ${segmente.length} Abschnitte vorgegeben. Schreibe **genau ein Kapitel je Abschnitt**, in dieser Reihenfolge. Fasse keine Abschnitte zusammen und teile keinen weiter auf – die Grenzen sind gesetzt. Jedes Kapitel bleibt in dem, was **sein** Abschnitt hergibt, und greift nicht auf spätere Abschnitte vor.
+
+${abschnitte}
+
+Am Ende müssen genau ${segmente.length} Kapitel dastehen – eines je Abschnitt, in Reihenfolge.
+
+Jedes Kapitel besteht aus:
+- einer kurzen Überschrift (2–6 Wörter),
+- ${satzVorgabe}.
+
+Anforderungen:
+${ausarbeitung}
+- Am Ende muss die Zusammenfassung **jedes** Kapitels mindestens ${minZeichen} Zeichen lang sein – lieber ausführlich und konkret als knapp. Zu kurze Kapitel sind unbrauchbar.
+- Alles auf Deutsch, ohne Nummerierung und ohne Aufzählungszeichen im Text.
+${formHinweis(options.form)}${tonHinweis(options.ton)}${sparksBlock}`;
+  }
 
   return `Zerlege die folgende Station eines Story Arcs in ${anzahlText}.
 

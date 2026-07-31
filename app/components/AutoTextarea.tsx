@@ -14,12 +14,19 @@ export function AutoTextarea({
   className = "",
   ariaLabel,
   placeholder,
+  id,
 }: {
   value: string;
   onChange: (value: string) => void;
   className?: string;
   ariaLabel?: string;
   placeholder?: string;
+  /**
+   * Optionale DOM-`id` des `<textarea>`. Nötig, wo eine Aufrufstelle das Feld
+   * direkt ansprechen muss – z. B. um an der **Cursorposition** etwas einzufügen
+   * (`document.getElementById` → `selectionStart`).
+   */
+  id?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useAutoGrow(ref, value);
@@ -27,6 +34,7 @@ export function AutoTextarea({
   return (
     <textarea
       ref={ref}
+      id={id}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label={ariaLabel}

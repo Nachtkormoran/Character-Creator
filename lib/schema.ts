@@ -971,6 +971,31 @@ export const MAX_ARC_STUFEN = 20;
 export const MAX_KAPITEL_PRO_STUFE = 8;
 
 /**
+ * **Kapitelgrenze in der Stationsbeschreibung.** Eine Zeile, die nur aus drei
+ * (oder mehr) Bindestrichen besteht, markiert bei der Kapitel-Ableitung einen
+ * harten Schnitt: Jeder so abgetrennte Abschnitt wird zu **genau einem** Kapitel
+ * (streng – das Modell fasst nicht zusammen und teilt nicht feiner). Beim
+ * Einfügen aus der UI wird `---` geschrieben; erkannt werden `-{3,}`.
+ */
+export const KAPITEL_TRENNER = "---";
+
+/** Erkennt eine reine Kapitelgrenzen-Zeile (nur Bindestriche, Whitespace erlaubt). */
+const KAPITEL_TRENNER_RE = /^[ \t]*-{3,}[ \t]*$/m;
+
+/**
+ * Zerlegt eine Stationsbeschreibung an den Kapitelgrenzen (`---`-Zeilen) in
+ * **Abschnitte**. Leere Abschnitte fallen weg. Ohne Trenner ist das Ergebnis
+ * der ganze Text als **ein** Abschnitt – dann bleibt die Ableitung
+ * modellgesteuert wie bisher (nur bei ≥ 2 Abschnitten gelten feste Grenzen).
+ */
+export function splitKapitelSegmente(beschreibung: string): string[] {
+  return beschreibung
+    .split(KAPITEL_TRENNER_RE)
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+}
+
+/**
  * **Wie viele Kapitel ein „Kapitel ableiten" erzeugt** – als Spanne, aus der das
  * Modell wählt. Wie die Arc-Länge ein Lauf-Parameter (nicht gespeichert). Die
  * größte `max` bleibt ≤ `MAX_KAPITEL_PRO_STUFE`, damit die Wahl nie über die
