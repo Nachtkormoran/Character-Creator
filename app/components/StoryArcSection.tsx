@@ -101,6 +101,8 @@ export function StoryArcSection({
   arcMeta,
   onArcWaehlen,
   onArcTitelAendern,
+  onArcTitelNeu,
+  arcTitelBusy,
   onArcFavorit,
   onArcKopieren,
   onArcLoeschen,
@@ -172,6 +174,10 @@ export function StoryArcSection({
   onArcWaehlen: (i: number) => void;
   /** Den Titel eines Arcs ändern (✎ am aktiven Reiter). */
   onArcTitelAendern: (i: number) => void;
+  /** Einen **neuen** Titel per KI erzeugen (✨ am aktiven Reiter). */
+  onArcTitelNeu: (i: number) => void;
+  /** Welcher Arc gerade einen neuen Titel erzeugt (Index) – für Sperre/Spinner. */
+  arcTitelBusy?: number | null;
   /** Einen Arc als Favorit markieren/entmarken (Stern am Reiter). */
   onArcFavorit: (i: number) => void;
   /** Einen Arc kopieren (eigenständige Kopie, angehängt). */
@@ -598,18 +604,40 @@ export function StoryArcSection({
                 >
                   {meta.favorit ? "⭐" : "☆"}
                 </button>
-                {/* Titel ändern – nur am aktiven Reiter. */}
+                {/* Titel ändern (✎) und neu per KI erzeugen (✨) – nur am
+                    aktiven Reiter. */}
                 {i === arcAktiv && (
-                  <button
-                    type="button"
-                    onClick={() => onArcTitelAendern(i)}
-                    disabled={disabled || busy}
-                    title={`Titel von Story Arc ${i + 1} ändern`}
-                    aria-label={`Titel von Story Arc ${i + 1} ändern`}
-                    className="flex items-center px-1 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40"
-                  >
-                    ✎
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onArcTitelAendern(i)}
+                      disabled={disabled || busy || arcTitelBusy !== null}
+                      title={`Titel von Story Arc ${i + 1} ändern`}
+                      aria-label={`Titel von Story Arc ${i + 1} ändern`}
+                      className="flex items-center px-1 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40"
+                    >
+                      ✎
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onArcTitelNeu(i)}
+                      disabled={
+                        disabled ||
+                        busy ||
+                        arcTitelBusy !== null ||
+                        stufen.length === 0
+                      }
+                      title={`Neuen Titel für Story Arc ${i + 1} per KI erzeugen`}
+                      aria-label={`Neuen Titel für Story Arc ${i + 1} per KI erzeugen`}
+                      className="flex items-center px-1 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40"
+                    >
+                      {arcTitelBusy === i ? (
+                        <span className="animate-pulse">…</span>
+                      ) : (
+                        "✨"
+                      )}
+                    </button>
+                  </>
                 )}
                 {loeschbar && (
                   <button

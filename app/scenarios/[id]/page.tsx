@@ -159,6 +159,9 @@ export default function ScenarioDetailPage({
   const [arcMeta, setArcMeta] = useState<VariantMeta[]>([]);
   const [arcBusy, setArcBusy] = useState(false);
   const [arcFehler, setArcFehler] = useState<string | null>(null);
+  // Welcher Arc gerade einen neuen Titel per KI erzeugt (Index) – für Sperre
+  // und Spinner am ✨-Knopf des Reiters.
+  const [arcTitelBusy, setArcTitelBusy] = useState<number | null>(null);
   /**
    * Länge, Format und Zusatzwunsch für die Arc-Erzeugung – wie beim
    * Handlungsentwurf **nicht gespeichert**: Sie beschreiben einen Lauf, nicht
@@ -600,6 +603,40 @@ export default function ScenarioDetailPage({
         k === i ? { ...m, titel: neu.trim().slice(0, 120) } : m,
       ),
     );
+  }
+
+  /**
+   * Einen **neuen Titel per KI** für einen Story Arc erzeugen (✨ am Reiter) –
+   * dieselbe Zusammenfassung der Stationen wie beim Ableiten (`generateStoryTitle`
+   * mit `art: "arc"`). Ersetzt den bisherigen Titel in `meta[i]`; das geht wie
+   * die manuelle Änderung in `dirty` ein und wird über „Änderungen speichern"
+   * abgelegt. Persistiert selbst nichts.
+   */
+  async function arcTitelNeu(i: number) {
+    if (arcBusy || saving || arcTitelBusy !== null) return;
+    const items = aktuelleArcs();
+    if (i < 0 || i >= items.length) return;
+    const arcText = items[i].stufen
+      .map((s) => [s.titel, s.beschreibung].filter(Boolean).join(": "))
+      .join("\n")
+      // Die Route deckelt den Text bei 8000 Zeichen; für einen Titel genügt eine
+      // Zusammenfassung, also vorsorglich kappen.
+      .slice(0, 8000);
+    if (!arcText.trim()) return;
+    setArcTitelBusy(i);
+    setArcFehler(null);
+    try {
+      const titel = await generateStoryTitle(arcText, "arc");
+      const neu = titel.trim().slice(0, 120);
+      if (neu) {
+        const meta = ausgerichtet(arcMeta, items.length);
+        setArcMeta(meta.map((m, k) => (k === i ? { ...m, titel: neu } : m)));
+      }
+    } catch (e) {
+      setArcFehler(e instanceof Error ? e.message : "Titel fehlgeschlagen.");
+    } finally {
+      setArcTitelBusy(null);
+    }
   }
 
   /** Einen Story Arc als **Favorit** markieren/entmarken – analog zu `favoritUmschalten`. */
@@ -2410,6 +2447,8 @@ export default function ScenarioDetailPage({
         arcMeta={ausgerichtet(arcMeta, aktuelleArcs().length)}
         onArcWaehlen={arcWaehlen}
         onArcTitelAendern={arcTitelAendern}
+        onArcTitelNeu={arcTitelNeu}
+        arcTitelBusy={arcTitelBusy}
         onArcFavorit={arcFavoritUmschalten}
         onArcKopieren={arcKopieren}
         onArcLoeschen={arcLoeschen}
