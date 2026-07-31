@@ -346,6 +346,83 @@ stimmen:
 
 ---
 
+## Betrieb: Schema-Umbauten in der Cloud (Leitfaden für später)
+
+Wie läuft ein DB-Umbau (neues Feld, neue Tabelle) ab, wenn die DB auf Supabase
+liegt? Im Kern **wie heute** – Prisma abstrahiert die Datenbank, der Handgriff ist
+derselbe. Neu ist nur, **wo/wann** die Migration angewandt wird und dass jetzt
+**echte Live-Daten** in der Cloud liegen.
+
+### Zuerst: Viele „neue Felder" brauchen gar keine Migration
+
+Ein großer Teil der Daten liegt als **JSON-String in Sammelspalten** (`details`,
+`traits`, `input`, `plotVariants`, `storyArcVariants`, `storyHooks`). Ein neues
+Feld *innerhalb* dieser Objekte ist **keine DB-Änderung** – kein `ALTER TABLE`,
+kein Deploy-Risiko; alte Zeilen füllt beim Lesen `normalize…` auf. Ein neues
+Szenario-Feld kostet „zwei Zeilen in `schema.ts`, keine Migration". Das gilt in
+der Cloud unverändert.
+
+Eine echte Migration braucht nur eine **neue echte Spalte** am Modell oder ein
+**neues Objekt/Tabelle** (wie zuletzt `ScenarioImage`).
+
+### Der Ablauf für eine echte Struktur-Änderung
+
+**Lokal (Entwicklung) – wie heute:**
+1. [prisma/schema.prisma](prisma/schema.prisma) bearbeiten (Feld/Model).
+2. `npx prisma migrate dev --name add_xyz` → erzeugt die Migrations-SQL unter
+   [prisma/migrations/](prisma/migrations/), wendet sie auf die **lokale** DB an,
+   generiert den Client neu.
+3. Dev-Server neu starten, Migration + Schema-Änderung **committen und pushen**.
+
+**In die Cloud (Supabase) – automatisch beim Deploy:**
+4. Push → Vercel baut → das Build-Skript ruft **`prisma migrate deploy`**
+   (Phase 2.1) und wendet **nur die noch nicht angewandten** Migrationen auf
+   Supabase an, über die **`DIRECT_URL`** (Port 5432, nicht den Pooler).
+
+Supabase wird also **nicht von Hand migriert** – der Deploy erledigt es idempotent.
+
+| Befehl | wofür | wo |
+|---|---|---|
+| `prisma migrate dev` | Migration **erzeugen** + anwenden | **nur lokal** (Dev-DB) |
+| `prisma migrate deploy` | vorhandene Migrationen **nur anwenden** | Cloud, im Vercel-Build |
+
+⚠️ **`migrate dev` niemals gegen die Produktions-DB** – es kann zurücksetzen und
+Drift „reparieren". Produktion bekommt ausschließlich `migrate deploy`.
+
+### Neu in der Cloud: Live-Daten
+
+Lokal war eine Migration gegen die Wegwerf-`dev.db` harmlos. In Supabase liegen
+echte Daten:
+
+- **Additiv = sicher, ohne Ausfall.** Eine **neue nullable Spalte** oder eine
+  **neue Tabelle** stört bestehende Zeilen nicht (so war es bei `ScenarioImage`).
+- **Destruktiv/verändernd = Plan nötig.** Spalte umbenennen/löschen oder `NOT
+  NULL` erzwingen, wo Daten liegen → **mehrstufig**: Spalte hinzufügen →
+  **Backfill** → Code umstellen → alte Spalte entfernen. Genau das Muster der
+  `ScenarioImage`-Migration, die vorhandene Weltbilder **erst kopierte, bevor** die
+  alten Spalten fielen.
+- **Backfill** schreibt man in die Migrations-SQL (wie bei `ScenarioImage`) oder –
+  wenn SQL es nicht kann (z. B. Bilder umkodieren) – als separates `tsx`-Skript.
+
+### Absicherung
+
+- **Vor riskanten Migrationen sichern.** Supabase macht automatische Backups
+  (täglich; Point-in-Time auf höheren Tiers). Passt zur Merkregel „vor dem Löschen
+  sichern".
+- **Supabase-Branching:** eine DB-Branch anlegen, die Migration dort testen, erst
+  dann auf die Haupt-DB loslassen – ideal für Heikles.
+- **Nur über Prisma migrieren, nie im Supabase-UI.** Direkte Schema-Änderungen im
+  SQL-Editor erzeugen **Drift**; der Dashboard-Editor ist zum Schauen, nicht zum
+  Ändern.
+- **Vorsicht bei Preview-Deploys:** Ein Preview auf dieselbe Supabase-DB fährt
+  `migrate deploy` gegen **Produktion**. Für riskante Migrationen Previews auf eine
+  separate Branch-DB richten (oder `migrate deploy` im Preview weglassen).
+- **Kein Auto-Rollback.** Prisma-Migrationen sind vorwärtsgerichtet – zurück geht es
+  über eine Gegen-Migration oder ein Backup-Restore. Destruktives vorher
+  durchdenken.
+
+---
+
 ## Reihenfolge / kürzester Weg
 
 1. **Phase 1 + 2** → App läuft überhaupt auf Vercel (Supabase-Postgres + Build).
