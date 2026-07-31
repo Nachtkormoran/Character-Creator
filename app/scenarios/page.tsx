@@ -17,7 +17,7 @@ import {
   type ScenarioDetails,
 } from "@/lib/schema";
 import { primaryImage, type StoredScenario } from "@/lib/serialize";
-import { genreLabel } from "@/lib/templates";
+import { DEFAULT_GENRE, genreLabel } from "@/lib/templates";
 import { ScenarioFields } from "../components/ScenarioFields";
 import { RandomScenarioModal } from "../components/RandomScenarioModal";
 
@@ -49,7 +49,9 @@ function summary(details: ScenarioDetails): string {
     .join(" · ");
 }
 
-const LEER: ScenarioDetails = normalizeScenarioDetails({});
+// Ein frisches Formular startet mit Genre „Gegenwart" vorbelegt (statt leer) –
+// die häufigste Wahl, und Ort/Zeit/Regeln-Würfel brauchen ohnehin ein Genre.
+const LEER: ScenarioDetails = normalizeScenarioDetails({ genre: DEFAULT_GENRE });
 
 /** Gemeinsame Optik der Bedienelemente (Auswahl + Suche) – wie in der Galerie. */
 const controlClass =
@@ -469,8 +471,10 @@ export default function ScenariosPage() {
 
       {/* Sortieren & Suchen – wie in der Charakterübersicht. Erst ab einem
           Szenario sinnvoll; die Leiste bleibt auch stehen, wenn die Suche
-          gerade nichts findet (sonst käme man an das Zurücksetzen nicht heran). */}
-      {scenarios.length > 0 && (
+          gerade nichts findet (sonst käme man an das Zurücksetzen nicht heran).
+          Während das Anlege-Formular offen ist, bleibt sie aus – dann zählt nur
+          das Formular, nicht der Bestand darunter. */}
+      {scenarios.length > 0 && !formOpen && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-black/10 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]">
           <label className="flex items-center gap-2 text-sm">
             <span className="text-foreground/60">Sortieren:</span>
@@ -510,13 +514,13 @@ export default function ScenariosPage() {
         </div>
       )}
 
-      {scenarios.length > 0 && visibleScenarios.length === 0 && (
+      {scenarios.length > 0 && !formOpen && visibleScenarios.length === 0 && (
         <div className="rounded-xl border border-dashed border-black/15 p-8 text-center text-sm text-foreground/60 dark:border-white/15">
           Kein Szenario passt zur Suche.
         </div>
       )}
 
-      {visibleScenarios.length > 0 && (
+      {!formOpen && visibleScenarios.length > 0 && (
         <ul className="flex flex-col gap-3">
           {visibleScenarios.map((s) => {
             const zeile = summary(s.details);
