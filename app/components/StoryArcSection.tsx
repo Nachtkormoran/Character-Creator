@@ -29,6 +29,7 @@ import {
   type Werkform,
 } from "@/lib/schema";
 import { AutoTextarea } from "./AutoTextarea";
+import { StoryReaderModal } from "./StoryReaderModal";
 
 /**
  * Der **Story Arc** eines Szenarios – die dramaturgische Zerlegung des aktiven
@@ -202,6 +203,15 @@ export function StoryArcSection({
   const kannAbleiten = handlung.trim().length > 0 && !busy && !disabled;
   const kannHinzufuegen = stufen.length < MAX_ARC_STUFEN;
 
+  // Buch-Reader: offen/zu, und ob es überhaupt etwas zu lesen gibt (mindestens
+  // ein Kapitel mit ausformuliertem Prosatext im aktiven Arc). Der Buchtitel ist
+  // der Titel des aktiven Arcs – mit demselben Rückfall wie in der Reiter-Leiste.
+  const [readerOffen, setReaderOffen] = useState(false);
+  const hatLesbareKapitel = stufen.some((s) =>
+    s.kapitel.some((k) => k.text.trim() !== ""),
+  );
+  const buchTitel = arcMeta[arcAktiv]?.titel?.trim() || `Arc ${arcAktiv + 1}`;
+
   // Welche Kapitel-Prosatexte ausgeklappt sind, nach „Station.Kapitel"-Schlüssel.
   // Rein darstellend – der Text selbst lebt im Arc, nicht hier.
   const [offeneTexte, setOffeneTexte] = useState<Set<string>>(
@@ -301,6 +311,18 @@ export function StoryArcSection({
               ? `Dramaturgische Zerlegung – abgeleitet aus ${quelleLabel}.`
               : "Die dramaturgische Zerlegung des Handlungsentwurfs in Stationen."}
           </p>
+          {/* Buch-Reader: erscheint nur, wenn mindestens ein Kapitel Prosa hat –
+              sonst gäbe es nichts zu lesen. */}
+          {hatLesbareKapitel && (
+            <button
+              type="button"
+              onClick={() => setReaderOffen(true)}
+              title="Die erzeugten Kapitel ablenkungsfrei als Buch lesen"
+              className="mt-2 rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+            >
+              📖 Als Buch lesen
+            </button>
+          )}
         </div>
 
         {/* Parameter + Ableiten-Knopf. Wirken nur auf die Arc-Erzeugung. Jeder
@@ -1150,6 +1172,14 @@ export function StoryArcSection({
           ➕ Station hinzufügen
         </button>
       </div>
+
+      {readerOffen && (
+        <StoryReaderModal
+          arc={storyArc}
+          titel={buchTitel}
+          onClose={() => setReaderOffen(false)}
+        />
+      )}
     </section>
   );
 }
