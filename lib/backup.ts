@@ -30,19 +30,57 @@ export function databasePath(): string {
   return path.resolve(process.cwd(), relative);
 }
 
+export interface ExportOptions {
+  /**
+   * Ob die **Bild-Originale** (`imageData`, je ~2 MB) mitgesichert werden. Die
+   * **Thumbnails** sind davon unberührt und immer dabei – nur sie zeigt die App
+   * in Listen, Karten und der Detailvorschau. Default `true` (Vollsicherung).
+   */
+  includeOriginals?: boolean;
+}
+
+/**
+ * Streift in einer **Kopie** der Datenbank die Bild-Originale ab: `imageData`
+ * wird geleert (die `thumbnail`-Spalte bleibt), danach `VACUUM`, damit die Datei
+ * auch tatsächlich schrumpft. Läuft über einen zweiten Client auf die Kopie –
+ * die aktive Datenbank bleibt unangetastet.
+ */
+async function stripOriginals(dbPath: string): Promise<void> {
+  const client = new PrismaClient({
+    adapter: new PrismaBetterSqlite3({ url: `file:${dbPath}` }),
+  });
+  try {
+    await client.$executeRawUnsafe(`UPDATE CharacterImage SET imageData = ''`);
+    await client.$executeRawUnsafe(`UPDATE ScenarioImage SET imageData = ''`);
+    // Ohne VACUUM bliebe die Datei so groß wie mit Originalen (SQLite gibt den
+    // Platz sonst nicht frei).
+    await client.$executeRawUnsafe(`VACUUM`);
+  } finally {
+    await client.$disconnect();
+  }
+}
+
 /**
  * Erzeugt einen **konsistenten** Snapshot der Datenbank.
  *
  * Bewusst `VACUUM INTO` statt die Datei zu kopieren: ein simples Kopieren
  * während laufender Schreibzugriffe kann eine unvollständige Datei liefern.
+ *
+ * Mit `includeOriginals: false` werden die großen Bild-Originale aus der Kopie
+ * entfernt (Thumbnails bleiben) – eine deutlich kleinere Sicherung, die weiter
+ * alle Texte, Merkmale, Szenarien und die Vorschaubilder trägt.
  */
-export async function exportDatabase(): Promise<Buffer> {
+export async function exportDatabase(
+  options: ExportOptions = {},
+): Promise<Buffer> {
+  const includeOriginals = options.includeOriginals !== false;
   const dir = await mkdtemp(path.join(tmpdir(), "cc-backup-"));
   const target = path.join(dir, `backup-${randomUUID()}.db`);
   try {
     // Kein Prisma-Modell im Spiel – daher als Raw-Statement. Der Pfad kommt
     // aus randomUUID/tmpdir, nicht aus Nutzereingaben.
     await prisma.$executeRawUnsafe(`VACUUM INTO '${target.replace(/'/g, "''")}'`);
+    if (!includeOriginals) await stripOriginals(target);
     return await readFile(target);
   } finally {
     await rm(dir, { recursive: true, force: true });

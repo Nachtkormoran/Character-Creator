@@ -447,6 +447,9 @@ function BackupSection() {
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // Ob die großen Bild-Originale mitexportiert werden. Die Thumbnails sind immer
+  // dabei. Default an – die Vollsicherung ist der übliche Fall.
+  const [includeOriginals, setIncludeOriginals] = useState(true);
 
   async function handleExport() {
     if (exporting) return;
@@ -454,7 +457,7 @@ function BackupSection() {
     setError(null);
     setMessage(null);
     try {
-      const { blob, filename } = await exportDatabase();
+      const { blob, filename } = await exportDatabase(includeOriginals);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -464,7 +467,8 @@ function BackupSection() {
       a.remove();
       URL.revokeObjectURL(url);
       setMessage(
-        `Sicherung heruntergeladen (${(blob.size / 1024 / 1024).toFixed(1)} MB).`,
+        `Sicherung heruntergeladen (${(blob.size / 1024 / 1024).toFixed(1)} MB` +
+          `${includeOriginals ? "" : ", ohne Bild-Originale"}).`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export fehlgeschlagen.");
@@ -513,7 +517,10 @@ function BackupSection() {
         <h2 className="font-medium">Sicherung</h2>
         <p className="text-sm text-foreground/60">
           Die gesamte Datenbank – Charaktere samt Bildern, Szenarien und
-          Einstellungen – als Datei sichern oder wieder einspielen.
+          Einstellungen – als Datei sichern oder wieder einspielen. Ohne die
+          Bild-Originale wird die Datei deutlich kleiner; die Vorschaubilder
+          bleiben erhalten, nur Vollbild, PDF und Bild-Export zeigen die
+          betroffenen Bilder dann nicht mehr.
         </p>
       </div>
 
@@ -526,6 +533,20 @@ function BackupSection() {
         >
           {exporting ? "Erstelle Sicherung …" : "Datenbank exportieren"}
         </button>
+
+        <label
+          className="flex cursor-pointer items-center gap-2 text-sm text-foreground/70 select-none"
+          title="Die großen Bild-Originale mitsichern. Die kleinen Vorschaubilder (Thumbnails) sind immer dabei."
+        >
+          <input
+            type="checkbox"
+            checked={includeOriginals}
+            onChange={(e) => setIncludeOriginals(e.target.checked)}
+            disabled={exporting || importing}
+            className="h-4 w-4 accent-current"
+          />
+          Bild-Originale mitexportieren
+        </label>
 
         <label
           className={`rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition dark:border-white/15 ${

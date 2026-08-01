@@ -668,12 +668,20 @@ export interface ImportResult {
   safetyCopy: string;
 }
 
-/** Lädt die komplette Datenbank als Datei herunter. */
-export async function exportDatabase(): Promise<{
+/**
+ * Lädt die komplette Datenbank als Datei herunter.
+ *
+ * Mit `includeOriginals: false` bleiben die großen Bild-Originale draußen; die
+ * Thumbnails sind immer dabei.
+ */
+export async function exportDatabase(
+  includeOriginals = true,
+): Promise<{
   blob: Blob;
   filename: string;
 }> {
-  const res = await fetch("/api/backup", { cache: "no-store" });
+  const url = includeOriginals ? "/api/backup" : "/api/backup?originals=false";
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data?.error || "Export fehlgeschlagen.");

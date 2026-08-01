@@ -5,15 +5,22 @@ export const runtime = "nodejs";
 // Datenbanken mit vielen Bildern sind groß – Import/Export darf dauern.
 export const maxDuration = 120;
 
-/** Vollständige Datenbank als Download. */
-export async function GET() {
+/**
+ * Vollständige Datenbank als Download. Mit `?originals=false` bleiben die großen
+ * Bild-Originale draußen (die Thumbnails sind immer dabei) – eine schlanke
+ * Sicherung.
+ */
+export async function GET(request: Request) {
   try {
-    const data = await exportDatabase();
+    const includeOriginals =
+      new URL(request.url).searchParams.get("originals") !== "false";
+    const data = await exportDatabase({ includeOriginals });
     const stamp = new Date().toISOString().slice(0, 10);
+    const suffix = includeOriginals ? "" : "-ohne-originale";
     return new NextResponse(new Uint8Array(data), {
       headers: {
         "Content-Type": "application/octet-stream",
-        "Content-Disposition": `attachment; filename="charakter-creator-${stamp}.db"`,
+        "Content-Disposition": `attachment; filename="charakter-creator-${stamp}${suffix}.db"`,
         "Content-Length": String(data.length),
       },
     });
