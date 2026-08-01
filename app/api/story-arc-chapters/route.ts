@@ -82,11 +82,11 @@ export async function POST(request: Request) {
     // genau die Abschnittszahl, sonst die Obergrenze der gewählten Spanne.
     const effektivMax = segmentModus ? segmente.length : max;
 
-    // Jede Kapitel-Zusammenfassung soll ausführlich sein – mindestens 600
+    // Jede Kapitel-Zusammenfassung soll ausführlich sein – mindestens 450
     // Zeichen. Wie die Stationen-Mindestlänge (`MIN_STUFE_LEN`) dreifach
     // abgesichert: Prompt als prüfbarer Endzustand, Feld-`describe()` und – hier
     // – ein Wiederholversuch, der zu kurze Kapitel zählt.
-    const MIN_KAPITEL_LEN = 600;
+    const MIN_KAPITEL_LEN = 450;
 
     const { client: openai, model, extraParams } =
       await getTextClient(textProvider, "chapters");
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     // zu kurzen Kapiteln (bei Gleichstand bleibt die erste).
     if (ergebnis && (hatKaputteZeichen(ergebnis) || zuKurz(ergebnis) > 0)) {
       console.warn(
-        "story-arc-chapters: Nachbesserung nötig (kaputte Zeichen oder Kapitel < 600 Zeichen), zweiter Versuch.",
+        "story-arc-chapters: Nachbesserung nötig (kaputte Zeichen oder Kapitel < 450 Zeichen), zweiter Versuch.",
       );
       const zweit = (await versuch()).choices[0]?.message.parsed;
       if (zweit) {

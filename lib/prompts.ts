@@ -979,7 +979,7 @@ export function buildStoryArcChaptersPrompt(
     /**
      * **Mindestlänge der Zusammenfassung je Kapitel** in Zeichen. Als prüfbarer
      * Endzustand im Prompt – knappe Modelle (etwa Gemini) liefern sonst zu kurze
-     * Zusammenfassungen. Default 600 (s. `MIN_KAPITEL_LEN` in der Route).
+     * Zusammenfassungen. Default 450 (s. `MIN_KAPITEL_LEN` in der Route).
      */
     minZeichen?: number;
     /**
@@ -994,7 +994,7 @@ export function buildStoryArcChaptersPrompt(
   const kreativ = !!options.kreativ;
   const min = options.min ?? 2;
   const max = options.max ?? 3;
-  const minZeichen = options.minZeichen ?? 600;
+  const minZeichen = options.minZeichen ?? 450;
   const segmente = options.segmente ?? [];
   const segmentModus = segmente.length >= 2;
   const anzahlText = `${min} bis ${max} Kapitel`;
@@ -1050,13 +1050,27 @@ ${ausarbeitung}
 ${formHinweis(options.form)}${tonHinweis(options.ton)}${sparksBlock}`;
   }
 
-  return `Zerlege die folgende Station eines Story Arcs in ${anzahlText}.
+  // Ein einzelnes Kapitel (Wahl „1") verlangt eine andere Grammatik als eine
+  // Spanne: kein „zerlege in", kein „keine zwei". Für alle übrigen Wahlen
+  // (Spanne) bleiben die Sätze zeichengleich wie bisher.
+  const einzeln = min === 1 && max === 1;
+  const auftrag = einzeln
+    ? "Fasse die folgende Station eines Story Arcs in **genau ein Kapitel** zusammen"
+    : `Zerlege die folgende Station eines Story Arcs in ${anzahlText}`;
+  const abschlussSatz = einzeln
+    ? "Am Ende muss genau ein Kapitel dastehen, das die Station als Ganzes abdeckt."
+    : `Am Ende müssen ${anzahlText} dastehen. Sie schreiten die Station in ihrer Reihenfolge ab und decken sie zusammen lückenlos ab.`;
+  const fortschrittBullet = einzeln
+    ? "- Das Kapitel deckt die Station als Ganzes ab, ohne sie bloß aufzuzählen."
+    : "- Jedes Kapitel trägt die Handlung ein Stück weiter; keine zwei, die dasselbe sagen.";
+
+  return `${auftrag}.
 
 Station: ${stufe.titel.trim() || "(ohne Titel)"}
 Was in ihr geschieht:
 ${stufe.beschreibung.trim() || "(keine Beschreibung)"}${figurenZeile}
 
-Am Ende müssen ${anzahlText} dastehen. Sie schreiten die Station in ihrer Reihenfolge ab und decken sie zusammen lückenlos ab.
+${abschlussSatz}
 
 Jedes Kapitel besteht aus:
 - einer kurzen Überschrift (2–6 Wörter),
@@ -1064,7 +1078,7 @@ Jedes Kapitel besteht aus:
 
 Anforderungen:
 ${ausarbeitung}
-- Jedes Kapitel trägt die Handlung ein Stück weiter; keine zwei, die dasselbe sagen.
+${fortschrittBullet}
 - Am Ende muss die Zusammenfassung **jedes** Kapitels mindestens ${minZeichen} Zeichen lang sein – lieber ausführlich und konkret als knapp. Zu kurze Kapitel sind unbrauchbar.
 - Alles auf Deutsch, ohne Nummerierung und ohne Aufzählungszeichen im Text.
 ${formHinweis(options.form)}${tonHinweis(options.ton)}${sparksBlock}`;
@@ -1262,6 +1276,7 @@ ${grenzAnforderung}${anschlussAnforderung ? "\n" + anschlussAnforderung : ""}
 ${atmosphaereBullet}
 - **Baue Dialog in wörtlicher Rede ein** (mit Anführungszeichen), der die Figuren charakterisiert und die Handlung trägt. Nicht nur berichten, was gesagt wird – lass sie sprechen.
 - Gehorche den Regeln der Welt. Erfinde nichts, was ihnen widerspricht; führe keine neuen tragenden Personen ein.
+- **Erzähle durchgehend in der Vergangenheitsform (Präteritum)** – „sie ging", „er sah", „es geschah". Halte diese Zeitform vom ersten bis zum letzten Satz konsequent durch und wechsle nie ins Präsens. Einzige Ausnahme ist die wörtliche Rede: Was eine Figur in Anführungszeichen sagt, steht in ihrer eigenen Zeit.
 ${stilZeile}
 - Reiner Fließtext, keine Überschrift, kein Markdown, keine Aufzählung.${tonFuss}
 Antworte mit nichts als dem Kapiteltext selbst.`;

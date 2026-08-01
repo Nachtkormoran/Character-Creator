@@ -1002,6 +1002,7 @@ export function splitKapitelSegmente(beschreibung: string): string[] {
  * Speichergrenze hinausläuft.
  */
 export const KAPITEL_COUNTS = [
+  { value: "eins", label: "1", min: 1, max: 1 },
   { value: "wenig", label: "2–3", min: 2, max: 3 },
   { value: "mittel", label: "4–5", min: 4, max: 5 },
   { value: "viel", label: "6–8", min: 6, max: 8 },
@@ -1391,7 +1392,7 @@ export const kapitelSchema = z.object({
   inhalt: z
     .string()
     .describe(
-      "Was in diesem Kapitel passiert – als ausgearbeiteter Fließtext, mindestens 600 Zeichen (etwa fünf bis acht Sätze): konkret und lückenlos, welche Figuren wie beteiligt sind und wie sich die Lage verschiebt.",
+      "Was in diesem Kapitel passiert – als ausgearbeiteter Fließtext, mindestens 450 Zeichen (etwa vier bis sechs Sätze): konkret und lückenlos, welche Figuren wie beteiligt sind und wie sich die Lage verschiebt.",
     ),
 });
 
