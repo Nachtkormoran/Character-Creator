@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -30,6 +30,7 @@ import {
 } from "@/lib/client";
 import { downloadBlob, safeFileName } from "@/lib/download";
 import { scenarioFileName } from "@/lib/scenarioFile";
+import { ladeRunParams, speichereRunParams } from "@/lib/scenarioRunParams";
 import { GENRE_TEMPLATES } from "@/lib/templates";
 import {
   DEFAULT_ARC_FORMAT,
@@ -941,7 +942,18 @@ export default function ScenarioDetailPage({
       .catch(() => {});
   }, []);
 
+  // --- Zuletzt gewählte Lauf-Parameter je Szenario (localStorage) -----------
+  // Handlungsentwurf (Form/Ton) und Story Arc (`arcParams` ohne `zusatz`) merken
+  // sich pro Szenario. Bewusst clientseitig und getrennt von „Änderungen
+  // speichern": es sind Lauf-Parameter, kein Szenario-Inhalt (s.
+  // `scenarioRunParams.ts`). Geladen werden sie unten im getScenario-`.then`
+  // (dort ist setState ohnehin üblich); `runParamsGeladen` schaltet den
+  // Schreib-Effekt erst danach scharf, damit er die geladenen Werte nicht mit
+  // Defaults überschreibt.
+  const runParamsGeladen = useRef(false);
+
   useEffect(() => {
+    runParamsGeladen.current = false; // beim (Neu-)Laden erst nach dem .then scharf
     getScenario(id)
       .then(({ scenario, characters }) => {
         setName(scenario.name);
@@ -963,10 +975,37 @@ export default function ScenarioDetailPage({
             arc: scenario.storyArcVariants,
           }),
         );
+        // Gemerkte Lauf-Parameter dieses Szenarios anwenden, dann den
+        // Schreib-Effekt scharf schalten.
+        const g = ladeRunParams(id);
+        setHandlungForm(g.handlung.form);
+        setHandlungTon(g.handlung.ton);
+        setArcParams((p) => ({ ...p, ...g.arc }));
+        runParamsGeladen.current = true;
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Fehler."))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Merken (bei Änderung). Erst nach dem Laden, und ohne den `zusatz` (der
+  // beschreibt einen einzelnen Lauf, keine dauerhafte Vorliebe).
+  useEffect(() => {
+    if (!runParamsGeladen.current) return;
+    speichereRunParams(id, {
+      handlung: { form: handlungForm, ton: handlungTon },
+      arc: {
+        werkform: arcParams.werkform,
+        laenge: arcParams.laenge,
+        format: arcParams.format,
+        kapitelAnzahl: arcParams.kapitelAnzahl,
+        kapitelLaenge: arcParams.kapitelLaenge,
+        ton: arcParams.ton,
+        form: arcParams.form,
+        kreativ: arcParams.kreativ,
+        weiterspinnen: arcParams.weiterspinnen,
+      },
+    });
+  }, [id, handlungForm, handlungTon, arcParams]);
 
   // Alle Szenarien fürs Zuordnungs-Menü des Detail-Modals. Getrennt vom
   // Haupt-Load, weil es unabhängig und nicht kritisch ist – schlägt es fehl,
