@@ -1670,7 +1670,7 @@ export default function ScenarioDetailPage({
             value={name}
             onChange={(e) => setName(e.target.value)}
             aria-label="Name des Szenarios"
-            className="w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-3xl font-semibold tracking-tight outline-none transition hover:border-border focus:border-primary/50"
+            className="w-full rounded-md border border-transparent bg-transparent px-2 py-1 font-display text-3xl font-semibold tracking-tight outline-none transition hover:border-border focus:border-primary/50"
           />
           {/*
             KI-Name aus Beschreibung/Ort/Zeit/Regeln. Ersetzt das Feld (geht in

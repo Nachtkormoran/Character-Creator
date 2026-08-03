@@ -168,7 +168,7 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Einstellungen</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Einstellungen</h1>
         <p className="mt-2 text-muted-foreground">
           Gelten für alle künftigen Generierungen. Bereits gespeicherte
           Charaktere bleiben unverändert.

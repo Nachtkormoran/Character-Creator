@@ -32,7 +32,7 @@ import type { StoredScenario } from "@/lib/serialize";
 export default function Page() {
   return (
     <Suspense
-      fallback={<p className="text-foreground/60">Einen Moment …</p>}
+      fallback={<p className="text-muted-foreground">Einen Moment …</p>}
     >
       <Home />
     </Suspense>
@@ -251,10 +251,10 @@ function Home() {
     return (
       <div className="flex flex-col gap-8">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
+          <h1 className="font-display text-3xl font-semibold tracking-tight">
             Charakter erstellen
           </h1>
-          <p className="mt-2 max-w-2xl text-foreground/70">
+          <p className="mt-2 max-w-2xl text-muted-foreground">
             Gib ein paar Vorgaben an – der Rest wird passend ergänzt.
             Anschließend entsteht ein ausführlicher Text, eine Merkmals-Tabelle
             und auf Wunsch ein Portrait.
@@ -268,7 +268,7 @@ function Home() {
           wo man hinwollte, ist eine Zeile zu viel.
         */}
         {prefillName && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-black/10 bg-black/[0.03] px-4 py-3 text-sm dark:border-white/10 dark:bg-white/[0.04]">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border bg-muted px-4 py-3 text-sm">
             <span>
               Für das Szenario <strong>{prefillName}</strong>. Genre, Ort, Zeit
               und Regeln sind unten übernommen und lassen sich ändern.
@@ -290,7 +290,7 @@ function Home() {
         )}
 
         {wartetAufSzenario ? (
-          <p className="text-foreground/60">Lade Szenario …</p>
+          <p className="text-muted-foreground">Lade Szenario …</p>
         ) : (
           <CharacterForm
             onGenerate={handleGenerate}
@@ -306,7 +306,7 @@ function Home() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-semibold tracking-tight">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">
           Dein Charakter
         </h1>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -320,7 +320,7 @@ function Home() {
           {scenarioParam && (
             <Link
               href={`/scenarios/${scenarioParam}`}
-              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+              className="rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
             >
               ← Zum Szenario
             </Link>
@@ -328,7 +328,7 @@ function Home() {
           <button
             type="button"
             onClick={handleNew}
-            className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+            className="rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
           >
             + Neuen Charakter erstellen
           </button>
@@ -336,13 +336,13 @@ function Home() {
       </div>
 
       {textError && (
-        <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {textError}
         </div>
       )}
 
       {textLoading && (
-        <div className="rounded-xl border border-black/10 bg-white p-6 text-center text-foreground/60 dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="rounded-xl border border-border bg-card p-6 text-center text-muted-foreground">
           Der Charakter wird erschaffen … einen Moment.
         </div>
       )}

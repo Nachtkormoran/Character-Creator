@@ -160,7 +160,7 @@ export default function LibraryPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Bibliothek</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Bibliothek</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Die lesefertigen Geschichten – jede Story-Arc-Variante mit erzeugten
           Kapiteln als eigenes Buch. Ein Klick öffnet den Leser.

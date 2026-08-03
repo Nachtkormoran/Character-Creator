@@ -321,7 +321,7 @@ export default function ScenariosPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Szenarien</h1>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Szenarien</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Ein Szenario fasst Charaktere für eine Geschichte zusammen und hält
             fest, was für sie alle gilt.
