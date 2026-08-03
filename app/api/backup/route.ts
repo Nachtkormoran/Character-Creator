@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { exportDatabase, importDatabase } from "@/lib/backup";
+import { exportDatabase, importDatabase, type ImportMode } from "@/lib/backup";
 
 export const runtime = "nodejs";
 // Datenbanken mit vielen Bildern sind groß – Import/Export darf dauern.
@@ -47,9 +47,13 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    // Import-Modus aus dem Formular; alles außer „additive" bleibt beim
+    // sicheren Standard „replace".
+    const mode: ImportMode =
+      form.get("mode") === "additive" ? "additive" : "replace";
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const result = await importDatabase(buffer);
+    const result = await importDatabase(buffer, mode);
     return NextResponse.json({ result });
   } catch (err) {
     console.error("backup import error:", err);

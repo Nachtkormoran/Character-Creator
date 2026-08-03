@@ -694,10 +694,22 @@ export async function exportDatabase(
   };
 }
 
-/** **Ersetzt** den gesamten Datenbestand durch den der Datei. */
-export async function importDatabase(file: File): Promise<ImportResult> {
+/** Modus, wie eine Sicherung eingespielt wird (Zwilling von `ImportMode` im Server). */
+export type ImportMode = "replace" | "additive";
+
+/**
+ * Spielt eine Sicherung ein. `mode: "replace"` (Vorgabe) **ersetzt** den
+ * gesamten Bestand; `mode: "additive"` legt Charaktere und Szenarien der Datei
+ * **zusätzlich** an (mit neuen Ids), ohne den Bestand oder die Einstellungen zu
+ * verändern.
+ */
+export async function importDatabase(
+  file: File,
+  mode: ImportMode = "replace",
+): Promise<ImportResult> {
   const form = new FormData();
   form.append("file", file);
+  form.append("mode", mode);
   const res = await fetch("/api/backup", { method: "POST", body: form });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.error || "Import fehlgeschlagen.");

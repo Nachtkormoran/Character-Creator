@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaClient } from "@/app/generated/prisma/client";
+import { Prisma, PrismaClient } from "@/app/generated/prisma/client";
 import { prisma } from "./prisma";
 
 /**
@@ -96,15 +96,29 @@ export interface ImportResult {
   safetyCopy: string;
 }
 
+/** Wie eine Sicherung eingespielt wird. */
+export type ImportMode = "replace" | "additive";
+
 /**
- * Ersetzt den **gesamten** Inhalt der Datenbank durch den der hochgeladenen
- * Datei. Vorher wird eine Sicherheitskopie des aktuellen Standes abgelegt.
+ * Spielt eine hochgeladene Sicherung ein. Vorher wird stets eine
+ * Sicherheitskopie des aktuellen Standes abgelegt.
+ *
+ * - `mode: "replace"` (Vorgabe): **ersetzt den gesamten Bestand** – der alte
+ *   Inhalt wird gelöscht und durch den der Datei ersetzt (Ids unverändert).
+ * - `mode: "additive"`: legt die Charaktere und Szenarien der Datei
+ *   **zusätzlich** an – mit **neuen Ids** (Beziehungen darauf umgeschrieben,
+ *   damit nichts mit dem Bestand kollidiert). Der vorhandene Bestand **und die
+ *   Einstellungen** bleiben unangetastet.
  *
  * Bewusst inhaltlich (Zeilen kopieren) statt die Datei auszutauschen: Prisma
  * hält eine offene Verbindung, ein Dateitausch im laufenden Betrieb würde sie
  * ins Leere laufen lassen. So bleibt der Server benutzbar.
  */
-export async function importDatabase(file: Buffer): Promise<ImportResult> {
+export async function importDatabase(
+  file: Buffer,
+  mode: ImportMode = "replace",
+): Promise<ImportResult> {
+  const additive = mode === "additive";
   if (!file.subarray(0, SQLITE_MAGIC.length).equals(SQLITE_MAGIC)) {
     throw new Error(
       "Das ist keine SQLite-Datenbank. Bitte eine zuvor exportierte .db-Datei wählen.",
@@ -199,7 +213,9 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
       await source.$disconnect();
     }
 
-    // Sicherheitskopie des aktuellen Standes, bevor irgendetwas gelöscht wird.
+    // Sicherheitskopie des aktuellen Standes, bevor der Bestand verändert wird
+    // (auch additiv – so lässt sich der Import über einen Ersetzen-Restore der
+    // Kopie vollständig zurücknehmen).
     const current = await exportDatabase();
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     const safetyCopy = path.join(
@@ -208,31 +224,82 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
     );
     await writeFile(safetyCopy, current);
 
-    // Alles-oder-nichts: bricht etwas ab, bleibt der alte Stand erhalten.
-    await prisma.$transaction([
-      prisma.character.deleteMany(),
-      prisma.scenario.deleteMany(),
-      prisma.setting.deleteMany(),
-      // Szenarien zuerst – Charaktere verweisen per scenarioId darauf.
-      ...scenarios.map((g) =>
+    // Additiv: frische Ids vergeben und alle Beziehungen darauf umschreiben,
+    // damit die Ids aus der Datei nicht mit dem Bestand kollidieren. Ersetzen:
+    // Ids unverändert übernehmen (die alte Datenbank wird ohnehin geleert).
+    const scenarioIdMap = new Map<string, string>();
+    const characterIdMap = new Map<string, string>();
+    if (additive) {
+      for (const s of scenarios) scenarioIdMap.set(String(s.id), randomUUID());
+      for (const c of characters) characterIdMap.set(String(c.id), randomUUID());
+    }
+    const neueScenarioId = (alt: unknown): string =>
+      additive ? scenarioIdMap.get(String(alt))! : (alt as string);
+    const neueCharacterId = (alt: unknown): string =>
+      additive ? characterIdMap.get(String(alt))! : (alt as string);
+
+    // Verwaiste Bilder (Eltern nicht in der Datei) additiv überspringen – in
+    // einer vollständigen Sicherung kommt das nicht vor, schützt aber vor
+    // FK-Fehlern bei beschädigten Dateien.
+    const bilder = additive
+      ? images.filter((i) => characterIdMap.has(String(i.characterId)))
+      : images;
+    const weltbilder = additive
+      ? scenarioImages.filter((i) => scenarioIdMap.has(String(i.scenarioId)))
+      : scenarioImages;
+
+    // Alles-oder-nichts: bricht etwas ab, bleibt der alte Stand erhalten. Beim
+    // additiven Import wird nichts gelöscht und die Einstellungen bleiben, wie
+    // sie sind.
+    const ops: Prisma.PrismaPromise<unknown>[] = [];
+    if (!additive) {
+      ops.push(
+        prisma.character.deleteMany(),
+        prisma.scenario.deleteMany(),
+        prisma.setting.deleteMany(),
+      );
+    }
+    // Szenarien zuerst – Charaktere verweisen per scenarioId darauf.
+    for (const g of scenarios) {
+      ops.push(
         prisma.scenario.create({
           data: {
-            id: g.id as string,
+            id: neueScenarioId(g.id),
             createdAt: new Date(g.createdAt as string | number),
             name: g.name as string,
+            // Festlegungen, Handlungsentwürfe und Story Arcs mitnehmen – sonst
+            // käme ein Szenario ohne seinen Inhalt zurück. Ältere Sicherungen
+            // ohne diese Spalten liefern `undefined` → `null`.
+            details: (g.details as string | null | undefined) ?? null,
+            plotVariants: (g.plotVariants as string | null | undefined) ?? null,
+            storyArc: (g.storyArc as string | null | undefined) ?? null,
+            storyArcVariants:
+              (g.storyArcVariants as string | null | undefined) ?? null,
           },
         }),
-      ),
-      ...characters.map((c) =>
+      );
+    }
+    for (const c of characters) {
+      // Alte Sicherungen tragen die Zuordnung noch als `groupId`.
+      const altSzenario = (c.scenarioId ?? c.groupId) as
+        | string
+        | null
+        | undefined;
+      ops.push(
         prisma.character.create({
           data: {
-            id: c.id as string,
+            id: neueCharacterId(c.id),
             createdAt: new Date(c.createdAt as string | number),
             updatedAt: new Date(c.updatedAt as string | number),
             name: (c.name as string | null) ?? null,
-            // Alte Sicherungen tragen die Zuordnung noch als `groupId`.
-            scenarioId:
-              ((c.scenarioId ?? c.groupId) as string | null) ?? null,
+            // Additiv auf die neue Szenario-Id umschreiben; verweist der
+            // Charakter auf ein nicht mitgeliefertes Szenario, bleibt er frei.
+            scenarioId: additive
+              ? altSzenario != null
+                ? (scenarioIdMap.get(String(altSzenario)) ?? null)
+                : null
+              : (altSzenario ?? null),
+            isProtagonist: Boolean(c.isProtagonist),
             input: c.input as string,
             shortDescription: (c.shortDescription as string | null) ?? null,
             description: c.description as string,
@@ -241,50 +308,62 @@ export async function importDatabase(file: Buffer): Promise<ImportResult> {
             storyHooks: (c.storyHooks as string | null) ?? null,
           },
         }),
-      ),
-      // Bilder nach den Charakteren – sie verweisen per characterId darauf.
-      ...images.map((i) =>
+      );
+    }
+    // Bilder nach den Charakteren – sie verweisen per characterId darauf.
+    for (const i of bilder) {
+      ops.push(
         prisma.characterImage.create({
           data: {
-            id: i.id as string,
+            // Additiv eine frische Bild-Id, sonst die aus der Datei.
+            id: additive ? randomUUID() : (i.id as string),
             createdAt: new Date(i.createdAt as string | number),
-            characterId: i.characterId as string,
+            characterId: neueCharacterId(i.characterId),
             imageData: i.imageData as string,
             thumbnail: (i.thumbnail as string | null) ?? null,
             isPrimary: Boolean(i.isPrimary),
           },
         }),
-      ),
-      // Weltbilder nach den Szenarien – sie verweisen per scenarioId darauf.
-      ...scenarioImages.map((i) =>
+      );
+    }
+    // Weltbilder nach den Szenarien – sie verweisen per scenarioId darauf.
+    for (const i of weltbilder) {
+      ops.push(
         prisma.scenarioImage.create({
           data: {
-            id: i.id as string,
+            id: additive ? randomUUID() : (i.id as string),
             createdAt: new Date(i.createdAt as string | number),
-            scenarioId: i.scenarioId as string,
+            scenarioId: neueScenarioId(i.scenarioId),
             imageData: i.imageData as string,
             thumbnail: (i.thumbnail as string | null) ?? null,
             isPrimary: Boolean(i.isPrimary),
           },
         }),
-      ),
-      ...settings.map((s) =>
-        prisma.setting.create({
-          data: {
-            key: s.key as string,
-            value: s.value as string,
-            updatedAt: new Date(s.updatedAt as string | number),
-          },
-        }),
-      ),
-    ]);
+      );
+    }
+    // Einstellungen nur beim Ersetzen – additiv bleibt die App-Konfiguration.
+    if (!additive) {
+      for (const s of settings) {
+        ops.push(
+          prisma.setting.create({
+            data: {
+              key: s.key as string,
+              value: s.value as string,
+              updatedAt: new Date(s.updatedAt as string | number),
+            },
+          }),
+        );
+      }
+    }
+    await prisma.$transaction(ops);
 
     return {
       characters: characters.length,
-      // Alle Bilder zusammen – Charakter- und Weltbilder.
-      images: images.length + scenarioImages.length,
+      // Alle tatsächlich angelegten Bilder zusammen – Charakter- und Weltbilder.
+      images: bilder.length + weltbilder.length,
       scenarios: scenarios.length,
-      settings: settings.length,
+      // Additiv werden die Einstellungen nicht eingespielt.
+      settings: additive ? 0 : settings.length,
       safetyCopy: path.basename(safetyCopy),
     };
   } finally {

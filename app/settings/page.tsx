@@ -6,15 +6,19 @@ import {
   getSettings,
   importDatabase,
   updateSettings,
+  type ImportMode,
 } from "@/lib/client";
 import {
+  GEMINI_TEXT_MODELS,
   IMAGE_MODELS,
   IMAGE_PRICES_AS_OF,
   IMAGE_PRICES_USD,
   IMAGE_QUALITIES,
+  isKnownGeminiModel,
   isKnownImageModel,
   STORY_GENERATIONS,
   TEXT_PROVIDERS,
+  type GeminiTextModel,
   type ImageModel,
   type ImageQuality,
   type Settings,
@@ -69,6 +73,23 @@ export default function SettingsPage() {
     setSaved(false);
     try {
       setSettings(await updateSettings({ textProvider }));
+      setSaved(true);
+    } catch (e) {
+      setSettings(previous); // Rollback bei Fehler
+      setError(e instanceof Error ? e.message : "Speichern fehlgeschlagen.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function chooseGeminiTextModel(geminiTextModel: GeminiTextModel) {
+    const previous = settings;
+    setSettings((s) => (s ? { ...s, geminiTextModel } : s)); // optimistisch
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      setSettings(await updateSettings({ geminiTextModel }));
       setSaved(true);
     } catch (e) {
       setSettings(previous); // Rollback bei Fehler
@@ -208,6 +229,48 @@ export default function SettingsPage() {
                 </label>
               );
             })}
+          </div>
+
+          {/*
+            Gemini-Modell: greift nur, wenn oben (oder je Story-Erzeugung)
+            Gemini läuft. Der Sinn ist das Free-Tier-Kontingent – Flash Lite hat
+            ein großes Tageskontingent, das Voll-Flash ist stärker, aber knapp.
+          */}
+          <div className="mt-1 flex flex-col gap-2 border-t border-black/5 pt-4 dark:border-white/5">
+            <label htmlFor="gemini-model" className="text-sm font-medium">
+              Gemini-Modell
+            </label>
+            <p className="text-xs text-foreground/60">
+              Welches Gemini-Modell läuft, wenn oben (oder je Story-Erzeugung)
+              Gemini gewählt ist. Daran hängt das kostenlose Tageskontingent.
+            </p>
+            <select
+              id="gemini-model"
+              value={settings.geminiTextModel}
+              onChange={(e) =>
+                chooseGeminiTextModel(e.target.value as GeminiTextModel)
+              }
+              disabled={saving}
+              className="self-start rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm disabled:opacity-50 dark:border-white/15"
+            >
+              {!isKnownGeminiModel(settings.geminiTextModel) && (
+                <option value={settings.geminiTextModel}>
+                  {settings.geminiTextModel} (aus Env)
+                </option>
+              )}
+              {GEMINI_TEXT_MODELS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-foreground/50">
+              {
+                GEMINI_TEXT_MODELS.find(
+                  (m) => m.value === settings.geminiTextModel,
+                )?.hint
+              }
+            </p>
           </div>
 
           <p className="text-xs text-foreground/50">
@@ -450,6 +513,9 @@ function BackupSection() {
   // Ob die großen Bild-Originale mitexportiert werden. Die Thumbnails sind immer
   // dabei. Default an – die Vollsicherung ist der übliche Fall.
   const [includeOriginals, setIncludeOriginals] = useState(true);
+  // Wie eine Sicherung eingespielt wird. Default „replace" (ersetzen) – der
+  // sichere, gewohnte Fall; „additive" hängt die Datei-Inhalte an.
+  const [importMode, setImportMode] = useState<ImportMode>("replace");
 
   async function handleExport() {
     if (exporting) return;
@@ -482,27 +548,35 @@ function BackupSection() {
     e.target.value = ""; // erlaubt erneutes Wählen derselben Datei
     if (!file || importing) return;
 
-    // Der Import löscht den gesamten Bestand – hier ist eine Rückfrage Pflicht.
-    if (
-      !confirm(
-        `„${file.name}" einspielen?\n\n` +
+    // Rückfrage – beim Ersetzen ist sie Pflicht (Datenverlust), aber auch
+    // additiv soll man wissen, was passiert. Der Text hängt am Modus.
+    const frage =
+      importMode === "additive"
+        ? `„${file.name}" additiv einspielen?\n\n` +
+          "Die Charaktere und Szenarien aus der Datei werden ZUSÄTZLICH " +
+          "angelegt (mit neuen IDs). Dein aktueller Bestand und deine " +
+          "Einstellungen bleiben unverändert.\n\n" +
+          "Vorher wird automatisch eine Sicherheitskopie abgelegt."
+        : `„${file.name}" einspielen?\n\n` +
           "ACHTUNG: Alle aktuellen Charaktere, Szenarien und Einstellungen werden " +
           "dabei gelöscht und durch den Inhalt der Datei ersetzt.\n\n" +
           "Vorher wird automatisch eine Sicherheitskopie des jetzigen Standes " +
-          "neben der Datenbank abgelegt.",
-      )
-    )
-      return;
+          "neben der Datenbank abgelegt.";
+    if (!confirm(frage)) return;
 
     setImporting(true);
     setError(null);
     setMessage(null);
     try {
-      const r = await importDatabase(file);
+      const r = await importDatabase(file, importMode);
+      const verb = importMode === "additive" ? "Hinzugefügt" : "Eingespielt";
       setMessage(
-        `Eingespielt: ${r.characters} Charaktere, ${r.images} Bilder, ` +
-          `${r.scenarios} Szenarien, ${r.settings} Einstellungen. ` +
-          `Sicherheitskopie: ${r.safetyCopy}`,
+        `${verb}: ${r.characters} Charaktere, ${r.images} Bilder, ` +
+          `${r.scenarios} Szenarien` +
+          (importMode === "additive"
+            ? ""
+            : `, ${r.settings} Einstellungen`) +
+          `. Sicherheitskopie: ${r.safetyCopy}`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import fehlgeschlagen.");
@@ -548,6 +622,20 @@ function BackupSection() {
           Bild-Originale mitexportieren
         </label>
 
+        <label className="flex items-center gap-2 text-sm text-foreground/70">
+          Import-Modus
+          <select
+            value={importMode}
+            onChange={(e) => setImportMode(e.target.value as ImportMode)}
+            disabled={importing || exporting}
+            title="Ersetzen leert den Bestand und spielt die Datei ein. Additiv hängt die Charaktere und Szenarien der Datei zusätzlich an (mit neuen IDs)."
+            className="rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm disabled:opacity-50 dark:border-white/15"
+          >
+            <option value="replace">Ersetzen</option>
+            <option value="additive">Additiv (hinzufügen)</option>
+          </select>
+        </label>
+
         <label
           className={`rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition dark:border-white/15 ${
             importing || exporting
@@ -567,9 +655,19 @@ function BackupSection() {
       </div>
 
       <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm">
-        Der Import <strong>ersetzt den gesamten Bestand</strong>. Vorher wird
-        automatisch eine Sicherheitskopie des aktuellen Standes neben der
-        Datenbank abgelegt.
+        {importMode === "additive" ? (
+          <>
+            <strong>Additiver Import:</strong> Charaktere und Szenarien der Datei
+            werden <strong>zusätzlich</strong> angelegt (neue IDs); Bestand und
+            Einstellungen bleiben. Vorher wird eine Sicherheitskopie abgelegt.
+          </>
+        ) : (
+          <>
+            Der Import <strong>ersetzt den gesamten Bestand</strong>. Vorher wird
+            automatisch eine Sicherheitskopie des aktuellen Standes neben der
+            Datenbank abgelegt.
+          </>
+        )}
       </p>
 
       {message && (
