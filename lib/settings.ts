@@ -1,12 +1,15 @@
 import { prisma } from "./prisma";
 import {
+  DEFAULT_GEMINI_TEXT_MODEL,
   DEFAULT_IMAGE_MODEL,
   DEFAULT_IMAGE_QUALITY,
   DEFAULT_TEXT_PROVIDER,
+  geminiTextModelSchema,
   imageModelSchema,
   imageQualitySchema,
   STORY_GENERATIONS,
   textProviderSchema,
+  type GeminiTextModel,
   type ImageModel,
   type ImageQuality,
   type Settings,
@@ -27,6 +30,7 @@ import {
 const IMAGE_MODEL_KEY = "imageModel";
 const IMAGE_QUALITY_KEY = "imageQuality";
 const TEXT_PROVIDER_KEY = "textProvider";
+const GEMINI_TEXT_MODEL_KEY = "geminiTextModel";
 const SHOW_MODEL_KEY = "showModel";
 const USE_MODEL_OVERRIDES_KEY = "useModelOverrides";
 
@@ -67,6 +71,13 @@ function parseTextProvider(
   return result.success ? result.data : null;
 }
 
+function parseGeminiTextModel(
+  value: string | undefined | null,
+): GeminiTextModel | null {
+  const result = geminiTextModelSchema.safeParse(value);
+  return result.success ? result.data : null;
+}
+
 export async function getSettings(): Promise<Settings> {
   const rows = await prisma.setting.findMany({
     where: {
@@ -75,6 +86,7 @@ export async function getSettings(): Promise<Settings> {
           IMAGE_MODEL_KEY,
           IMAGE_QUALITY_KEY,
           TEXT_PROVIDER_KEY,
+          GEMINI_TEXT_MODEL_KEY,
           SHOW_MODEL_KEY,
           USE_MODEL_OVERRIDES_KEY,
           ...STORY_GENERATIONS.map((g) => storyModelKey(g.value)),
@@ -104,6 +116,14 @@ export async function getSettings(): Promise<Settings> {
     parseTextProvider(byKey.get(TEXT_PROVIDER_KEY)) ??
     parseTextProvider(process.env.TEXT_PROVIDER) ??
     DEFAULT_TEXT_PROVIDER;
+
+  // Gemini-Modell wie das Bildmodell: gespeicherter Wert (Allowlist) → Env
+  // (`GEMINI_TEXT_MODEL`, ungeprüfter Escape-Hatch für nicht gelistete Modelle)
+  // → Default. Wirkt nur, wenn der Anbieter Gemini ist.
+  const geminiTextModel =
+    parseGeminiTextModel(byKey.get(GEMINI_TEXT_MODEL_KEY)) ??
+    process.env.GEMINI_TEXT_MODEL?.trim() ??
+    DEFAULT_GEMINI_TEXT_MODEL;
 
   // Reine Anzeige-Einstellung, Default aus. Wie oben: gespeichert → Env → Default.
   const showModel =
@@ -135,6 +155,7 @@ export async function getSettings(): Promise<Settings> {
     imageModel,
     imageQuality,
     textProvider,
+    geminiTextModel,
     showModel,
     useModelOverrides,
     storyModels,
@@ -146,6 +167,7 @@ export async function updateSettings(patch: {
   imageModel?: ImageModel;
   imageQuality?: ImageQuality;
   textProvider?: TextProvider;
+  geminiTextModel?: GeminiTextModel;
   showModel?: boolean;
   useModelOverrides?: boolean;
   storyModels?: Partial<StoryModels>;
@@ -155,6 +177,8 @@ export async function updateSettings(patch: {
   if (patch.imageQuality) writes.push([IMAGE_QUALITY_KEY, patch.imageQuality]);
   if (patch.textProvider)
     writes.push([TEXT_PROVIDER_KEY, patch.textProvider]);
+  if (patch.geminiTextModel)
+    writes.push([GEMINI_TEXT_MODEL_KEY, patch.geminiTextModel]);
   // Boolean: explizit auf undefined prüfen, sonst würde `false` verschluckt.
   if (patch.showModel !== undefined)
     writes.push([SHOW_MODEL_KEY, String(patch.showModel)]);

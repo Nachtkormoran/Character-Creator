@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 import { getSettings } from "./settings";
-import { textProviderSchema, type StoryGeneration } from "./schema";
+import {
+  textProviderSchema,
+  type Settings,
+  type StoryGeneration,
+} from "./schema";
 
 /**
  * Zentrale OpenAI-Clients. Werden ausschließlich serverseitig (in API-Routen)
@@ -36,17 +40,11 @@ export const IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
  * OpenAI-SDK-Client wie oben, nur mit anderem `baseURL` und Key – so bleibt
  * der gesamte Aufruf-Code (auch Structured Outputs) unverändert.
  *
- * Modell und Endpunkt sind per Env überschreibbar; der Key kommt aus
- * `GEMINI_API_KEY` (kostenloses Kontingent über Google AI Studio).
+ * Das **Modell** wählt `getTextClient()` über die Einstellungen
+ * (`settings.geminiTextModel`, Auswahl bzw. Env `GEMINI_TEXT_MODEL`, s.
+ * `GEMINI_TEXT_MODELS` in `schema.ts` zum Free-Tier-Hintergrund); Endpunkt und
+ * Key kommen aus der Env (`GEMINI_BASE_URL`, `GEMINI_API_KEY`).
  */
-// `gemini-flash-lite-latest` folgt dem jeweils aktuellen Flash-**Lite**-Modell.
-// Bewusst Lite und nicht das Voll-Flash (`gemini-flash-latest`): Letzteres löst
-// sich auf `gemini-3.6-flash` auf, das im Free-Tier nur ~20 Anfragen/Tag erlaubt
-// – für ein paar Charaktere zu wenig. Die Lite-Modelle haben ein deutlich
-// größeres Tageskontingent. Und `gemini-2.0-flash` scheidet ganz aus: dessen
-// Free-Tier ist für neue Konten `limit: 0` (gemessen 21.07.2026).
-export const GEMINI_TEXT_MODEL =
-  process.env.GEMINI_TEXT_MODEL || "gemini-flash-lite-latest";
 export const GEMINI_BASE_URL =
   process.env.GEMINI_BASE_URL ||
   "https://generativelanguage.googleapis.com/v1beta/openai/";
@@ -144,19 +142,26 @@ export async function getTextClient(
 }> {
   const übersteuert = textProviderSchema.safeParse(providerOverride);
   let textProvider;
+  // Die Einstellungen werden nur bei Bedarf gelesen (der Pro-Lauf-Override
+  // spart den DB-Zugriff) – aber fürs Gemini-Modell brauchen wir sie doch, also
+  // hier merken und unten wiederverwenden.
+  let settings: Settings | null = null;
   if (übersteuert.success) {
     textProvider = übersteuert.data;
   } else {
-    const settings = await getSettings();
+    settings = await getSettings();
     textProvider =
       generation && settings.useModelOverrides
         ? settings.storyModels[generation]
         : settings.textProvider;
   }
   if (textProvider === "gemini") {
+    // Das konkrete Gemini-Modell kommt aus den Einstellungen (Auswahl bzw. Env
+    // `GEMINI_TEXT_MODEL`) – daran hängt das Free-Tier-Kontingent.
+    settings ??= await getSettings();
     return {
       client: getGemini(),
-      model: GEMINI_TEXT_MODEL,
+      model: settings.geminiTextModel,
       extraParams: { reasoning_effort: "minimal" },
     };
   }

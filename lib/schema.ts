@@ -140,6 +140,45 @@ export const textProviderSchema = z.enum(
 );
 
 /**
+ * **Wählbare Gemini-Textmodelle.** Der Sinn der Auswahl ist das
+ * Free-Tier-Kontingent (s. Fallstricke in CLAUDE.md): Das **Lite**-Modell hat
+ * ein großes Tageskontingent, das Voll-**Flash** ist stärker, im Free-Tier aber
+ * auf ~20 Anfragen/Tag begrenzt. Bewusst die `-latest`-Aliasse, weil Google
+ * konkrete Versionen abkündigt. Wirkt nur, wenn als Textanbieter **Gemini**
+ * läuft (global oder je Story-Erzeugung).
+ */
+export const GEMINI_TEXT_MODELS = [
+  {
+    value: "gemini-flash-lite-latest",
+    label: "Flash Lite",
+    hint: "Folgt dem aktuellen Flash-Lite. Großes Gratis-Tageskontingent – die Vorgabe, gut für viele Erzeugungen.",
+  },
+  {
+    value: "gemini-flash-latest",
+    label: "Flash",
+    hint: "Folgt dem aktuellen Voll-Flash – stärker, im Free-Tier aber nur ~20 Anfragen/Tag. Für wenige, hochwertige Läufe.",
+  },
+] as const;
+
+export type GeminiTextModel = (typeof GEMINI_TEXT_MODELS)[number]["value"];
+
+/** Default = Flash Lite (großes Gratis-Kontingent), wie der bisherige Env-Default. */
+export const DEFAULT_GEMINI_TEXT_MODEL: GeminiTextModel =
+  "gemini-flash-lite-latest";
+
+export const geminiTextModelSchema = z.enum(
+  GEMINI_TEXT_MODELS.map((m) => m.value) as [
+    GeminiTextModel,
+    ...GeminiTextModel[],
+  ],
+);
+
+/** Steht das Gemini-Modell in der Auswahlliste (oder kommt es aus der Env)? */
+export function isKnownGeminiModel(value: string): value is GeminiTextModel {
+  return GEMINI_TEXT_MODELS.some((m) => m.value === value);
+}
+
+/**
  * **Die vier Story-Erzeugungen, für die sich das Textmodell einzeln festlegen
  * lässt** (Einstellungsseite, „Modell je Story-Erzeugung"). Jede entspricht
  * genau einer Route. Der `value` ist zugleich der `generation`-Schlüssel, den
@@ -180,6 +219,8 @@ export const settingsPatchSchema = z.object({
   imageModel: imageModelSchema,
   imageQuality: imageQualitySchema,
   textProvider: textProviderSchema,
+  // Welches Gemini-Modell läuft, wenn der Textanbieter Gemini ist. Allowlist.
+  geminiTextModel: geminiTextModelSchema,
   // Ob bei den Story-Erzeugungen (Handlungsentwurf, Story Arc, Kapitel,
   // Kapitel-Prosa) das verwendete Modell mit angezeigt wird. Reine Anzeige,
   // Default aus.
@@ -201,6 +242,13 @@ export interface Settings {
   imageModel: string;
   imageQuality: ImageQuality;
   textProvider: TextProvider;
+  /**
+   * Gemini-Textmodell, das läuft, wenn der Anbieter Gemini ist. Bewusst
+   * `string` (wie `imageModel`): ein über `GEMINI_TEXT_MODEL` gesetztes Modell
+   * ist serverseitige Konfiguration und wird respektiert, auch wenn es nicht in
+   * der Auswahlliste steht.
+   */
+  geminiTextModel: string;
   /** Modell bei den Story-Erzeugungen mit anzeigen (reine Anzeige, Default aus). */
   showModel: boolean;
   /**
