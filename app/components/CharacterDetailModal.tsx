@@ -34,6 +34,21 @@ import { TraitsTable } from "./TraitsTable";
 import { CharacterInputModal } from "./CharacterInputModal";
 import { ScenarioFromCharacterModal } from "./ScenarioFromCharacterModal";
 import { useBackdropClose } from "./useBackdropClose";
+import { Button } from "./ui/Button";
+import { IconButton } from "./ui/IconButton";
+import {
+  Dices,
+  Download,
+  FileText,
+  Images,
+  Sparkles,
+  Trash2,
+  X,
+} from "./ui/icons";
+
+/** Token-getriebene Eingabe-Klasse (16px mobil gegen iOS-Zoom, ab sm kompakt). */
+const FIELD =
+  "rounded-md border border-border bg-background px-3 py-1.5 text-base text-foreground outline-none transition focus:border-primary/50 disabled:opacity-50 sm:text-sm";
 
 export function CharacterDetailModal({
   character: c,
@@ -388,7 +403,7 @@ export function CharacterDetailModal({
       {...backdrop}
     >
       <div
-        className="my-8 w-full max-w-5xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
+        className="my-8 w-full max-w-5xl rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-lg)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
@@ -398,46 +413,44 @@ export function CharacterDetailModal({
                 value={edited.name}
                 onChange={(e) => setField("name", e.target.value)}
                 aria-label="Name des Charakters"
-                className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 -mx-2 text-2xl font-semibold outline-none transition hover:border-black/15 focus:border-black/40 dark:hover:border-white/15 dark:focus:border-white/40"
+                className="-mx-2 min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 font-display text-2xl font-semibold outline-none transition hover:border-border focus:border-primary/50"
               />
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={rollName}
                 title="Zufallsname passend zu Geschlecht und Herkunft aus der Merkmalstabelle – sofort und ohne KI"
-                className="shrink-0 rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+                className="shrink-0"
               >
-                🎲 Würfeln
-              </button>
-              <button
-                type="button"
+                <Dices size={15} strokeWidth={1.75} aria-hidden="true" />
+                Würfeln
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={suggestName}
                 disabled={namingAI}
                 title="Namensvorschlag der KI auf Basis der Merkmalstabelle"
-                className="shrink-0 rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                className="shrink-0"
               >
-                {namingAI ? "Denkt nach …" : "✨ Zu den Merkmalen"}
-              </button>
+                <Sparkles size={15} strokeWidth={1.75} aria-hidden="true" />
+                {namingAI ? "Denkt nach …" : "Zu den Merkmalen"}
+              </Button>
             </div>
             {nameError && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                {nameError}
-              </p>
+              <p className="mt-1 text-xs text-destructive">{nameError}</p>
             )}
             <AutoTextarea
               value={edited.kurzbeschreibung}
               onChange={(value) => setField("kurzbeschreibung", value)}
               ariaLabel="Kurzbeschreibung"
               placeholder="Kurzbeschreibung"
-              className="mt-1 text-foreground/70 italic"
+              className="mt-1 text-muted-foreground italic"
             />
           </div>
-          <button
-            onClick={onClose}
-            className="shrink-0 rounded-md px-2 py-1 text-foreground/60 transition hover:bg-black/5 dark:hover:bg-white/10"
-            aria-label="Schließen"
-          >
-            ✕
-          </button>
+          <IconButton label="Schließen" onClick={onClose} className="shrink-0">
+            <X size={18} strokeWidth={1.75} aria-hidden="true" />
+          </IconButton>
         </div>
 
         {/* Änderungen speichern (erscheint bei Änderungen) */}
@@ -446,26 +459,28 @@ export function CharacterDetailModal({
             <span className="text-sm text-amber-800 dark:text-amber-300">
               Ungespeicherte Änderungen
             </span>
-            <button
+            <Button
+              size="sm"
               onClick={saveEdits}
               disabled={savingEdits || !nameValid}
-              className="ml-auto rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+              className="ml-auto"
             >
               {savingEdits ? "Speichere …" : "Änderungen speichern"}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setEdited(c.character);
                 setHooks(splitHooks(c.storyHooks));
                 setGenre(c.input?.genre ?? DEFAULT_GENRE);
               }}
               disabled={savingEdits}
-              className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
             >
               Verwerfen
-            </button>
+            </Button>
             {editError && (
-              <span className="w-full text-xs text-red-600 dark:text-red-400">
+              <span className="w-full text-xs text-destructive">
                 {editError}
               </span>
             )}
@@ -475,10 +490,10 @@ export function CharacterDetailModal({
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_240px]">
           <div className="order-2 md:order-1">
             <div className="mb-2 flex items-baseline justify-between gap-2">
-              <h3 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+              <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
                 Beschreibung
               </h3>
-              <span className="text-xs text-foreground/50">
+              <span className="text-xs text-muted-foreground tabular-nums">
                 {edited.beschreibung.length.toLocaleString("de-DE")} Zeichen
               </span>
             </div>
@@ -493,30 +508,32 @@ export function CharacterDetailModal({
               Text neu erzeugen. Steht unter dem Textfeld, nicht darüber: es ist
               der Griff zum vorhandenen Text, keine Überschrift.
             */}
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-black/10 bg-black/[0.02] p-2 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted p-2">
               <input
                 value={rewriteHint}
                 onChange={(e) => setRewriteHint(e.target.value)}
                 maxLength={1000}
                 placeholder="Zusätzliche Wünsche – z. B. nüchterner Stil, mehr über die Kindheit …"
                 aria-label="Zusätzliche Wünsche für den neuen Text"
-                className="min-w-40 flex-1 rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                className={`min-w-40 flex-1 ${FIELD}`}
               />
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={rewriteDescription}
                 disabled={rewriting}
                 title="Erzeugt den Beschreibungstext neu – aus den ursprünglichen Vorgaben und der Merkmalstabelle. Name und Merkmale bleiben unverändert."
-                className="shrink-0 rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                className="shrink-0"
               >
-                {rewriting ? "Schreibt …" : "✨ Text neu erzeugen"}
-              </button>
+                <Sparkles size={15} strokeWidth={1.75} aria-hidden="true" />
+                {rewriting ? "Schreibt …" : "Text neu erzeugen"}
+              </Button>
               {rewriteError ? (
-                <p className="w-full text-xs text-red-600 dark:text-red-400">
+                <p className="w-full text-xs text-destructive">
                   {rewriteError}
                 </p>
               ) : (
-                <p className="w-full text-xs text-foreground/50">
+                <p className="w-full text-xs text-muted-foreground">
                   Ersetzt den Text oben. Bis zum Speichern lässt er sich
                   verwerfen.
                 </p>
@@ -524,7 +541,7 @@ export function CharacterDetailModal({
             </div>
           </div>
           <div className="order-1 md:order-2">
-            <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted">
               {preview ? (
                 <button
                   type="button"
@@ -543,22 +560,23 @@ export function CharacterDetailModal({
                   />
                 </button>
               ) : (
-                <div className="flex h-full items-center justify-center p-4 text-center text-sm text-foreground/40">
+                <div className="flex h-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
                   Kein Bild
                 </div>
               )}
             </div>
 
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => setImagesOpen(true)}
-              className="mt-3 w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+              className="mt-3 w-full"
             >
+              <Images size={16} strokeWidth={1.75} aria-hidden="true" />
               {c.images.length > 0
                 ? `Bilder verwalten (${c.images.length})`
                 : "Bild erzeugen …"}
-            </button>
-            <p className="mt-1.5 text-xs text-foreground/50">
+            </Button>
+            <p className="mt-1.5 text-xs text-muted-foreground">
               Weitere Bilder erzeugen, hochladen und das primäre wählen.
             </p>
 
@@ -574,13 +592,13 @@ export function CharacterDetailModal({
               Untereinander mit eigener Beschriftung ist das zu erkennen –
               nebeneinander in einer Zeile wäre es eine Falle.
             */}
-            <div className="mt-4 flex flex-col gap-3 border-t border-black/10 pt-4 dark:border-white/10">
+            <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-foreground/60">Genre</span>
+                <span className="text-muted-foreground">Genre</span>
                 <select
                   value={genre}
                   onChange={(e) => setGenre(e.target.value)}
-                  className="w-full rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                  className={`w-full ${FIELD}`}
                 >
                   {GENRE_TEMPLATES.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -588,19 +606,19 @@ export function CharacterDetailModal({
                     </option>
                   ))}
                 </select>
-                <span className="text-xs text-foreground/50">
+                <span className="text-xs text-muted-foreground">
                   Steuert die Würfel und das Genre eines abgeleiteten
                   Szenarios. Wird erst beim Speichern der Änderungen übernommen.
                 </span>
               </label>
 
               <label className="flex flex-col gap-1 text-sm">
-                <span className="text-foreground/60">Szenario</span>
+                <span className="text-muted-foreground">Szenario</span>
                 <select
                   value={c.scenarioId ?? ""}
                   onChange={(e) => assignScenario(e.target.value || null)}
                   disabled={assigningScenario}
-                  className="w-full rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                  className={`w-full ${FIELD}`}
                 >
                   <option value="">— keine —</option>
                   {scenarios.map((g) => (
@@ -609,7 +627,7 @@ export function CharacterDetailModal({
                     </option>
                   ))}
                 </select>
-                <span className="text-xs text-foreground/50">
+                <span className="text-xs text-muted-foreground">
                   Wird sofort gespeichert.
                 </span>
               </label>
@@ -624,21 +642,17 @@ export function CharacterDetailModal({
         */}
         <div className="mt-6">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+            <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
               Ansatzpunkte für eine Geschichte
             </h3>
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-2 text-xs">
-                <span className="text-foreground/60">Bindung:</span>
+                <span className="text-muted-foreground">Bindung:</span>
                 <select
                   value={anchor}
-                  onChange={(e) =>
-                    setAnchor(e.target.value as StoryHookAnchor)
-                  }
-                  title={
-                    STORY_HOOK_ANCHORS.find((a) => a.value === anchor)?.hint
-                  }
-                  className="rounded-md border border-black/15 bg-white px-2 py-1 text-xs outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                  onChange={(e) => setAnchor(e.target.value as StoryHookAnchor)}
+                  title={STORY_HOOK_ANCHORS.find((a) => a.value === anchor)?.hint}
+                  className="rounded-md border border-border bg-background px-2 py-1.5 text-base text-foreground outline-none transition focus:border-primary/50 sm:text-xs"
                 >
                   {STORY_HOOK_ANCHORS.map((a) => (
                     <option key={a.value} value={a.value}>
@@ -647,23 +661,24 @@ export function CharacterDetailModal({
                   ))}
                 </select>
               </label>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={deriveHooks}
                 disabled={hooksBusy}
                 title="Leitet aus Beschreibung und Merkmalen eine weitere Ausgangslage für eine Geschichte ab und hängt sie an die Liste an"
-                className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
               >
+                <Sparkles size={15} strokeWidth={1.75} aria-hidden="true" />
                 {hooksBusy
                   ? "Denkt nach …"
                   : hooks.length
-                    ? "✨ Weiteren ableiten"
-                    : "✨ Ableiten"}
-              </button>
+                    ? "Weiteren ableiten"
+                    : "Ableiten"}
+              </Button>
             </div>
           </div>
           {/* Der Hinweis erklärt die Stufe, ohne dass man das Menü aufklappen muss. */}
-          <p className="mb-2 text-xs text-foreground/50">
+          <p className="mb-2 text-xs text-muted-foreground">
             {STORY_HOOK_ANCHORS.find((a) => a.value === anchor)?.hint}
           </p>
 
@@ -684,7 +699,7 @@ export function CharacterDetailModal({
               maxLength={500}
               placeholder="Richtung (optional) – z. B. alte Schuld, Verrat im Kollegium, eher leise …"
               aria-label="Stichworte zur Richtung der Ansatzpunkte"
-              className="w-full rounded-md border border-black/15 bg-white px-3 py-1.5 text-sm outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              className={`w-full ${FIELD}`}
             />
             {/*
               Bei „eng" ist der Hinweis eine **Warnung**, keine Erläuterung:
@@ -698,7 +713,7 @@ export function CharacterDetailModal({
                 className={
                   anchor === "eng"
                     ? "mt-1 text-xs text-amber-700 dark:text-amber-400"
-                    : "mt-1 text-xs text-foreground/50"
+                    : "mt-1 text-xs text-muted-foreground"
                 }
               >
                 {anchor === "eng"
@@ -715,7 +730,7 @@ export function CharacterDetailModal({
             „Verwerfen" holt die gespeicherte Liste zurück.
           */}
           {hooks.length === 0 ? (
-            <p className="rounded-md border border-dashed border-black/15 px-3 py-6 text-center text-sm text-foreground/50 dark:border-white/15">
+            <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
               Noch keine Ansatzpunkte – der Knopf oben schlägt einen vor. Jeder
               weitere Klick hängt einen an.
             </p>
@@ -727,9 +742,9 @@ export function CharacterDetailModal({
                   // keine Id, und die Liste ändert sich nur am Ende (Anhängen)
                   // oder durch Löschen – beides ohne Umsortieren.
                   key={i}
-                  className="flex items-start gap-2 rounded-md border border-black/10 bg-black/[0.02] px-3 py-2 dark:border-white/10 dark:bg-white/[0.03]"
+                  className="flex items-start gap-2 rounded-md border border-border bg-muted px-3 py-2"
                 >
-                  <span className="mt-1 w-4 shrink-0 text-right text-xs text-foreground/40 tabular-nums">
+                  <span className="mt-1 w-4 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
                     {i + 1}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -744,73 +759,66 @@ export function CharacterDetailModal({
                   </div>
                   <button
                     type="button"
-                    onClick={() =>
-                      setHooks((h) => h.filter((_, j) => j !== i))
-                    }
+                    onClick={() => setHooks((h) => h.filter((_, j) => j !== i))}
                     title="Diesen Ansatzpunkt entfernen"
                     aria-label={`Ansatzpunkt ${i + 1} entfernen`}
-                    className="mt-0.5 shrink-0 rounded-md border border-transparent px-2 py-0.5 text-sm text-foreground/40 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400"
+                    className="mt-0.5 flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
                   >
-                    ✕
+                    <X size={16} strokeWidth={1.75} aria-hidden="true" />
                   </button>
                 </li>
               ))}
             </ul>
           )}
           {hooksError && (
-            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-              {hooksError}
-            </p>
+            <p className="mt-1 text-xs text-destructive">{hooksError}</p>
           )}
         </div>
 
         <div className="mt-6">
-          <h3 className="mb-2 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+          <h3 className="mb-2 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Merkmale
           </h3>
           <TraitsTable traits={edited.merkmale} onChange={setTrait} compact />
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-black/10 pt-4 dark:border-white/10">
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-foreground/50">
+        <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs text-muted-foreground tabular-nums">
               {new Date(c.createdAt).toLocaleDateString("de-DE")}
             </span>
             {/*
               Die Gegenrichtung zu „+ Charakter für dieses Szenario" in der
               Szenario-Detailansicht: dort prägt eine Welt eine neue Figur,
-              hier spannt eine Figur die Welt auf. Steht bei den anderen
-              Knöpfen, die etwas aus dem Charakter erzeugen, statt beim
-              Szenario-Auswahlfeld links – das ordnet einem **vorhandenen**
-              Szenario zu und legt keines an.
+              hier spannt eine Figur die Welt auf.
             */}
-            <button
+            <Button
+              variant="secondary"
               onClick={() => setScenarioDraftOpen(true)}
               title="Leitet aus Beschreibung, Merkmalen und Ansatzpunkten ein neues Szenario ab und ordnet den Charakter ihm zu"
-              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
             >
-              ✨ Szenario ableiten
-            </button>
-            <button
-              onClick={() => setInputOpen(true)}
-              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
-            >
+              <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+              Szenario ableiten
+            </Button>
+            <Button variant="secondary" onClick={() => setInputOpen(true)}>
+              <FileText size={16} strokeWidth={1.75} aria-hidden="true" />
               Vorgaben anzeigen
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
               onClick={exportPdf}
               disabled={exporting}
-              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
             >
+              <Download size={16} strokeWidth={1.75} aria-hidden="true" />
               {exporting ? "Erstelle PDF …" : "Als PDF exportieren"}
-            </button>
+            </Button>
             {/*
               „mit Bild" (Default an) direkt vor dem Datei-Export: Ohne Häkchen
               geht der Charakter **ohne Bilder** in die Datei – kleiner und
               schneller. Betrifft nur den Datei-Export, nicht das PDF.
             */}
             <label
-              className="flex items-center gap-1.5 text-xs text-foreground/60"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
               title="Bild(er) in die Export-Datei aufnehmen. Ohne Häkchen wird der Charakter ohne Bilder exportiert – deutlich kleinere Datei."
             >
               <input
@@ -818,31 +826,30 @@ export function CharacterDetailModal({
                 checked={exportMitBild}
                 onChange={(e) => setExportMitBild(e.target.checked)}
                 disabled={exportingJson}
-                className="size-3.5 accent-foreground"
+                className="size-4 accent-primary"
               />
               mit Bild
             </label>
-            <button
+            <Button
+              variant="secondary"
               onClick={exportJson}
               disabled={exportingJson}
               title="Charakter als Datei – lässt sich anderswo wieder importieren. Mit oder ohne Bild je nach Häkchen."
-              className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
             >
+              <Download size={16} strokeWidth={1.75} aria-hidden="true" />
               {exportingJson
                 ? exportMitBild
                   ? "Sammle Bilder …"
                   : "Exportiere …"
                 : "Als Datei exportieren"}
-            </button>
-            <button
-              onClick={onDelete}
-              className="rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
-            >
+            </Button>
+            <Button variant="danger" onClick={onDelete}>
+              <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
               Löschen
-            </button>
+            </Button>
           </div>
           {exportError && (
-            <span className="w-full text-right text-xs text-red-600 dark:text-red-400">
+            <span className="w-full text-right text-xs text-destructive">
               {exportError}
             </span>
           )}
