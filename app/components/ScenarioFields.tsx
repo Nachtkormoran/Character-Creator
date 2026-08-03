@@ -1,5 +1,7 @@
 "use client";
 
+import { Dices, Plus, Sparkles, X } from "./ui/icons";
+
 import {
   SCENARIO_HINTS,
   SCENARIO_LABELS,
@@ -277,9 +279,12 @@ function EintragListe({
                     disabled || aktion.busy !== null || !eintrag.text.trim()
                   }
                   title={aktion.titel}
-                  className="mt-0.5 shrink-0 rounded-md border border-border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition hover:bg-muted disabled:opacity-50"
+                  className="mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition hover:bg-muted disabled:opacity-50"
                 >
-                  {aktion.busy === eintrag.text ? aktion.labelBusy : aktion.labelIdle}
+                  <Sparkles size={13} strokeWidth={1.75} aria-hidden="true" />
+                  {aktion.busy === eintrag.text
+                    ? aktion.labelBusy
+                    : aktion.labelIdle}
                 </button>
               )}
               <button
@@ -288,9 +293,9 @@ function EintragListe({
                 disabled={disabled}
                 title={entfernenTitel}
                 aria-label={`${einzahl} ${i + 1} entfernen`}
-                className="mt-0.5 shrink-0 rounded-md border border-transparent px-2 py-0.5 text-sm text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50 dark:hover:text-red-400"
+                className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
               >
-                ✕
+                <X size={15} strokeWidth={1.75} aria-hidden="true" />
               </button>
             </li>
           ))}
@@ -302,9 +307,10 @@ function EintragListe({
           onClick={() => emit([...list, { text: "", aktiv: true }])}
           disabled={disabled}
           title={hinzufuegenTitel}
-          className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-50"
         >
-          ➕ {einzahl} hinzufügen
+          <Plus size={14} strokeWidth={1.75} aria-hidden="true" />
+          {einzahl} hinzufügen
         </button>
       </div>
     </div>
@@ -588,9 +594,10 @@ export function ScenarioFields({
                           ? "Passend zum gewählten Genre."
                           : "Ohne gewähltes Genre aus der Gegenwart.")
                       }
-                      className={`${kopfzeilenClass} hover:bg-muted`}
+                      className={`${kopfzeilenClass} inline-flex items-center gap-1.5 hover:bg-muted`}
                     >
-                      {details[key].trim() ? "🎲 Ergänzen" : "🎲 Würfeln"}
+                      <Dices size={14} strokeWidth={1.75} aria-hidden="true" />
+                      {details[key].trim() ? "Ergänzen" : "Würfeln"}
                     </button>
                   )}
                   {generatable?.has(key) && onGenerate && (
@@ -608,7 +615,7 @@ export function ScenarioFields({
                       // Ständen.
                       disabled={disabled || generatingField !== null}
                       title={GENERATE_HINTS[key]}
-                      className={`${kopfzeilenClass} whitespace-nowrap hover:bg-muted`}
+                      className={`${kopfzeilenClass} inline-flex items-center gap-1.5 whitespace-nowrap hover:bg-muted`}
                     >
                       {/*
                         Drei Beschriftungen, weil der Knopf drei verschiedene
@@ -617,13 +624,22 @@ export function ScenarioFields({
                         gemeinsames „Neu erzeugen" hätte am Ortsfeld gedroht,
                         etwas wegzunehmen, was dort bleibt.
                       */}
-                      {generatingField === key
-                        ? "Schreibt …"
-                        : !details[key].trim()
-                          ? "✨ Erzeugen"
-                          : ERGAENZT.has(key)
-                            ? "✨ Ergänzen"
-                            : "✨ Neu erzeugen"}
+                      {generatingField === key ? (
+                        "Schreibt …"
+                      ) : (
+                        <>
+                          <Sparkles
+                            size={14}
+                            strokeWidth={1.75}
+                            aria-hidden="true"
+                          />
+                          {!details[key].trim()
+                            ? "Erzeugen"
+                            : ERGAENZT.has(key)
+                              ? "Ergänzen"
+                              : "Neu erzeugen"}
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
@@ -665,7 +681,7 @@ export function ScenarioFields({
                       ? {
                           titel:
                             "Aus dieser Figur einen Charakter für das Szenario anlegen",
-                          labelIdle: "✨ Charakter",
+                          labelIdle: "Charakter",
                           labelBusy: "Liest …",
                           onAktion: onFigurCharakter,
                           busy: figurBusy,
