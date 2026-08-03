@@ -40,7 +40,7 @@ export function AutoTextarea({
       aria-label={ariaLabel}
       placeholder={placeholder}
       rows={1}
-      className={`w-full resize-none overflow-hidden rounded-md border border-transparent bg-transparent px-2 py-1 -mx-2 leading-relaxed outline-none transition hover:border-black/15 focus:border-black/40 dark:hover:border-white/15 dark:focus:border-white/40 ${className}`}
+      className={`w-full resize-none overflow-hidden rounded-md border border-transparent bg-transparent px-2 py-1 -mx-2 leading-relaxed outline-none transition hover:border-border focus:border-primary/50 ${className}`}
     />
   );
 }

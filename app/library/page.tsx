@@ -53,7 +53,7 @@ const LEERE_META: VariantMeta = {
 };
 
 const controlClass =
-  "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
+  "rounded-md border border-border bg-card px-3 py-2 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50";
 
 type SortKey = "titel-asc" | "titel-desc" | "kapitel-desc" | "szenario-asc";
 
@@ -161,21 +161,21 @@ export default function LibraryPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Bibliothek</h1>
-        <p className="mt-1 text-sm text-foreground/60">
+        <p className="mt-1 text-sm text-muted-foreground">
           Die lesefertigen Geschichten – jede Story-Arc-Variante mit erzeugten
           Kapiteln als eigenes Buch. Ein Klick öffnet den Leser.
         </p>
       </div>
 
-      {loading && <p className="text-foreground/60">Lade Bibliothek …</p>}
+      {loading && <p className="text-muted-foreground">Lade Bibliothek …</p>}
       {error && (
-        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </p>
       )}
 
       {!loading && !error && buecher.length === 0 && (
-        <div className="rounded-xl border border-dashed border-black/15 p-10 text-center text-foreground/60 dark:border-white/15">
+        <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground">
           Noch keine lesefertigen Geschichten. Leite in einem{" "}
           <Link href="/scenarios" className="underline">
             Szenario
@@ -185,9 +185,9 @@ export default function LibraryPage() {
       )}
 
       {buecher.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-black/10 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card p-3">
           <label className="flex items-center gap-2 text-sm">
-            <span className="text-foreground/60">Sortieren:</span>
+            <span className="text-muted-foreground">Sortieren:</span>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
@@ -215,7 +215,7 @@ export default function LibraryPage() {
                 type="button"
                 onClick={() => setQuery("")}
                 aria-label="Suche zurücksetzen"
-                className="absolute right-2 text-foreground/40 transition hover:text-foreground"
+                className="absolute right-2 text-muted-foreground transition hover:text-foreground"
               >
                 ×
               </button>
@@ -225,7 +225,7 @@ export default function LibraryPage() {
       )}
 
       {buecher.length > 0 && sichtbar.length === 0 && (
-        <div className="rounded-xl border border-dashed border-black/15 p-8 text-center text-sm text-foreground/60 dark:border-white/15">
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           Kein Buch passt zur Suche.
         </div>
       )}

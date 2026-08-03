@@ -55,7 +55,7 @@ const LEER: ScenarioDetails = normalizeScenarioDetails({ genre: DEFAULT_GENRE })
 
 /** Gemeinsame Optik der Bedienelemente (Auswahl + Suche) – wie in der Galerie. */
 const controlClass =
-  "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
+  "rounded-md border border-border bg-card px-3 py-2 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50";
 
 type SortKey = "name-asc" | "name-desc" | "newest" | "oldest";
 
@@ -322,7 +322,7 @@ export default function ScenariosPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Szenarien</h1>
-          <p className="mt-1 text-sm text-foreground/60">
+          <p className="mt-1 text-sm text-muted-foreground">
             Ein Szenario fasst Charaktere für eine Geschichte zusammen und hält
             fest, was für sie alle gilt.
           </p>
@@ -341,10 +341,10 @@ export default function ScenariosPage() {
           */}
           <label
             title="Eine zuvor exportierte Szenario-Datei einspielen – Welt und, falls enthalten, ihre Charaktere kommen zum Bestand hinzu"
-            className={`rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition dark:border-white/15 ${
+            className={`rounded-md border border-border px-4 py-2 text-sm font-medium transition ${
               importing
                 ? "cursor-not-allowed opacity-50"
-                : "cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                : "cursor-pointer hover:bg-muted"
             }`}
           >
             {importing ? "Importiere …" : "Szenario importieren"}
@@ -362,7 +362,7 @@ export default function ScenariosPage() {
               setFormOpen((o) => !o);
               if (formOpen) resetForm();
             }}
-            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
           >
             {formOpen ? "Abbrechen" : "+ Neues Szenario"}
           </button>
@@ -375,7 +375,7 @@ export default function ScenariosPage() {
         </p>
       )}
       {importError && (
-        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {importError}
         </p>
       )}
@@ -383,7 +383,7 @@ export default function ScenariosPage() {
       {formOpen && (
         <form
           onSubmit={handleCreate}
-          className="flex flex-col gap-4 rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]"
+          className="flex flex-col gap-4 rounded-xl border border-border bg-card p-5"
         >
           {/*
             Ganz oben: das ganze Szenario auf einmal würfeln. Öffnet ein Modal
@@ -396,7 +396,7 @@ export default function ScenariosPage() {
               onClick={() => setRandomOpen(true)}
               disabled={saving}
               title="Das ganze Formular per KI ausfüllen – bereits ausgefüllte Felder bleiben erhalten"
-              className="rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              className="rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
             >
               ✨ Zufälliges Szenario
             </button>
@@ -410,9 +410,9 @@ export default function ScenariosPage() {
               maxLength={80}
               autoFocus
               placeholder="z. B. „Die Bucht von Vigo“"
-              className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none transition focus:border-primary/50"
             />
-            <span className="text-xs text-foreground/50">
+            <span className="text-xs text-muted-foreground">
               Das Einzige, was ein Szenario braucht. Alles Weitere lässt sich
               auch später ergänzen.
             </span>
@@ -435,12 +435,12 @@ export default function ScenariosPage() {
             <button
               type="submit"
               disabled={saving || !name.trim()}
-              className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
             >
               {saving ? "Lege an …" : "Szenario anlegen"}
             </button>
             {formError && (
-              <span className="text-sm text-red-600 dark:text-red-400">
+              <span className="text-sm text-destructive">
                 {formError}
               </span>
             )}
@@ -448,15 +448,15 @@ export default function ScenariosPage() {
         </form>
       )}
 
-      {loading && <p className="text-foreground/60">Lade Szenarien …</p>}
+      {loading && <p className="text-muted-foreground">Lade Szenarien …</p>}
       {error && (
-        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </p>
       )}
 
       {!loading && !error && scenarios.length === 0 && !formOpen && (
-        <div className="rounded-xl border border-dashed border-black/15 p-10 text-center text-foreground/60 dark:border-white/15">
+        <div className="rounded-xl border border-dashed border-border p-10 text-center text-muted-foreground">
           Noch keine Szenarien.{" "}
           <button
             type="button"
@@ -475,9 +475,9 @@ export default function ScenariosPage() {
           Während das Anlege-Formular offen ist, bleibt sie aus – dann zählt nur
           das Formular, nicht der Bestand darunter. */}
       {scenarios.length > 0 && !formOpen && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-black/10 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card p-3">
           <label className="flex items-center gap-2 text-sm">
-            <span className="text-foreground/60">Sortieren:</span>
+            <span className="text-muted-foreground">Sortieren:</span>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as SortKey)}
@@ -505,7 +505,7 @@ export default function ScenariosPage() {
                 type="button"
                 onClick={() => setQuery("")}
                 aria-label="Suche zurücksetzen"
-                className="absolute right-2 text-foreground/40 transition hover:text-foreground"
+                className="absolute right-2 text-muted-foreground transition hover:text-foreground"
               >
                 ×
               </button>
@@ -515,7 +515,7 @@ export default function ScenariosPage() {
       )}
 
       {scenarios.length > 0 && !formOpen && visibleScenarios.length === 0 && (
-        <div className="rounded-xl border border-dashed border-black/15 p-8 text-center text-sm text-foreground/60 dark:border-white/15">
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           Kein Szenario passt zur Suche.
         </div>
       )}
@@ -528,10 +528,10 @@ export default function ScenariosPage() {
               <li key={s.id}>
                 <Link
                   href={`/scenarios/${s.id}`}
-                  className="flex items-center gap-4 rounded-xl border border-black/10 bg-white p-4 transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
+                  className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 transition hover:shadow-md"
                 >
                   {primaryImage(s)?.thumbnail && (
-                    <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-black/[0.03] dark:bg-white/[0.03]">
+                    <div className="relative size-14 shrink-0 overflow-hidden rounded-lg bg-muted">
                       <Image
                         src={primaryImage(s)!.thumbnail!}
                         alt=""
@@ -544,11 +544,11 @@ export default function ScenariosPage() {
                   )}
                   <div className="min-w-0 flex-1">
                     <span className="font-medium">{s.name}</span>
-                    <p className="truncate text-sm text-foreground/60">
+                    <p className="truncate text-sm text-muted-foreground">
                       {zeile || "Noch keine Festlegungen"}
                     </p>
                   </div>
-                  <span className="shrink-0 text-sm text-foreground/50">
+                  <span className="shrink-0 text-sm text-muted-foreground">
                     {s.count === 1 ? "1 Charakter" : `${s.count} Charaktere`}
                   </span>
                 </Link>

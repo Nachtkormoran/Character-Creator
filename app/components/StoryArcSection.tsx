@@ -76,11 +76,11 @@ const PHASE_STYLE: Record<ArcPhase, { dot: string; chip: string }> = {
 
 /** Kleiner quadratischer Icon-Knopf (▲ ▼ ✕) – gleiche Optik überall. */
 const MINI_BTN =
-  "rounded px-1.5 py-0.5 text-xs leading-none text-foreground/40 transition hover:bg-black/[0.05] hover:text-foreground/70 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-foreground/40 dark:hover:bg-white/[0.06]";
+  "rounded px-1.5 py-0.5 text-xs leading-none text-muted-foreground transition hover:bg-muted hover:text-muted-foreground disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground";
 
 /** Knopf im Feld-/Kopfstil – gleiche Höhe und Rand wie in `ScenarioFields`. */
 const CHIP_BTN =
-  "rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]";
+  "rounded-md border border-border px-2.5 py-1 text-xs font-medium transition hover:bg-muted disabled:opacity-50";
 
 export function StoryArcSection({
   storyArc,
@@ -377,13 +377,13 @@ export function StoryArcSection({
   }
 
   return (
-    <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+    <section className="rounded-xl border border-border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Story Arc
           </h2>
-          <p className="mt-1 text-xs text-foreground/50">
+          <p className="mt-1 text-xs text-muted-foreground">
             {hatArc
               ? `Dramaturgische Zerlegung – abgeleitet aus ${quelleLabel}.`
               : "Die dramaturgische Zerlegung des Handlungsentwurfs in Stationen."}
@@ -396,7 +396,7 @@ export function StoryArcSection({
                   type="button"
                   onClick={() => setReaderOffen(true)}
                   title="Die erzeugten Kapitel ablenkungsfrei als Buch lesen"
-                  className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted"
                 >
                   📖 Als Buch lesen
                 </button>
@@ -406,7 +406,7 @@ export function StoryArcSection({
                 onClick={() => setCoverOffen((o) => !o)}
                 disabled={disabled || busy}
                 title="Titelbild dieses Buches in der Bibliothek wählen (Weltbild oder ein Charakterporträt)"
-                className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
               >
                 🖼️ Cover: {coverLabel}
               </button>
@@ -414,7 +414,7 @@ export function StoryArcSection({
                   Default aus. Ein frisch abgeleiteter Arc ist ein Arbeitsstand. */}
               <label
                 title="Diesen Story Arc als Buch in der Bibliothek anzeigen (nur mit mindestens einem ausformulierten Kapitel)"
-                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted"
               >
                 <input
                   type="checkbox"
@@ -439,7 +439,7 @@ export function StoryArcSection({
             Kapitel je Station und Kapitellänge vor (die bleiben danach frei) und
             prägt zusätzlich live den Prosastil (verdichtet ↔ ausladend).
           */}
-          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             Werkform:
             <select
               value={params.werkform}
@@ -460,7 +460,7 @@ export function StoryArcSection({
               }}
               disabled={disabled || busy}
               title="Führende Einstellung: Kurzgeschichte/Novelle/Roman belegt Länge, Kapitel je Station und Kapitellänge vor und prägt den Prosastil (verdichtet ↔ ausladend). Die Zahlen bleiben danach frei justierbar. „— frei —“ = keine Vorgabe."
-              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+              className={`${CHIP_BTN} bg-card`}
             >
               {WERKFORMEN.map((w) => (
                 <option key={w.value} value={w.value}>
@@ -469,7 +469,7 @@ export function StoryArcSection({
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             Länge:
             <select
               value={params.laenge}
@@ -478,7 +478,7 @@ export function StoryArcSection({
               }
               disabled={disabled || busy}
               title="Wie viele Stationen (Akte) der Arc hat – die Dramaturgie, nicht die Gesamtlänge. Von der Werkform vorbelegt, danach frei."
-              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+              className={`${CHIP_BTN} bg-card`}
             >
               {ARC_LENGTHS.map((l) => (
                 <option key={l.value} value={l.value}>
@@ -487,7 +487,7 @@ export function StoryArcSection({
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             Format:
             <select
               value={params.format}
@@ -496,7 +496,7 @@ export function StoryArcSection({
               }
               disabled={disabled || busy}
               title="Erzählabschnitte (Buch) oder spielbare Szenen (Spiel)"
-              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+              className={`${CHIP_BTN} bg-card`}
             >
               {ARC_FORMATS.map((f) => (
                 <option key={f.value} value={f.value}>
@@ -505,7 +505,7 @@ export function StoryArcSection({
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             Erzählform:
             <select
               value={params.form}
@@ -514,7 +514,7 @@ export function StoryArcSection({
               }
               disabled={disabled || busy}
               title="Die Art der Geschichte (Krimi, Liebe, Abenteuer …) – gilt für Arc und Kapitel und prägt deren Aufbau, unabhängig vom Genre der Welt. „Allround“ = gemischt wie bisher."
-              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+              className={`${CHIP_BTN} bg-card`}
             >
               {STORY_FORMS.map((f) => (
                 <option key={f.value} value={f.value}>
@@ -523,7 +523,7 @@ export function StoryArcSection({
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             Ton:
             <select
               value={params.ton}
@@ -532,7 +532,7 @@ export function StoryArcSection({
               }
               disabled={disabled || busy}
               title="Ton und Sprache – gilt für Arc und Kapitel und nimmt den Ton der späteren Geschichte vorweg"
-              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+              className={`${CHIP_BTN} bg-card`}
             >
               {STORY_TONES.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -541,7 +541,7 @@ export function StoryArcSection({
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             Kapitellänge:
             <select
               value={params.kapitelLaenge}
@@ -553,7 +553,7 @@ export function StoryArcSection({
               }
               disabled={disabled || busy}
               title="Wie viel Prosa „Story generieren“ je Kapitel schreibt – entkoppelt vom Kreativ-Haken. Von der Werkform vorbelegt, danach frei."
-              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+              className={`${CHIP_BTN} bg-card`}
             >
               {KAPITEL_LAENGEN.map((k) => (
                 <option key={k.value} value={k.value}>
@@ -569,7 +569,7 @@ export function StoryArcSection({
             Textmodell); ein konkreter Anbieter übersteuert nur diese Erzeugungen
             und wird nicht gespeichert.
           */}
-          <label className="flex items-center gap-1.5 text-xs font-medium text-foreground/60">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             Modell:
             <select
               value={provider}
@@ -578,7 +578,7 @@ export function StoryArcSection({
               }
               disabled={disabled || busy}
               title="Welches Textmodell Story Arc, Kapitel und Story-Prosa erzeugt. „Standard&quot; folgt der Einstellungsseite; die Wahl hier gilt nur für diese Erzeugungen und wird nicht gespeichert."
-              className={`${CHIP_BTN} bg-white dark:bg-white/5`}
+              className={`${CHIP_BTN} bg-card`}
             >
               <option value="">Standard (Einstellungen)</option>
               {TEXT_PROVIDERS.map((p) => (
@@ -595,16 +595,16 @@ export function StoryArcSection({
           Charakterporträt. Setzt `meta[aktiv].cover` (geht in „Änderungen
           speichern"); wirkt aufs Titelbild in der Bibliothek. */}
       {coverOffen && hatArc && (
-        <div className="mt-3 rounded-lg border border-black/10 bg-black/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.03]">
+        <div className="mt-3 rounded-lg border border-border bg-muted p-3">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs font-medium text-foreground/60">
+            <span className="text-xs font-medium text-muted-foreground">
               Cover für „{buchTitel}“ (Bibliothek)
             </span>
             <button
               type="button"
               onClick={() => setCoverOffen(false)}
               aria-label="Cover-Auswahl schließen"
-              className="px-1 text-foreground/50 transition hover:text-foreground"
+              className="px-1 text-muted-foreground transition hover:text-foreground"
             >
               ✕
             </button>
@@ -667,7 +667,7 @@ export function StoryArcSection({
             })}
           </div>
           {coverCharaktere.length === 0 && (
-            <p className="mt-2 text-xs text-foreground/50">
+            <p className="mt-2 text-xs text-muted-foreground">
               Noch keine Charaktere im Szenario – als Cover dient das Weltbild.
             </p>
           )}
@@ -683,7 +683,7 @@ export function StoryArcSection({
       */}
       {arcs.length >= 1 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs font-medium text-foreground/50">
+          <span className="mr-1 text-xs font-medium text-muted-foreground">
             Story Arcs:
           </span>
           {arcs.map((arc, i) => {
@@ -731,8 +731,8 @@ export function StoryArcSection({
                 key={i}
                 className={`inline-flex items-stretch gap-1 overflow-hidden rounded-lg border text-xs transition ${
                   i === arcAktiv
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-black/15 hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+                    ? "border-foreground bg-primary text-primary-foreground"
+                    : "border-border hover:bg-muted"
                 }`}
               >
                 <button
@@ -751,7 +751,7 @@ export function StoryArcSection({
                   </span>
                   <span
                     className={`max-w-[18rem] truncate text-[10px] leading-tight ${
-                      i === arcAktiv ? "text-background/70" : "text-foreground/50"
+                      i === arcAktiv ? "text-background/70" : "text-muted-foreground"
                     }`}
                   >
                     {zeile2}
@@ -832,7 +832,7 @@ export function StoryArcSection({
                     className={`flex items-center pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
                       i === arcAktiv
                         ? "hover:text-red-300"
-                        : "hover:text-red-600 dark:hover:text-red-400"
+                        : "hover:text-destructive dark:hover:text-red-400"
                     }`}
                   >
                     ✕
@@ -851,7 +851,7 @@ export function StoryArcSection({
             onClick={() => onArcKopieren(arcAktiv)}
             disabled={disabled || busy}
             title="Den aktiven Story Arc kopieren – als eigenständige neue Variante"
-            className="rounded-full border border-black/15 px-2.5 py-1 text-xs font-medium text-foreground/70 transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-40"
           >
             ⧉ Kopieren
           </button>
@@ -861,7 +861,7 @@ export function StoryArcSection({
             ersetzen.
           */}
           {arcs.length === 1 && (
-            <span className="text-xs text-foreground/50">
+            <span className="text-xs text-muted-foreground">
               · „📖 Neu ableiten“ legt einen weiteren an, statt diesen zu
               ersetzen
             </span>
@@ -873,7 +873,7 @@ export function StoryArcSection({
               onClick={onAlleArcsLoeschen}
               disabled={disabled || busy}
               title="Alle Story Arcs löschen"
-              className="ml-auto rounded-full border border-red-600/30 px-2.5 py-1 text-xs font-medium text-red-600 transition hover:bg-red-600/10 disabled:opacity-40 dark:border-red-400/30 dark:text-red-400 dark:hover:bg-red-400/10"
+              className="ml-auto rounded-full border border-red-600/30 px-2.5 py-1 text-xs font-medium text-destructive transition hover:bg-red-600/10 disabled:opacity-40 dark:border-red-400/30 dark:hover:bg-red-400/10"
             >
               Alle löschen
             </button>
@@ -886,7 +886,7 @@ export function StoryArcSection({
         und wenn bekannt (nicht bei Altbeständen/von Hand angelegten Arcs).
       */}
       {showModel && hatArc && arcMeta[arcAktiv]?.modell?.trim() && (
-        <p className="mt-2 text-xs text-foreground/50">
+        <p className="mt-2 text-xs text-muted-foreground">
           Arc erzeugt mit{" "}
           <span className="font-mono">{arcMeta[arcAktiv].modell}</span>
         </p>
@@ -900,7 +900,7 @@ export function StoryArcSection({
         Wirkt nur auf „Ableiten", nicht auf die Kapitel.
       */}
       <label
-        className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+        className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground"
         title="Der Handlungsentwurf ist eine Ausgangslage mit offenem Ende. Angehakt entwickelt der Arc daraus eine vollständige Geschichte mit Zuspitzung und Ende, statt die offene Lage nur in Stationen zu gliedern. Wirkt nur auf „Ableiten“."
       >
         <input
@@ -910,7 +910,7 @@ export function StoryArcSection({
             onParamsChange({ ...params, weiterspinnen: e.target.checked })
           }
           disabled={disabled || busy}
-          className="size-4 accent-foreground"
+          className="size-4 accent-primary"
         />
         🧵 Handlung weiterspinnen – zur vollständigen Geschichte
       </label>
@@ -923,7 +923,7 @@ export function StoryArcSection({
         Kapitellänge oben (entkoppelt).
       */}
       <label
-        className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+        className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground"
         title="Zufällige Impulse und mehr Freiheit: Der Arc fällt lebendiger aus, die Kapitel-Gerüste werden ausführlicher und die Temperatur steigt. Die Länge der ausgeschriebenen Prosa steuert dagegen die „Kapitellänge“ oben."
       >
         <input
@@ -933,7 +933,7 @@ export function StoryArcSection({
             onParamsChange({ ...params, kreativ: e.target.checked })
           }
           disabled={disabled}
-          className="size-4 accent-foreground"
+          className="size-4 accent-primary"
         />
         ✨ Kreativ – Impulse und lebendigere Ausarbeitung
       </label>
@@ -962,7 +962,7 @@ export function StoryArcSection({
           placeholder="Stichwörter für den Arc – z. B. „ein Verrat trägt den Wendepunkt“, „ohne Gewalt“"
           title="Stichwörter, die der nächste Arc berücksichtigen soll. Werden nicht gespeichert."
           aria-label="Stichwörter für den Story Arc"
-          className="min-w-0 flex-1 basis-56 rounded-md border border-black/15 bg-white px-3 py-1.5 text-xs outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+          className="min-w-0 flex-1 basis-56 rounded-md border border-border bg-card px-3 py-1.5 text-xs outline-none transition focus:border-primary/50 disabled:opacity-50"
         />
         <button
           type="button"
@@ -984,11 +984,11 @@ export function StoryArcSection({
       </div>
 
       {error && (
-        <p className="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p className="mt-3 text-xs text-destructive">{error}</p>
       )}
 
       {!hatArc && !busy && (
-        <p className="mt-4 text-sm text-foreground/50">
+        <p className="mt-4 text-sm text-muted-foreground">
           {handlung.trim()
             ? "Noch kein Story Arc. „Story Arc ableiten“ zerlegt den Handlungsentwurf oben – oder baue die Stationen von Hand auf."
             : "Sobald ein Handlungsentwurf steht, lässt sich daraus ein Story Arc ableiten. Von Hand geht es auch."}
@@ -1000,7 +1000,7 @@ export function StoryArcSection({
           {/* durchgehende Linie hinter den Punkten */}
           <span
             aria-hidden
-            className="absolute top-3 bottom-3 left-[0.34rem] w-px bg-black/10 dark:bg-white/10"
+            className="absolute top-3 bottom-3 left-[0.34rem] w-px bg-black/10"
           />
           {stufen.map((s, i) => {
             const stil = PHASE_STYLE[s.phase];
@@ -1020,10 +1020,10 @@ export function StoryArcSection({
                     className={`absolute top-2 left-0 size-3 rounded-full ring-4 ring-white dark:ring-[#0a0a0a] ${stil.dot}`}
                   />
                 </div>
-                <div className="rounded-lg border border-black/10 bg-black/[0.02] p-3 dark:border-white/10 dark:bg-white/[0.02]">
+                <div className="rounded-lg border border-border bg-muted p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold tabular-nums text-foreground/40">
+                      <span className="text-xs font-semibold tabular-nums text-muted-foreground">
                         {i + 1}
                       </span>
                       {/* Phase editierbar – der Punkt an der Linie folgt ihr. */}
@@ -1098,7 +1098,7 @@ export function StoryArcSection({
                     aria-label={`Titel der Station ${i + 1}`}
                     placeholder="Titel der Station"
                     maxLength={200}
-                    className="mt-2 -mx-2 w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-semibold outline-none transition hover:border-black/15 focus:border-black/40 disabled:opacity-60 dark:hover:border-white/15 dark:focus:border-white/40"
+                    className="mt-2 -mx-2 w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-semibold outline-none transition hover:border-border focus:border-primary/50 disabled:opacity-60"
                   />
 
                   <AutoTextarea
@@ -1124,7 +1124,7 @@ export function StoryArcSection({
                       ➕ Kapitelgrenze
                     </button>
                     {hatSegmente && (
-                      <span className="text-xs text-foreground/50">
+                      <span className="text-xs text-muted-foreground">
                         ergibt {segmentZahl} Kapitel (feste Grenzen)
                       </span>
                     )}
@@ -1135,7 +1135,7 @@ export function StoryArcSection({
                       {s.figuren.map((f, k) => (
                         <span
                           key={k}
-                          className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-black/[0.04] py-0.5 pr-1 pl-2 text-xs text-foreground/70 dark:border-white/10 dark:bg-white/[0.06]"
+                          className="inline-flex items-center gap-1 rounded-full border border-border bg-muted py-0.5 pr-1 pl-2 text-xs text-muted-foreground"
                         >
                           ◆ {f}
                           <button
@@ -1144,7 +1144,7 @@ export function StoryArcSection({
                             disabled={disabled}
                             aria-label={`${f} aus Station ${i + 1} entfernen`}
                             title="Figur entfernen"
-                            className="rounded-full px-1 leading-none text-foreground/40 transition hover:text-red-600 disabled:opacity-40 dark:hover:text-red-400"
+                            className="rounded-full px-1 leading-none text-muted-foreground transition hover:text-destructive disabled:opacity-40 dark:hover:text-red-400"
                           >
                             ✕
                           </button>
@@ -1154,9 +1154,9 @@ export function StoryArcSection({
                   )}
 
                   {/* Kapitel dieser Station – eine Ebene unter dem Akt. */}
-                  <div className="mt-3 border-t border-black/10 pt-3 dark:border-white/10">
+                  <div className="mt-3 border-t border-border pt-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-foreground/60">
+                      <span className="text-xs font-medium text-muted-foreground">
                         Kapitel ({s.kapitel.length})
                       </span>
                       <div className="flex items-center gap-1.5">
@@ -1229,14 +1229,14 @@ export function StoryArcSection({
                     </div>
 
                     {kapitelError?.index === i && (
-                      <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                      <p className="mt-2 text-xs text-destructive">
                         {kapitelError.text}
                       </p>
                     )}
 
                     {/* Modell der letzten Kapitel-Ableitung dieser Station (transient). */}
                     {showModel && kapitelModell?.[i]?.trim() && (
-                      <p className="mt-2 text-xs text-foreground/50">
+                      <p className="mt-2 text-xs text-muted-foreground">
                         Kapitel erzeugt mit{" "}
                         <span className="font-mono">{kapitelModell[i]}</span>
                       </p>
@@ -1247,7 +1247,7 @@ export function StoryArcSection({
                         {s.kapitel.map((k, ki) => (
                           <li
                             key={ki}
-                            className="rounded-md border border-black/10 bg-white p-2 dark:border-white/10 dark:bg-white/[0.03]"
+                            className="rounded-md border border-border bg-card p-2"
                           >
                             <div className="flex items-center gap-1.5">
                               <span className="shrink-0 text-xs tabular-nums text-foreground/35">
@@ -1264,7 +1264,7 @@ export function StoryArcSection({
                                 aria-label={`Überschrift von Kapitel ${i + 1}.${ki + 1}`}
                                 placeholder="Überschrift"
                                 maxLength={200}
-                                className="-mx-1 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium outline-none transition hover:border-black/15 focus:border-black/40 disabled:opacity-60 dark:hover:border-white/15 dark:focus:border-white/40"
+                                className="-mx-1 min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-medium outline-none transition hover:border-border focus:border-primary/50 disabled:opacity-60"
                               />
                               <button
                                 type="button"
@@ -1313,7 +1313,7 @@ export function StoryArcSection({
                               Ausklappbar, damit die langen Texte die Zeitleiste
                               nicht überfluten; auf Knopfdruck erzeugt.
                             */}
-                            <div className="mt-2 border-t border-black/5 pt-2 dark:border-white/5">
+                            <div className="mt-2 border-t border-border pt-2">
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <button
                                   type="button"
@@ -1324,7 +1324,7 @@ export function StoryArcSection({
                                       ? "Story einklappen"
                                       : "Story ausklappen"
                                   }
-                                  className="flex items-center gap-1 rounded px-1 py-0.5 text-xs font-medium text-foreground/60 transition hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                                  className="flex items-center gap-1 rounded px-1 py-0.5 text-xs font-medium text-muted-foreground transition hover:bg-muted"
                                 >
                                   <span className="text-[0.6rem]">
                                     {textOffen(i, ki) ? "▾" : "▸"}
@@ -1361,7 +1361,7 @@ export function StoryArcSection({
 
                               {kapitelTextError?.stufe === i &&
                                 kapitelTextError?.kapitel === ki && (
-                                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                                  <p className="mt-1 text-xs text-destructive">
                                     {kapitelTextError.text}
                                   </p>
                                 )}
@@ -1369,7 +1369,7 @@ export function StoryArcSection({
                               {/* Modell der zuletzt erzeugten Prosa dieses Kapitels (transient). */}
                               {showModel &&
                                 storyTextModell?.[`${i}-${ki}`]?.trim() && (
-                                  <p className="mt-1 text-xs text-foreground/50">
+                                  <p className="mt-1 text-xs text-muted-foreground">
                                     Story erzeugt mit{" "}
                                     <span className="font-mono">
                                       {storyTextModell[`${i}-${ki}`]}
@@ -1452,10 +1452,10 @@ function CoverKachel({
       className={`flex w-[72px] flex-col overflow-hidden rounded-md border text-left transition ${
         ausgewaehlt
           ? "border-foreground ring-2 ring-foreground/60"
-          : "border-black/15 hover:border-black/40 dark:border-white/15 dark:hover:border-white/40"
+          : "border-border hover:border-border"
       }`}
     >
-      <div className="relative aspect-square w-full bg-black/[0.04] dark:bg-white/[0.04]">
+      <div className="relative aspect-square w-full bg-muted">
         {children}
         {markierung && (
           <span className="absolute top-0.5 right-0.5 text-xs drop-shadow">
@@ -1463,7 +1463,7 @@ function CoverKachel({
           </span>
         )}
       </div>
-      <span className="truncate px-1.5 py-1 text-[11px] text-foreground/70">
+      <span className="truncate px-1.5 py-1 text-[11px] text-muted-foreground">
         {label}
       </span>
     </button>

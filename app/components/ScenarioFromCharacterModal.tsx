@@ -214,7 +214,7 @@ export function ScenarioFromCharacterModal({
     >
       <div
         ref={dialog}
-        className="my-8 w-full max-w-2xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
+        className="my-8 w-full max-w-2xl rounded-xl border border-border bg-background p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
@@ -233,7 +233,7 @@ export function ScenarioFromCharacterModal({
               zweiter Satz darüber wiederholte sie nur.
             */}
             {!created && (
-              <p className="mt-1 text-sm text-foreground/60">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Die Welt, die diese Figur hervorgebracht hat – abgeleitet aus
                 Beschreibung, Merkmalen und Ansatzpunkten. Alles lässt sich vor
                 dem Anlegen ändern.
@@ -245,7 +245,7 @@ export function ScenarioFromCharacterModal({
               e.stopPropagation();
               onClose();
             }}
-            className="shrink-0 rounded-md px-2 py-1 text-foreground/60 transition hover:bg-black/5 dark:hover:bg-white/10"
+            className="shrink-0 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted"
             aria-label="Schließen"
           >
             ✕
@@ -261,25 +261,25 @@ export function ScenarioFromCharacterModal({
             <div className="flex flex-wrap items-center gap-3">
               <Link
                 href={`/scenarios/${created.id}`}
-                className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
               >
                 Zum Szenario
               </Link>
               <button
                 onClick={onClose}
-                className="text-sm text-foreground/60 transition hover:text-foreground"
+                className="text-sm text-muted-foreground transition hover:text-foreground"
               >
                 Schließen
               </button>
             </div>
-            <p className="text-xs text-foreground/50">
+            <p className="text-xs text-muted-foreground">
               Ein Handlungsentwurf entsteht dort – er braucht mehrere Figuren.
             </p>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
             {busy && !hatVorschlag ? (
-              <p className="rounded-lg border border-dashed border-black/15 px-4 py-8 text-center text-sm text-foreground/60 dark:border-white/15">
+              <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
                 Die Welt wird entworfen … einen Moment.
               </p>
             ) : !hatVorschlag ? (
@@ -295,14 +295,14 @@ export function ScenarioFromCharacterModal({
                 Ergebnis. Ein Schalter, der erst nach der Wirkung erscheint,
                 ist keiner.
               */
-              <div className="rounded-lg border border-dashed border-black/15 px-4 py-6 text-sm text-foreground/70 dark:border-white/15">
+              <div className="rounded-lg border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
                 <p>
                   Aus Beschreibung, Merkmalen und Ansatzpunkten von{" "}
                   {edited.name || "dieser Figur"} entsteht ein Vorschlag für
                   Ort, Zeit, Regeln und Beschreibung einer Welt. Das Genre wird
                   übernommen, nicht neu gewählt.
                 </p>
-                <p className="mt-2 text-foreground/50">
+                <p className="mt-2 text-muted-foreground">
                   Gespeichert wird nichts, bevor du „Szenario anlegen&ldquo;
                   drückst.
                 </p>
@@ -316,9 +316,9 @@ export function ScenarioFromCharacterModal({
                     onChange={(e) => setName(e.target.value)}
                     disabled={busy || saving}
                     maxLength={80}
-                    className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                    className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50"
                   />
-                  <span className="text-xs text-foreground/50">
+                  <span className="text-xs text-muted-foreground">
                     Benennt die Welt, nicht die Person – es kommen weitere
                     Figuren dazu.
                   </span>
@@ -333,12 +333,12 @@ export function ScenarioFromCharacterModal({
             )}
 
             {error && (
-              <p className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {error}
               </p>
             )}
 
-            <div className="flex flex-col gap-3 border-t border-black/10 pt-4 dark:border-white/10">
+            <div className="flex flex-col gap-3 border-t border-border pt-4">
               {/*
                 Die Option steht **nur im Startzustand**, nicht mehr neben dem
                 fertigen Entwurf.
@@ -365,11 +365,11 @@ export function ScenarioFromCharacterModal({
                     checked={beispiele}
                     onChange={(e) => setBeispiele(e.target.checked)}
                     disabled={busy || saving}
-                    className="mt-0.5 size-4 shrink-0 accent-foreground"
+                    className="mt-0.5 size-4 shrink-0 accent-primary"
                   />
                   <span>
                     Würfel-Beispiele als Stilvorlage
-                    <span className="block text-xs text-foreground/50">
+                    <span className="block text-xs text-muted-foreground">
                       Gibt dem Modell je drei zufällige Orte, Zeiten und Regeln
                       des Genres mit – als Machart, nicht als Inhalt.
                     </span>
@@ -389,7 +389,7 @@ export function ScenarioFromCharacterModal({
                     <button
                       onClick={anlegen}
                       disabled={!nameValid || busy || saving}
-                      className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                      className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                     >
                       {saving ? "Lege an …" : "Szenario anlegen"}
                     </button>
@@ -405,7 +405,7 @@ export function ScenarioFromCharacterModal({
                           ? "Mit Würfel-Beispielen als Stilvorlage"
                           : "Ohne Würfel-Beispiele"
                       } (umstellen: Dialog schließen und neu öffnen).`}
-                      className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                      className="rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
                     >
                       {busy ? "Entwirft …" : "✨ Neu ableiten"}
                     </button>
@@ -415,7 +415,7 @@ export function ScenarioFromCharacterModal({
                     onClick={() => void ableiten()}
                     disabled={busy || saving}
                     title="Fragt das Modell – kostet einen Modellaufruf"
-                    className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                   >
                     {busy ? "Entwirft …" : "✨ Ableiten"}
                   </button>
@@ -423,7 +423,7 @@ export function ScenarioFromCharacterModal({
                 <button
                   onClick={onClose}
                   disabled={saving}
-                  className="ml-auto text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
+                  className="ml-auto text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-50"
                 >
                   Abbrechen
                 </button>

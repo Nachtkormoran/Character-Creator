@@ -76,10 +76,10 @@ export function RandomScenarioModal({
     >
       <div
         ref={dialog}
-        className="my-8 w-full max-w-lg rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/10"
+        className="my-8 w-full max-w-lg rounded-xl border border-border bg-background p-6 shadow-xl"
       >
         <h2 className="text-lg font-semibold">Zufälliges Szenario erzeugen</h2>
-        <p className="mt-1 text-sm text-foreground/60">
+        <p className="mt-1 text-sm text-muted-foreground">
           Ein Stichwort, ein Satz – oder nichts. Die KI füllt daraus Name, Welt,
           Figuren – und, wenn du Ansätze zur Handlung nennst, auch
           Handlungselemente.
@@ -94,9 +94,9 @@ export function RandomScenarioModal({
             autoFocus
             maxLength={1000}
             placeholder="z. B. „eine sturmumtoste Hafenstadt, in der Schmuggler und Zunftmeister um die Macht ringen“ – oder leer lassen für völligen Zufall"
-            className="min-h-24 w-full resize-y rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+            className="min-h-24 w-full resize-y rounded-md border border-border bg-card px-3 py-2 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50"
           />
-          <span className="text-xs text-foreground/50">
+          <span className="text-xs text-muted-foreground">
             Bereits ausgefüllte Felder bleiben erhalten; alle leeren Felder
             werden passend ausgefüllt. Nennst du Ansätze zur Handlung, werden
             sie als Handlungselemente-Karten gespeichert. Der Handlungsentwurf
@@ -105,17 +105,17 @@ export function RandomScenarioModal({
           </span>
         </label>
 
-        <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-foreground/70">
+        <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-muted-foreground">
           <input
             type="checkbox"
             checked={genreWuerfeln}
             onChange={(e) => setGenreWuerfeln(e.target.checked)}
             disabled={busy}
-            className="mt-0.5 size-4 accent-foreground"
+            className="mt-0.5 size-4 accent-primary"
           />
           <span>
             Genre auch zufällig wählen
-            <span className="text-foreground/50">
+            <span className="text-muted-foreground">
               {" "}
               – sonst bleibt es bei „{genreLabel(currentDetails.genre)}“
             </span>
@@ -123,7 +123,7 @@ export function RandomScenarioModal({
         </label>
 
         {error && (
-          <p className="mt-3 text-xs text-red-600 dark:text-red-400">{error}</p>
+          <p className="mt-3 text-xs text-destructive">{error}</p>
         )}
 
         <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
@@ -131,7 +131,7 @@ export function RandomScenarioModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
+            className="text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-50"
           >
             Abbrechen
           </button>
@@ -139,7 +139,7 @@ export function RandomScenarioModal({
             type="button"
             onClick={erzeugen}
             disabled={busy}
-            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
           >
             {busy ? "Erzeuge …" : "✨ Formular ausfüllen"}
           </button>

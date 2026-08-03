@@ -169,25 +169,25 @@ export default function SettingsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Einstellungen</h1>
-        <p className="mt-2 text-foreground/60">
+        <p className="mt-2 text-muted-foreground">
           Gelten für alle künftigen Generierungen. Bereits gespeicherte
           Charaktere bleiben unverändert.
         </p>
       </div>
 
-      {loading && <p className="text-foreground/60">Lade Einstellungen …</p>}
+      {loading && <p className="text-muted-foreground">Lade Einstellungen …</p>}
 
       {error && (
-        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </p>
       )}
 
       {!loading && settings && (
-        <section className="flex flex-col gap-4 rounded-lg border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+        <section className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5">
           <div>
             <h2 className="font-medium">Textmodell</h2>
-            <p className="text-sm text-foreground/60">
+            <p className="text-sm text-muted-foreground">
               Welcher Anbieter die Texte erzeugt (Beschreibungen, Namen,
               Szenarien, Ansatzpunkte …). Die <strong>Bilder</strong> laufen
               unabhängig davon immer über OpenAI.
@@ -202,8 +202,8 @@ export default function SettingsPage() {
                   key={p.value}
                   className={`flex cursor-pointer gap-3 rounded-md border p-3 transition ${
                     active
-                      ? "border-foreground/40 bg-foreground/[0.06]"
-                      : "border-black/10 hover:border-black/20 dark:border-white/10 dark:hover:border-white/20"
+                      ? "border-primary/40 bg-primary/10"
+                      : "border-border hover:border-border"
                   }`}
                 >
                   <input
@@ -219,12 +219,12 @@ export default function SettingsPage() {
                     <span className="font-medium">
                       {p.label}
                       {p.value === "openai" && (
-                        <span className="ml-2 text-xs font-normal text-foreground/50">
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
                           Standard
                         </span>
                       )}
                     </span>
-                    <span className="text-xs text-foreground/60">{p.hint}</span>
+                    <span className="text-xs text-muted-foreground">{p.hint}</span>
                   </span>
                 </label>
               );
@@ -236,11 +236,11 @@ export default function SettingsPage() {
             Gemini läuft. Der Sinn ist das Free-Tier-Kontingent – Flash Lite hat
             ein großes Tageskontingent, das Voll-Flash ist stärker, aber knapp.
           */}
-          <div className="mt-1 flex flex-col gap-2 border-t border-black/5 pt-4 dark:border-white/5">
+          <div className="mt-1 flex flex-col gap-2 border-t border-border pt-4">
             <label htmlFor="gemini-model" className="text-sm font-medium">
               Gemini-Modell
             </label>
-            <p className="text-xs text-foreground/60">
+            <p className="text-xs text-muted-foreground">
               Welches Gemini-Modell läuft, wenn oben (oder je Story-Erzeugung)
               Gemini gewählt ist. Daran hängt das kostenlose Tageskontingent.
             </p>
@@ -251,7 +251,7 @@ export default function SettingsPage() {
                 chooseGeminiTextModel(e.target.value as GeminiTextModel)
               }
               disabled={saving}
-              className="self-start rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm disabled:opacity-50 dark:border-white/15"
+              className="self-start rounded-md border border-border bg-transparent px-2 py-1.5 text-sm disabled:opacity-50"
             >
               {!isKnownGeminiModel(settings.geminiTextModel) && (
                 <option value={settings.geminiTextModel}>
@@ -264,7 +264,7 @@ export default function SettingsPage() {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-foreground/50">
+            <p className="text-xs text-muted-foreground">
               {
                 GEMINI_TEXT_MODELS.find(
                   (m) => m.value === settings.geminiTextModel,
@@ -273,7 +273,7 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          <p className="text-xs text-foreground/50">
+          <p className="text-xs text-muted-foreground">
             {saving
               ? "Speichere …"
               : saved
@@ -285,7 +285,7 @@ export default function SettingsPage() {
             Anzeige-Schalter: Modell bei den Story-Erzeugungen mit anzeigen.
             Reine Anzeige, Default aus – ändert nichts an der Erzeugung selbst.
           */}
-          <label className="mt-1 flex cursor-pointer items-start gap-3 border-t border-black/5 pt-4 dark:border-white/5">
+          <label className="mt-1 flex cursor-pointer items-start gap-3 border-t border-border pt-4">
             <input
               type="checkbox"
               checked={settings.showModel}
@@ -297,7 +297,7 @@ export default function SettingsPage() {
               <span className="text-sm font-medium">
                 Verwendetes Modell anzeigen
               </span>
-              <span className="text-xs text-foreground/60">
+              <span className="text-xs text-muted-foreground">
                 Zeigt bei Handlungsentwurf, Story Arc, Kapitel-Ableitung und
                 Kapitel-Prosa an, mit welchem Textmodell sie erzeugt wurden.
                 Reine Anzeige – Standard aus.
@@ -308,10 +308,10 @@ export default function SettingsPage() {
       )}
 
       {!loading && settings && (
-        <section className="flex flex-col gap-4 rounded-lg border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+        <section className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5">
           <div>
             <h2 className="font-medium">Modell je Story-Erzeugung</h2>
-            <p className="text-sm text-foreground/60">
+            <p className="text-sm text-muted-foreground">
               Legt für die vier Story-Erzeugungen jeweils <strong>ein eigenes</strong>{" "}
               Textmodell fest. Alle übrigen Text-Erzeugungen (Beschreibungen,
               Namen, Szenarien, Ansatzpunkte …) folgen weiter dem{" "}
@@ -336,7 +336,7 @@ export default function SettingsPage() {
               <span className="text-sm font-medium">
                 Modell je Story-Erzeugung separat festlegen
               </span>
-              <span className="text-xs text-foreground/60">
+              <span className="text-xs text-muted-foreground">
                 Aus (Standard): alle vier folgen dem Textmodell oben. An: die
                 Auswahl darunter wird verwendet. Ein Pro-Lauf-Selektor auf der
                 Szenario-Seite übersteuert die Wahl weiterhin für einen
@@ -352,7 +352,7 @@ export default function SettingsPage() {
             Schalter oben aus ist.
           */}
           <div
-            className={`flex flex-col gap-3 border-t border-black/5 pt-4 dark:border-white/5 ${
+            className={`flex flex-col gap-3 border-t border-border pt-4 ${
               settings.useModelOverrides ? "" : "opacity-50"
             }`}
           >
@@ -368,7 +368,7 @@ export default function SettingsPage() {
                     chooseStoryModel(g.value, e.target.value as TextProvider)
                   }
                   disabled={saving || !settings.useModelOverrides}
-                  className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-60 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                  className="rounded-md border border-border bg-card px-2 py-1 text-sm outline-none transition focus:border-primary/50 disabled:opacity-60"
                 >
                   {TEXT_PROVIDERS.map((p) => (
                     <option key={p.value} value={p.value}>
@@ -380,7 +380,7 @@ export default function SettingsPage() {
             ))}
           </div>
 
-          <p className="text-xs text-foreground/50">
+          <p className="text-xs text-muted-foreground">
             {saving
               ? "Speichere …"
               : saved
@@ -391,10 +391,10 @@ export default function SettingsPage() {
       )}
 
       {!loading && settings && (
-        <section className="flex flex-col gap-4 rounded-lg border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+        <section className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5">
           <div>
             <h2 className="font-medium">Bildmodell und Qualität</h2>
-            <p className="text-sm text-foreground/60">
+            <p className="text-sm text-muted-foreground">
               Wähle die Kombination aus Modell und Qualitätsstufe. Beides
               verändert das Bildergebnis – die Preise sind ungefähre Kosten pro
               Portrait bei 1024×1024.
@@ -405,13 +405,13 @@ export default function SettingsPage() {
             <table className="w-full min-w-[34rem] border-collapse text-sm">
               <thead>
                 <tr>
-                  <th className="border-b border-black/10 px-2 py-2 text-left font-medium dark:border-white/10">
+                  <th className="border-b border-border px-2 py-2 text-left font-medium">
                     Modell
                   </th>
                   {IMAGE_QUALITIES.map((q) => (
                     <th
                       key={q.value}
-                      className="border-b border-black/10 px-2 py-2 text-center font-medium dark:border-white/10"
+                      className="border-b border-border px-2 py-2 text-center font-medium"
                     >
                       {q.label}
                     </th>
@@ -423,11 +423,11 @@ export default function SettingsPage() {
                   <tr key={m.value} className="align-top">
                     <th
                       scope="row"
-                      className="border-b border-black/5 px-2 py-3 text-left font-normal dark:border-white/5"
+                      className="border-b border-border px-2 py-3 text-left font-normal"
                     >
                       <span className="font-mono text-sm">{m.label}</span>
                       {m.value === "gpt-image-1" && (
-                        <span className="ml-2 text-xs text-foreground/50">
+                        <span className="ml-2 text-xs text-muted-foreground">
                           Standard
                         </span>
                       )}
@@ -444,13 +444,13 @@ export default function SettingsPage() {
                       return (
                         <td
                           key={q.value}
-                          className="border-b border-black/5 px-1 py-2 text-center dark:border-white/5"
+                          className="border-b border-border px-1 py-2 text-center"
                         >
                           <label
                             className={`flex cursor-pointer flex-col items-center gap-1 rounded-md border p-2 transition ${
                               active
-                                ? "border-foreground/40 bg-foreground/[0.06]"
-                                : "border-transparent hover:border-black/15 dark:hover:border-white/15"
+                                ? "border-primary/40 bg-primary/10"
+                                : "border-transparent hover:border-border"
                             }`}
                           >
                             <input
@@ -462,7 +462,7 @@ export default function SettingsPage() {
                               disabled={saving}
                               aria-label={`${m.label}, Qualität ${q.label}, ${formatPrice(price)} pro Bild`}
                             />
-                            <span className="tabular-nums text-xs text-foreground/70">
+                            <span className="tabular-nums text-xs text-muted-foreground">
                               {formatPrice(price)}
                             </span>
                           </label>
@@ -475,7 +475,7 @@ export default function SettingsPage() {
             </table>
           </div>
 
-          <p className="text-xs text-foreground/50">
+          <p className="text-xs text-muted-foreground">
             Preise: ungefähre Angaben pro Bild bei 1024×1024, Stand{" "}
             {IMAGE_PRICES_AS_OF}, aus öffentlichen Preisvergleichen – ohne
             Gewähr. Vor allem in der höchsten Stufe weichen die Quellen
@@ -490,7 +490,7 @@ export default function SettingsPage() {
             </p>
           )}
 
-          <p className="text-xs text-foreground/50">
+          <p className="text-xs text-muted-foreground">
             {saving
               ? "Speichere …"
               : saved
@@ -586,10 +586,10 @@ function BackupSection() {
   }
 
   return (
-    <section className="flex flex-col gap-4 rounded-lg border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+    <section className="flex flex-col gap-4 rounded-lg border border-border bg-card p-5">
       <div>
         <h2 className="font-medium">Sicherung</h2>
-        <p className="text-sm text-foreground/60">
+        <p className="text-sm text-muted-foreground">
           Die gesamte Datenbank – Charaktere samt Bildern, Szenarien und
           Einstellungen – als Datei sichern oder wieder einspielen. Ohne die
           Bild-Originale wird die Datei deutlich kleiner; die Vorschaubilder
@@ -603,13 +603,13 @@ function BackupSection() {
           type="button"
           onClick={handleExport}
           disabled={exporting || importing}
-          className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
         >
           {exporting ? "Erstelle Sicherung …" : "Datenbank exportieren"}
         </button>
 
         <label
-          className="flex cursor-pointer items-center gap-2 text-sm text-foreground/70 select-none"
+          className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground select-none"
           title="Die großen Bild-Originale mitsichern. Die kleinen Vorschaubilder (Thumbnails) sind immer dabei."
         >
           <input
@@ -622,14 +622,14 @@ function BackupSection() {
           Bild-Originale mitexportieren
         </label>
 
-        <label className="flex items-center gap-2 text-sm text-foreground/70">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
           Import-Modus
           <select
             value={importMode}
             onChange={(e) => setImportMode(e.target.value as ImportMode)}
             disabled={importing || exporting}
             title="Ersetzen leert den Bestand und spielt die Datei ein. Additiv hängt die Charaktere und Szenarien der Datei zusätzlich an (mit neuen IDs)."
-            className="rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm disabled:opacity-50 dark:border-white/15"
+            className="rounded-md border border-border bg-transparent px-2 py-1.5 text-sm disabled:opacity-50"
           >
             <option value="replace">Ersetzen</option>
             <option value="additive">Additiv (hinzufügen)</option>
@@ -637,10 +637,10 @@ function BackupSection() {
         </label>
 
         <label
-          className={`rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition dark:border-white/15 ${
+          className={`rounded-md border border-border px-4 py-2 text-sm font-medium transition ${
             importing || exporting
               ? "cursor-not-allowed opacity-50"
-              : "cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+              : "cursor-pointer hover:bg-muted"
           }`}
         >
           {importing ? "Spiele ein …" : "Datenbank importieren"}
@@ -671,10 +671,10 @@ function BackupSection() {
       </p>
 
       {message && (
-        <p className="text-sm text-foreground/70">{message}</p>
+        <p className="text-sm text-muted-foreground">{message}</p>
       )}
       {error && (
-        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </p>
       )}

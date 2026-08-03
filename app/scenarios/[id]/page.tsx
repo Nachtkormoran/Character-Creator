@@ -1642,11 +1642,11 @@ export default function ScenarioDetailPage({
     }
   }
 
-  if (loading) return <p className="text-foreground/60">Lade Szenario …</p>;
+  if (loading) return <p className="text-muted-foreground">Lade Szenario …</p>;
   if (error) {
     return (
       <div className="flex flex-col gap-4">
-        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </p>
         <Link href="/scenarios" className="text-sm underline">
@@ -1661,7 +1661,7 @@ export default function ScenarioDetailPage({
       <div>
         <Link
           href="/scenarios"
-          className="text-sm text-foreground/60 transition hover:text-foreground"
+          className="text-sm text-muted-foreground transition hover:text-foreground"
         >
           ← Szenarien
         </Link>
@@ -1670,7 +1670,7 @@ export default function ScenarioDetailPage({
             value={name}
             onChange={(e) => setName(e.target.value)}
             aria-label="Name des Szenarios"
-            className="w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-3xl font-semibold tracking-tight outline-none transition hover:border-black/15 focus:border-black/40 dark:hover:border-white/15 dark:focus:border-white/40"
+            className="w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-3xl font-semibold tracking-tight outline-none transition hover:border-border focus:border-primary/50"
           />
           {/*
             KI-Name aus Beschreibung/Ort/Zeit/Regeln. Ersetzt das Feld (geht in
@@ -1692,13 +1692,13 @@ export default function ScenarioDetailPage({
             }
             title="Namen aus Beschreibung, Ort, Zeit und Regeln erzeugen"
             aria-label="Namen per KI erzeugen"
-            className="shrink-0 rounded-md border border-black/15 px-2.5 py-1.5 text-lg transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            className="shrink-0 rounded-md border border-border px-2.5 py-1.5 text-lg transition hover:bg-muted disabled:opacity-40"
           >
             {nameBusy ? "…" : "✨"}
           </button>
         </div>
         {nameFehler && (
-          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+          <p className="mt-1 text-xs text-destructive">
             {nameFehler}
           </p>
         )}
@@ -1712,7 +1712,7 @@ export default function ScenarioDetailPage({
           <button
             onClick={save}
             disabled={saving || !nameValid}
-            className="ml-auto rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+            className="ml-auto rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
           >
             {saving ? "Speichere …" : "Änderungen speichern"}
           </button>
@@ -1735,12 +1735,12 @@ export default function ScenarioDetailPage({
               setStoryArc(s.arc.items[s.arc.aktiv] ?? { stufen: [] });
             }}
             disabled={saving}
-            className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
+            className="text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-50"
           >
             Verwerfen
           </button>
           {saveError && (
-            <span className="w-full text-xs text-red-600 dark:text-red-400">
+            <span className="w-full text-xs text-destructive">
               {saveError}
             </span>
           )}
@@ -1753,7 +1753,7 @@ export default function ScenarioDetailPage({
         darunter. `order-*` zeigt das Bild auf schmalen Schirmen zuerst – wie
         beim Charakter.
       */}
-      <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+      <section className="rounded-xl border border-border bg-card p-5">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_240px]">
           {/* Links: die Beschreibung – der Fließtext über die Welt. */}
           <div className="order-2 md:order-1">
@@ -1789,7 +1789,7 @@ export default function ScenarioDetailPage({
               title={
                 bilder.length > 0 ? "Weltbilder verwalten" : "Weltbild hinzufügen"
               }
-              className="relative aspect-square w-full overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] transition hover:border-black/25 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/25"
+              className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted transition hover:border-border"
             >
               {weltbildVorschau ? (
                 <Image
@@ -1815,7 +1815,7 @@ export default function ScenarioDetailPage({
             <button
               type="button"
               onClick={() => setBildModalOffen(true)}
-              className="w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+              className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
             >
               {bilder.length > 0
                 ? "🖼️ Weltbilder verwalten"
@@ -1825,8 +1825,8 @@ export default function ScenarioDetailPage({
         </div>
       </section>
 
-      <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
-        <h2 className="mb-4 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+      <section className="rounded-xl border border-border bg-card p-5">
+        <h2 className="mb-4 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
           Festlegungen
         </h2>
         <ScenarioFields
@@ -1853,9 +1853,9 @@ export default function ScenarioDetailPage({
         standen die Charaktere ganz unten; hier stehen sie bei den Figuren, aus
         denen sie hervorgehen.
       */}
-      <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+      <section className="rounded-xl border border-border bg-card p-5">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Charaktere ({characters.length})
           </h2>
           <div className="flex flex-wrap items-center gap-2">
@@ -1869,7 +1869,7 @@ export default function ScenarioDetailPage({
               type="button"
               onClick={() => setAddOffen(true)}
               title="Einen bereits vorhandenen Charakter diesem Szenario zuordnen"
-              className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-muted"
             >
               + Vorhandenen hinzufügen
             </button>
@@ -1881,14 +1881,14 @@ export default function ScenarioDetailPage({
             */}
             <Link
               href={`/?scenario=${id}`}
-              className="rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition hover:opacity-90"
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:opacity-90"
             >
               + Neuen erstellen
             </Link>
           </div>
         </div>
         {characters.length > 0 && (
-          <p className="mb-3 text-xs text-foreground/50">
+          <p className="mb-3 text-xs text-muted-foreground">
             Mit dem ⭐ markierst du <strong>Protagonisten</strong> – der
             Handlungsentwurf dreht sich dann um sie, die übrigen sind
             Nebenfiguren. Ohne Markierung bleibt alles wie bisher.
@@ -1901,7 +1901,7 @@ export default function ScenarioDetailPage({
           </p>
         )}
         {characters.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-black/15 p-8 text-center text-sm text-foreground/60 dark:border-white/15">
+          <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
             Diesem Szenario ist noch niemand zugeordnet. Füge über die Knöpfe
             oben einen vorhandenen Charakter hinzu, erstelle einen neuen – oder
             lege unten aus einer Figur einen an.
@@ -1922,13 +1922,13 @@ export default function ScenarioDetailPage({
                     type="button"
                     onClick={() => setSelectedChar(c)}
                     title={c.character.kurzbeschreibung}
-                    className={`flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border bg-white text-left transition hover:shadow-md dark:bg-white/[0.03] ${
+                    className={`flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border bg-card text-left transition hover:shadow-md ${
                       c.isProtagonist
                         ? "border-amber-400 ring-1 ring-amber-400/60 dark:border-amber-400/70"
-                        : "border-black/10 dark:border-white/10"
+                        : "border-border"
                     }`}
                   >
-                    <div className="relative aspect-square w-full bg-black/[0.03] dark:bg-white/[0.03]">
+                    <div className="relative aspect-square w-full bg-muted">
                       {preview ? (
                         <Image
                           src={preview}
@@ -1991,11 +1991,11 @@ export default function ScenarioDetailPage({
           gefüllt wird von Hand, per Würfel/KI-Ergänzen oder vom „Zufälligen
           Szenario".
         */}
-        <div className="mt-6 border-t border-black/10 pt-5 dark:border-white/10">
-          <h3 className="mb-1 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+        <div className="mt-6 border-t border-border pt-5">
+          <h3 className="mb-1 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Figuren
           </h3>
-          <p className="mb-3 text-xs text-foreground/50">
+          <p className="mb-3 text-xs text-muted-foreground">
             Notizen zu wichtigen Personen, aus denen noch kein Charakter angelegt
             ist. „✨ Charakter“ macht aus einer Figur einen Charakter für dieses
             Szenario.
@@ -2018,7 +2018,7 @@ export default function ScenarioDetailPage({
           />
 
           {details.figuren.trim() && (
-            <p className="mt-3 border-t border-black/10 pt-3 text-xs text-foreground/50 dark:border-white/10">
+            <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
               Das Häkchen je Figur entscheidet, ob sie in Handlungsentwurf und
               Story Arc einfließt. Abgehakte Figuren bleiben in der Liste, werden
               dort aber übergangen.
@@ -2035,14 +2035,14 @@ export default function ScenarioDetailPage({
         darunter sind per `hideLabel` ausgeblendet (für Screenreader bleiben sie
         erhalten), sonst stünde die Überschrift doppelt da.
       */}
-      <section className="rounded-xl border border-black/10 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03]">
+      <section className="rounded-xl border border-border bg-card p-5">
         {/*
           Handlungselemente – die persistenten Vorgaben für die Erzeugung: was der
           nächste „✨ Neu erzeugen“-Lauf aufgreift. Aktive Elemente (Häkchen)
           fließen ein; die einmalige Stichwörter-Zeile im Entwurf-Kopf wirkt
           zusätzlich. Ein zufällig erzeugtes Szenario füllt die Liste mit.
         */}
-        <h2 className="mb-3 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+        <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
           Handlungselemente
         </h2>
         <ScenarioFields
@@ -2054,7 +2054,7 @@ export default function ScenarioDetailPage({
           hideLabel
         />
 
-        <h2 className="mt-6 mb-4 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+        <h2 className="mt-6 mb-4 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
           Handlungsentwurf
         </h2>
         {/*
@@ -2066,7 +2066,7 @@ export default function ScenarioDetailPage({
         */}
         {variantenAnzeige.length >= 1 && (
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-xs font-medium text-foreground/50">
+            <span className="mr-1 text-xs font-medium text-muted-foreground">
               Entwürfe:
             </span>
             {variantenAnzeige.map((text, i) => {
@@ -2085,8 +2085,8 @@ export default function ScenarioDetailPage({
                   key={i}
                   className={`inline-flex items-stretch gap-1 overflow-hidden rounded-lg border text-xs transition ${
                     i === aktiv
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-black/15 hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06]"
+                      ? "border-foreground bg-primary text-primary-foreground"
+                      : "border-border hover:bg-muted"
                   }`}
                 >
                   <button
@@ -2104,7 +2104,7 @@ export default function ScenarioDetailPage({
                         className={`text-[10px] leading-tight ${
                           i === aktiv
                             ? "text-background/70"
-                            : "text-foreground/50"
+                            : "text-muted-foreground"
                         }`}
                       >
                         {badge}
@@ -2165,7 +2165,7 @@ export default function ScenarioDetailPage({
                       className={`flex items-center pr-2 pl-0.5 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40 ${
                         i === aktiv
                           ? "hover:text-red-300"
-                          : "hover:text-red-600 dark:hover:text-red-400"
+                          : "hover:text-destructive dark:hover:text-red-400"
                       }`}
                     >
                       ✕
@@ -2183,7 +2183,7 @@ export default function ScenarioDetailPage({
               onClick={() => varianteKopieren(aktiv)}
               disabled={saving || generatingField !== null}
               title="Den aktiven Handlungsentwurf kopieren – als eigenständige neue Variante"
-              className="rounded-full border border-black/15 px-2.5 py-1 text-xs font-medium text-foreground/70 transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-40"
             >
               ⧉ Kopieren
             </button>
@@ -2197,7 +2197,7 @@ export default function ScenarioDetailPage({
               onClick={leerenEntwurfHinzufuegen}
               disabled={saving || generatingField !== null}
               title="Einen leeren Handlungsentwurf zum Selbstschreiben anlegen"
-              className="rounded-full border border-black/15 px-2.5 py-1 text-xs font-medium text-foreground/70 transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-40"
             >
               ➕ Leerer Entwurf
             </button>
@@ -2208,7 +2208,7 @@ export default function ScenarioDetailPage({
               einem Entwurf auf die Idee, dass mehrere nebeneinander möglich sind.
             */}
             {variantenAnzeige.length === 1 && (
-              <span className="text-xs text-foreground/50">
+              <span className="text-xs text-muted-foreground">
                 · „✨ Neu erzeugen“ legt einen weiteren an, statt diesen zu
                 ersetzen
               </span>
@@ -2224,7 +2224,7 @@ export default function ScenarioDetailPage({
                 onClick={alleVariantenLoeschen}
                 disabled={saving || generatingField !== null}
                 title="Alle Handlungsentwürfe löschen"
-                className="ml-auto rounded-full border border-red-600/30 px-2.5 py-1 text-xs font-medium text-red-600 transition hover:bg-red-600/10 disabled:opacity-40 dark:border-red-400/30 dark:text-red-400 dark:hover:bg-red-400/10"
+                className="ml-auto rounded-full border border-red-600/30 px-2.5 py-1 text-xs font-medium text-destructive transition hover:bg-red-600/10 disabled:opacity-40 dark:border-red-400/30 dark:hover:bg-red-400/10"
               >
                 Alle löschen
               </button>
@@ -2236,7 +2236,7 @@ export default function ScenarioDetailPage({
           Einstellung und wenn es (nicht bei Altbeständen) bekannt ist.
         */}
         {showModel && variantenMeta[aktiv]?.modell?.trim() && (
-          <p className="mb-3 text-xs text-foreground/50">
+          <p className="mb-3 text-xs text-muted-foreground">
             Erzeugt mit{" "}
             <span className="font-mono">{variantenMeta[aktiv].modell}</span>
           </p>
@@ -2249,14 +2249,14 @@ export default function ScenarioDetailPage({
             erzählt. Zwei getrennte Achsen, beide unabhängig vom Genre der Welt.
           */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70">
+            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground">
               <span>Erzählform:</span>
               <select
                 value={handlungForm}
                 onChange={(e) => setHandlungForm(e.target.value as StoryForm)}
                 disabled={saving || generatingField !== null}
                 title="Die Art der Geschichte (Krimi, Liebe, Abenteuer …) – prägt Konflikt und Aufbau des Entwurfs, unabhängig vom Genre der Welt. „Allround“ = gemischt wie bisher."
-                className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                className="rounded-md border border-border bg-card px-2 py-1 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50"
               >
                 {STORY_FORMS.map((f) => (
                   <option key={f.value} value={f.value}>
@@ -2265,14 +2265,14 @@ export default function ScenarioDetailPage({
                 ))}
               </select>
             </label>
-            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70">
+            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground">
               <span>Ton:</span>
               <select
                 value={handlungTon}
                 onChange={(e) => setHandlungTon(e.target.value as StoryTone)}
                 disabled={saving || generatingField !== null}
                 title="Ton und Sprache des Handlungsentwurfs – nimmt den Ton der späteren Geschichte vorweg"
-                className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                className="rounded-md border border-border bg-card px-2 py-1 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50"
               >
                 {STORY_TONES.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -2287,7 +2287,7 @@ export default function ScenarioDetailPage({
               globale Textmodell); ein konkreter Anbieter übersteuert das nur für
               „✨ Neu erzeugen" hier.
             */}
-            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70">
+            <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground">
               <span>Modell:</span>
               <select
                 value={handlungProvider}
@@ -2296,7 +2296,7 @@ export default function ScenarioDetailPage({
                 }
                 disabled={saving || generatingField !== null}
                 title="Welches Textmodell diesen Handlungsentwurf erzeugt. „Standard&quot; folgt der Einstellungsseite; die Wahl hier gilt nur für den Entwurf und wird nicht gespeichert."
-                className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                className="rounded-md border border-border bg-card px-2 py-1 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50"
               >
                 <option value="">Standard (Einstellungen)</option>
                 {TEXT_PROVIDERS.map((p) => (
@@ -2314,7 +2314,7 @@ export default function ScenarioDetailPage({
             der offenen Ausgangslage.
           */}
           <label
-            className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+            className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground"
             title="Angehakt skizziert „✨ Neu erzeugen“ eine vollständige Geschichte – von der Ausgangslage über die Zuspitzung bis zu einem Ende – statt einer offenen Ausgangslage. Gilt auch beim Aufbauen auf einem vorhandenen Entwurf."
           >
             <input
@@ -2322,7 +2322,7 @@ export default function ScenarioDetailPage({
               checked={handlungWeiterspinnen}
               onChange={(e) => setHandlungWeiterspinnen(e.target.checked)}
               disabled={saving || generatingField !== null}
-              className="size-4 accent-foreground"
+              className="size-4 accent-primary"
             />
             🧵 Handlung weiterspinnen – vollständige Geschichte statt offener
             Ausgangslage
@@ -2342,7 +2342,7 @@ export default function ScenarioDetailPage({
           */}
           {details.handlung.trim() && (
             <label
-              className="flex w-fit cursor-pointer items-center gap-2 text-sm text-foreground/70"
+              className="flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground"
               title="Der nächste „✨ Neu erzeugen“-Lauf nimmt den angezeigten Entwurf als Grundlage und formt daraus eine neue Fassung – statt frei aus Welt und Figuren zu beginnen. Die Stichwörter wirken zusätzlich."
             >
               <input
@@ -2350,7 +2350,7 @@ export default function ScenarioDetailPage({
                 checked={handlungAlsBasis}
                 onChange={(e) => setHandlungAlsBasis(e.target.checked)}
                 disabled={saving || generatingField !== null}
-                className="size-4 accent-foreground"
+                className="size-4 accent-primary"
               />
               aktuellen Handlungsentwurf bei neuem Entwurf verwenden
             </label>
@@ -2364,7 +2364,7 @@ export default function ScenarioDetailPage({
             Danach lassen sich die Neuen über „Personen im Entwurf suchen"
             als Charaktere anlegen.
           */}
-          <div className="flex flex-wrap items-center gap-2 text-sm text-foreground/70">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <label className="flex items-center gap-2">
               <span>👥 Neue Personen:</span>
               <select
@@ -2374,7 +2374,7 @@ export default function ScenarioDetailPage({
                 }
                 disabled={saving || generatingField !== null}
                 title="Wie viele neue, benannte Personen der Entwurf zusätzlich einführt. Wirkt auf „Neu erzeugen“ – frisch wie auf Basis eines vorhandenen Entwurfs."
-                className="rounded-md border border-black/15 bg-white px-2 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                className="rounded-md border border-border bg-card px-2 py-1 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50"
               >
                 <option value={0}>aus</option>
                 {Array.from({ length: MAX_NEUE_PLOT_PERSONEN }, (_, i) => (
@@ -2395,7 +2395,7 @@ export default function ScenarioDetailPage({
                 placeholder="optional: Namen/Rollen – z. B. „Mira (Schwester); ein korrupter Beamter“"
                 title="Gewünschte Namen oder Rollen der neuen Personen. Leer gelassen erfindet die KI sie stimmig aus Welt und Konflikt. Wird nicht gespeichert."
                 aria-label="Gewünschte Namen oder Rollen der neuen Personen"
-                className="min-w-0 flex-1 rounded-md border border-black/15 bg-white px-3 py-1 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                className="min-w-0 flex-1 rounded-md border border-border bg-card px-3 py-1 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50"
               />
             )}
           </div>
@@ -2428,7 +2428,7 @@ export default function ScenarioDetailPage({
               onClick={handlungFortsetzen}
               disabled={saving || generatingField !== null}
               title="Knüpft an das Ende des aktuellen Entwurfs an und schreibt weiter. Die Fortsetzung wird an den vorhandenen Text angehängt (nicht als neuer Reiter). Nutzt Ton, Erzählform, „Weiterspinnen“ und die Stichwörter wie „Neu erzeugen“."
-              className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
             >
               {generatingField === "handlung"
                 ? "Setze fort …"
@@ -2447,39 +2447,39 @@ export default function ScenarioDetailPage({
           der erste seiner Art.
         */}
         {details.handlung.trim() && (
-          <div className="mt-4 border-t border-black/10 pt-4 dark:border-white/10">
+          <div className="mt-4 border-t border-border pt-4">
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={personenSuchen}
                 disabled={suchend}
                 title="Sucht im Handlungsentwurf nach Personen, die dem Szenario noch nicht zugeordnet sind"
-                className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                className="rounded-md border border-border px-2.5 py-1 text-xs font-medium transition hover:bg-muted disabled:opacity-50"
               >
                 {suchend ? "Sucht …" : "🔍 Personen im Entwurf suchen"}
               </button>
               {personen === null && !suchend && (
-                <span className="text-xs text-foreground/50">
+                <span className="text-xs text-muted-foreground">
                   Findet Namen, für die es noch keinen Charakter gibt.
                 </span>
               )}
             </div>
 
             {suchFehler && (
-              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+              <p className="mt-2 text-xs text-destructive">
                 {suchFehler}
               </p>
             )}
 
             {personen !== null &&
               (personen.length === 0 ? (
-                <p className="mt-2 text-xs text-foreground/50">
+                <p className="mt-2 text-xs text-muted-foreground">
                   Keine neuen Personen – der Entwurf nennt nur Figuren, die dem
                   Szenario schon zugeordnet sind.
                 </p>
               ) : (
                 <div className="mt-3">
-                  <p className="mb-2 text-xs text-foreground/60">
+                  <p className="mb-2 text-xs text-muted-foreground">
                     Noch nicht im Szenario – anklicken, um daraus einen Charakter
                     anzulegen:
                   </p>
@@ -2549,12 +2549,12 @@ export default function ScenarioDetailPage({
         onProviderChange={setArcProvider}
       />
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-4 dark:border-white/10">
+      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
         <button
           onClick={exportieren}
           disabled={exportiert}
           title="Schreibt Festlegungen und – wenn angehakt – die zugeordneten Charaktere samt Bildern in eine Datei"
-          className="rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+          className="rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
         >
           {exportiert ? "Sammle Daten …" : "Als Datei exportieren"}
         </button>
@@ -2571,8 +2571,8 @@ export default function ScenarioDetailPage({
         <label
           className={`flex items-center gap-2 text-sm ${
             characters.length === 0
-              ? "cursor-not-allowed text-foreground/40"
-              : "cursor-pointer text-foreground/70"
+              ? "cursor-not-allowed text-muted-foreground"
+              : "cursor-pointer text-muted-foreground"
           }`}
         >
           <input
@@ -2580,7 +2580,7 @@ export default function ScenarioDetailPage({
             checked={mitCharakteren && characters.length > 0}
             onChange={(e) => setMitCharakteren(e.target.checked)}
             disabled={exportiert || characters.length === 0}
-            className="size-4 accent-foreground"
+            className="size-4 accent-primary"
           />
           {characters.length === 0
             ? "Keine Charaktere zugeordnet"
@@ -2591,26 +2591,26 @@ export default function ScenarioDetailPage({
           Bilder mitexportieren – Default an. Ohne Häkchen bleiben Weltbild und
           Charakter-Bilder weg: eine schlanke Datei nur aus Texten/Festlegungen.
         */}
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground/70">
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
           <input
             type="checkbox"
             checked={mitBildern}
             onChange={(e) => setMitBildern(e.target.checked)}
             disabled={exportiert}
-            className="size-4 accent-foreground"
+            className="size-4 accent-primary"
           />
           Bilder mitexportieren
         </label>
 
         {exportFehler && (
-          <span className="text-sm text-red-600 dark:text-red-400">
+          <span className="text-sm text-destructive">
             {exportFehler}
           </span>
         )}
 
         <button
           onClick={entfernen}
-          className="ml-auto rounded-md border border-red-500/40 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
+          className="ml-auto rounded-md border border-destructive/40 px-4 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/10"
         >
           Szenario löschen
         </button>

@@ -71,21 +71,21 @@ export function PlotPersonModal({
     >
       <div
         ref={dialog}
-        className="my-8 w-full max-w-lg rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/10"
+        className="my-8 w-full max-w-lg rounded-xl border border-border bg-background p-6 shadow-xl"
       >
         <h2 className="text-lg font-semibold">
           Charakter für {person.name} anlegen?
         </h2>
-        <p className="mt-1 text-sm text-foreground/60">
+        <p className="mt-1 text-sm text-muted-foreground">
           Diese Angaben belegen das Erstellen-Formular vor. Dort lassen sie sich
           vor dem Erzeugen noch ändern.
         </p>
 
         {felder.length > 0 ? (
-          <dl className="mt-4 flex flex-col gap-2 rounded-md border border-black/10 bg-black/[0.02] p-3 text-sm dark:border-white/10 dark:bg-white/[0.03]">
+          <dl className="mt-4 flex flex-col gap-2 rounded-md border border-border bg-muted p-3 text-sm">
             {felder.map(([label, wert]) => (
               <div key={label} className="flex flex-col gap-0.5">
-                <dt className="text-xs tracking-wide text-foreground/50 uppercase">
+                <dt className="text-xs tracking-wide text-muted-foreground uppercase">
                   {label}
                 </dt>
                 <dd className="whitespace-pre-wrap">{wert}</dd>
@@ -93,7 +93,7 @@ export function PlotPersonModal({
             ))}
           </dl>
         ) : (
-          <p className="mt-4 rounded-md border border-dashed border-black/15 p-4 text-center text-sm text-foreground/60 dark:border-white/15">
+          <p className="mt-4 rounded-md border border-dashed border-border p-4 text-center text-sm text-muted-foreground">
             Der Entwurf nennt nur den Namen. Alles Weitere entsteht beim
             Erzeugen – oder du ergänzt es vorher im Formular.
           </p>
@@ -110,14 +110,14 @@ export function PlotPersonModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-sm text-foreground/60 transition hover:text-foreground"
+            className="text-sm text-muted-foreground transition hover:text-foreground"
           >
             Abbrechen
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90"
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
           >
             Ja, Charakter anlegen
           </button>

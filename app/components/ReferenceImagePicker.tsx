@@ -47,19 +47,19 @@ export function ReferenceImagePicker({
 
   return (
     <div className="mt-3 flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-foreground/60">
+      <span className="text-xs font-medium text-muted-foreground">
         Referenzbild (optional)
       </span>
 
       {value ? (
-        <div className="flex items-center gap-3 rounded-md border border-black/15 p-2 dark:border-white/15">
+        <div className="flex items-center gap-3 rounded-md border border-border p-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={value}
             alt="Gewählte Vorlage"
             className="h-12 w-12 shrink-0 rounded object-cover"
           />
-          <span className="min-w-0 flex-1 text-xs text-foreground/60">
+          <span className="min-w-0 flex-1 text-xs text-muted-foreground">
             Wird als Stil- und Motivvorlage mitgegeben.
           </span>
           <button
@@ -67,7 +67,7 @@ export function ReferenceImagePicker({
             onClick={() => onChange(null)}
             disabled={disabled}
             aria-label="Referenzbild entfernen"
-            className="rounded px-2 py-1 text-foreground/50 transition hover:bg-black/[0.06] hover:text-foreground disabled:opacity-50 dark:hover:bg-white/[0.08]"
+            className="rounded px-2 py-1 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50 dark:hover:bg-white/[0.08]"
           >
             ×
           </button>
@@ -75,10 +75,10 @@ export function ReferenceImagePicker({
       ) : (
         <div className="flex flex-col gap-1.5 sm:flex-row">
           <label
-            className={`flex-1 rounded-md border border-dashed border-black/20 px-3 py-2 text-center text-sm text-foreground/60 transition dark:border-white/20 ${
+            className={`flex-1 rounded-md border border-dashed border-border px-3 py-2 text-center text-sm text-muted-foreground transition ${
               disabled || loading
                 ? "cursor-not-allowed opacity-50"
-                : "cursor-pointer hover:border-black/40 hover:text-foreground dark:hover:border-white/40"
+                : "cursor-pointer hover:border-border hover:text-foreground"
             }`}
           >
             {loading ? "Lade …" : "Datei wählen …"}
@@ -96,7 +96,7 @@ export function ReferenceImagePicker({
               type="button"
               onClick={onChooseOwn}
               disabled={disabled || loading}
-              className="flex-1 rounded-md border border-dashed border-black/20 px-3 py-2 text-center text-sm text-foreground/60 transition hover:border-black/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/20 dark:hover:border-white/40"
+              className="flex-1 rounded-md border border-dashed border-border px-3 py-2 text-center text-sm text-muted-foreground transition hover:border-border hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
               Charakterbild wählen …
             </button>
@@ -105,7 +105,7 @@ export function ReferenceImagePicker({
       )}
 
       {error && (
-        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-xs text-destructive">{error}</p>
       )}
     </div>
   );

@@ -214,7 +214,7 @@ function EintragListe({
   return (
     <div className="flex flex-col gap-2">
       {list.length === 0 ? (
-        <p className="rounded-md border border-dashed border-black/15 px-3 py-6 text-center text-sm text-foreground/50 dark:border-white/15">
+        <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
           {leerHinweis}
         </p>
       ) : (
@@ -227,8 +227,8 @@ function EintragListe({
               key={i}
               className={`flex items-start gap-2 rounded-md border px-3 py-1 transition ${
                 eintrag.aktiv
-                  ? "border-black/10 bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03]"
-                  : "border-dashed border-black/10 bg-transparent opacity-60 dark:border-white/10"
+                  ? "border-border bg-muted"
+                  : "border-dashed border-border bg-transparent opacity-60"
               }`}
             >
               {/*
@@ -249,9 +249,9 @@ function EintragListe({
                 disabled={disabled}
                 title={aktivTitel(eintrag.aktiv)}
                 aria-label={`${einzahl} ${i + 1} ${aktivAria}`}
-                className="mt-1.5 size-4 shrink-0 accent-foreground"
+                className="mt-1.5 size-4 shrink-0 accent-primary"
               />
-              <span className="mt-1 w-4 shrink-0 text-right text-xs text-foreground/40 tabular-nums">
+              <span className="mt-1 w-4 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
                 {i + 1}
               </span>
               <div className="min-w-0 flex-1">
@@ -264,7 +264,7 @@ function EintragListe({
                   className="text-sm"
                 />
                 {aktion?.fehler && aktion.fehler.item === eintrag.text && (
-                  <p className="mt-0.5 text-xs text-red-600 dark:text-red-400">
+                  <p className="mt-0.5 text-xs text-destructive">
                     {aktion.fehler.text}
                   </p>
                 )}
@@ -277,7 +277,7 @@ function EintragListe({
                     disabled || aktion.busy !== null || !eintrag.text.trim()
                   }
                   title={aktion.titel}
-                  className="mt-0.5 shrink-0 rounded-md border border-black/15 px-2 py-0.5 text-xs font-medium whitespace-nowrap transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                  className="mt-0.5 shrink-0 rounded-md border border-border px-2 py-0.5 text-xs font-medium whitespace-nowrap transition hover:bg-muted disabled:opacity-50"
                 >
                   {aktion.busy === eintrag.text ? aktion.labelBusy : aktion.labelIdle}
                 </button>
@@ -288,7 +288,7 @@ function EintragListe({
                 disabled={disabled}
                 title={entfernenTitel}
                 aria-label={`${einzahl} ${i + 1} entfernen`}
-                className="mt-0.5 shrink-0 rounded-md border border-transparent px-2 py-0.5 text-sm text-foreground/40 transition hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50 dark:hover:text-red-400"
+                className="mt-0.5 shrink-0 rounded-md border border-transparent px-2 py-0.5 text-sm text-muted-foreground transition hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive disabled:opacity-50 dark:hover:text-red-400"
               >
                 ✕
               </button>
@@ -302,7 +302,7 @@ function EintragListe({
           onClick={() => emit([...list, { text: "", aktiv: true }])}
           disabled={disabled}
           title={hinzufuegenTitel}
-          className="rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium text-foreground/70 transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+          className="rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-50"
         >
           ➕ {einzahl} hinzufügen
         </button>
@@ -455,7 +455,7 @@ export function ScenarioFields({
   const [figurenAnzahl, setFigurenAnzahl] = useState(3);
 
   const controlClass =
-    "w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
+    "w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50";
 
   // Die **Inhalts-Textfelder** (Ort, Zeit, Regeln, Beschreibung,
   // Handlungsentwurf) tragen keinen eigenen weißen Kasten, sondern nehmen die
@@ -465,11 +465,11 @@ export function ScenarioFields({
   // Genre-Auswahlfeld bleiben dagegen weiß: Sie sind Bedienelemente, keine
   // Inhalte, und sollen sich abheben.
   const contentClass =
-    "w-full rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:focus:border-white/40";
+    "w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50";
 
   /** Knöpfe und Stichwort-Feld in der Kopfzeile – gleiche Höhe, gleicher Rand. */
   const kopfzeilenClass =
-    "rounded-md border border-black/15 px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 dark:border-white/15";
+    "rounded-md border border-border px-2.5 py-1 text-xs font-medium transition disabled:opacity-50";
 
   // Ohne `fields` alle Felder in Schema-Reihenfolge; mit `fields` genau die
   // genannten, in genau dieser Reihenfolge.
@@ -527,7 +527,7 @@ export function ScenarioFields({
                       // `min-w-0` + `basis-56`: wächst in die freie Breite,
                       // darf aber schrumpfen – sonst drückt es die Knöpfe in
                       // einer schmalen Spalte aus der Zeile.
-                      className={`${kopfzeilenClass} min-w-0 flex-1 basis-56 bg-white font-normal outline-none focus:border-black/40 dark:bg-white/5 dark:focus:border-white/40`}
+                      className={`${kopfzeilenClass} min-w-0 flex-1 basis-56 bg-card font-normal outline-none focus:border-primary/50`}
                     />
                   )}
 
@@ -537,10 +537,10 @@ export function ScenarioFields({
                   */}
                   {key === "figuren" && (
                     <label
-                      className={`${kopfzeilenClass} flex items-center gap-1.5 bg-white font-normal dark:bg-white/5`}
+                      className={`${kopfzeilenClass} flex items-center gap-1.5 bg-card font-normal`}
                       title="Wie viele Figuren „Würfeln/Ergänzen“ und „Erzeugen/Ergänzen“ hinzufügen – gilt für Würfel und KI."
                     >
-                      <span className="text-foreground/60">Anzahl</span>
+                      <span className="text-muted-foreground">Anzahl</span>
                       <select
                         value={figurenAnzahl}
                         onChange={(e) =>
@@ -588,7 +588,7 @@ export function ScenarioFields({
                           ? "Passend zum gewählten Genre."
                           : "Ohne gewähltes Genre aus der Gegenwart.")
                       }
-                      className={`${kopfzeilenClass} hover:bg-black/[0.04] dark:hover:bg-white/[0.06]`}
+                      className={`${kopfzeilenClass} hover:bg-muted`}
                     >
                       {details[key].trim() ? "🎲 Ergänzen" : "🎲 Würfeln"}
                     </button>
@@ -608,7 +608,7 @@ export function ScenarioFields({
                       // Ständen.
                       disabled={disabled || generatingField !== null}
                       title={GENERATE_HINTS[key]}
-                      className={`${kopfzeilenClass} whitespace-nowrap hover:bg-black/[0.04] dark:hover:bg-white/[0.06]`}
+                      className={`${kopfzeilenClass} whitespace-nowrap hover:bg-muted`}
                     >
                       {/*
                         Drei Beschriftungen, weil der Knopf drei verschiedene
@@ -722,7 +722,7 @@ export function ScenarioFields({
                 färbt sich bernsteinfarben, sobald es eng wird.
               */}
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                <span className="text-xs text-foreground/50">
+                <span className="text-xs text-muted-foreground">
                   {SCENARIO_HINTS[key]}
                 </span>
                 {key !== "genre" && (
@@ -730,7 +730,7 @@ export function ScenarioFields({
                     className={`shrink-0 text-xs tabular-nums ${
                       details[key].length >= SCENARIO_MAXLENGTHS[key] * 0.9
                         ? "text-amber-600 dark:text-amber-500"
-                        : "text-foreground/40"
+                        : "text-muted-foreground"
                     }`}
                     aria-label={`${details[key].length} von ${SCENARIO_MAXLENGTHS[key]} Zeichen`}
                   >

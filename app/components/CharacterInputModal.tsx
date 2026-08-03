@@ -59,13 +59,13 @@ export function CharacterInputModal({
     >
       <div
         ref={dialog}
-        className="my-8 w-full max-w-2xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
+        className="my-8 w-full max-w-2xl rounded-xl border border-border bg-background p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h2 className="text-xl font-semibold">Vorgaben bei der Erstellung</h2>
-            <p className="mt-1 text-sm text-foreground/60">
+            <p className="mt-1 text-sm text-muted-foreground">
               Womit {name || "dieser Charakter"} erzeugt wurde – {belegt} von{" "}
               {keys.length} Feldern ausgefüllt.
             </p>
@@ -75,14 +75,14 @@ export function CharacterInputModal({
               e.stopPropagation();
               onClose();
             }}
-            className="shrink-0 rounded-md px-2 py-1 text-foreground/60 transition hover:bg-black/5 dark:hover:bg-white/10"
+            className="shrink-0 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted"
             aria-label="Schließen"
           >
             ✕
           </button>
         </div>
 
-        <div className="overflow-x-auto rounded-lg border border-black/10 dark:border-white/10">
+        <div className="overflow-x-auto rounded-lg border border-border">
           <table className="w-full text-sm">
             <tbody>
               {keys.map((key, i) => {
@@ -92,11 +92,11 @@ export function CharacterInputModal({
                     key={key}
                     className={
                       i % 2 === 0
-                        ? "bg-black/[0.02] dark:bg-white/[0.03]"
+                        ? "bg-muted"
                         : undefined
                     }
                   >
-                    <th className="w-1/4 px-4 py-2 text-left align-top font-medium whitespace-nowrap text-foreground/60">
+                    <th className="w-1/4 px-4 py-2 text-left align-top font-medium whitespace-nowrap text-muted-foreground">
                       {INPUT_LABELS[key]}
                     </th>
                     <td className="px-4 py-2 align-top whitespace-pre-wrap">

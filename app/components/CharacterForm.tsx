@@ -32,7 +32,7 @@ const EMPTY: CharacterInput = {
 };
 
 const inputClass =
-  "w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
+  "w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none transition focus:border-primary/50";
 
 function Field({
   label,
@@ -47,7 +47,7 @@ function Field({
     <label className="flex flex-col gap-1.5">
       <span className="text-sm font-medium">{label}</span>
       {children}
-      {hint && <span className="text-xs text-foreground/50">{hint}</span>}
+      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </label>
   );
 }
@@ -71,7 +71,7 @@ function DiceButton({
       disabled={disabled}
       aria-label={label}
       title={title}
-      className="shrink-0 rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+      className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
     >
       🎲
     </button>
@@ -104,7 +104,7 @@ function AiButton({
       disabled={disabled}
       aria-label={label}
       title={title}
-      className="shrink-0 rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+      className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
     >
       {busy ? "…" : "✨"}
     </button>
@@ -258,7 +258,7 @@ export function CharacterForm({
         e.preventDefault();
         onGenerate(form);
       }}
-      className="flex flex-col gap-5 rounded-xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.03]"
+      className="flex flex-col gap-5 rounded-xl border border-border bg-card p-6 shadow-sm"
     >
       {/*
         Ganz oben: die ganze Figur auf einmal würfeln. Öffnet ein Modal mit
@@ -272,7 +272,7 @@ export function CharacterForm({
           onClick={() => setRandomOpen(true)}
           disabled={loading}
           title="Das ganze Formular per KI ausfüllen – bereits ausgefüllte Felder bleiben erhalten"
-          className="rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+          className="rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
         >
           ✨ Zufälligen Charakter erzeugen
         </button>
@@ -312,7 +312,7 @@ export function CharacterForm({
             onClick={rollName}
             disabled={loading}
             title="Zufallsname passend zur Genre-Vorlage – sofort und ohne KI"
-            className="shrink-0 rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
           >
             🎲 Würfeln
           </button>
@@ -321,13 +321,13 @@ export function CharacterForm({
             onClick={suggestName}
             disabled={loading || namingAI}
             title="Namensvorschlag der KI, passend zu Herkunft, Setting, Beruf und Hintergrund"
-            className="shrink-0 rounded-md border border-black/15 px-3 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
           >
             {namingAI ? "Denkt nach …" : "✨ Zu den Angaben"}
           </button>
         </div>
         {nameError && (
-          <span className="text-xs text-red-600 dark:text-red-400">
+          <span className="text-xs text-destructive">
             {nameError}
           </span>
         )}
@@ -392,7 +392,7 @@ export function CharacterForm({
           />
         </div>
         {aiFieldError?.feld === "appearance" && (
-          <span className="text-xs text-red-600 dark:text-red-400">
+          <span className="text-xs text-destructive">
             {aiFieldError.msg}
           </span>
         )}
@@ -421,7 +421,7 @@ export function CharacterForm({
           />
         </div>
         {aiFieldError?.feld === "personality" && (
-          <span className="text-xs text-red-600 dark:text-red-400">
+          <span className="text-xs text-destructive">
             {aiFieldError.msg}
           </span>
         )}
@@ -460,7 +460,7 @@ export function CharacterForm({
             />
           </div>
           {aiFieldError?.feld === "occupation" && (
-            <span className="text-xs text-red-600 dark:text-red-400">
+            <span className="text-xs text-destructive">
               {aiFieldError.msg}
             </span>
           )}
@@ -490,7 +490,7 @@ export function CharacterForm({
           />
         </div>
         {aiFieldError?.feld === "background" && (
-          <span className="text-xs text-red-600 dark:text-red-400">
+          <span className="text-xs text-destructive">
             {aiFieldError.msg}
           </span>
         )}
@@ -509,7 +509,7 @@ export function CharacterForm({
         <button
           type="submit"
           disabled={loading}
-          className="rounded-md bg-foreground px-5 py-2.5 text-sm font-medium text-background transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading ? "Erstelle Charakter …" : "Charakter erstellen"}
         </button>
@@ -517,7 +517,7 @@ export function CharacterForm({
           type="button"
           onClick={reset}
           disabled={loading}
-          className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
+          className="text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-50"
         >
           Zurücksetzen
         </button>

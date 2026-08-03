@@ -160,7 +160,7 @@ export function ScenarioImageModal({
       {...backdrop}
     >
       <div
-        className="my-8 w-full max-w-4xl rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
+        className="my-8 w-full max-w-4xl rounded-xl border border-border bg-background p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-1 flex items-start justify-between gap-4">
@@ -172,13 +172,13 @@ export function ScenarioImageModal({
               e.stopPropagation();
               onClose();
             }}
-            className="shrink-0 rounded-md px-2 py-1 text-foreground/60 transition hover:bg-black/5 dark:hover:bg-white/10"
+            className="shrink-0 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted"
             aria-label="Bilder-Ansicht schließen"
           >
             ✕
           </button>
         </div>
-        <p className="mb-6 text-sm text-foreground/60">
+        <p className="mb-6 text-sm text-muted-foreground">
           {images.length === 0
             ? "Noch keine Weltbilder – ein Establishing-Shot der Welt, ohne Figuren."
             : `${images.length} ${images.length === 1 ? "Bild" : "Bilder"} – das primäre wird überall groß angezeigt.`}
@@ -192,7 +192,7 @@ export function ScenarioImageModal({
                 className={`flex flex-col overflow-hidden rounded-xl border transition ${
                   img.isPrimary
                     ? "border-foreground/60 ring-2 ring-foreground/20"
-                    : "border-black/10 dark:border-white/10"
+                    : "border-border"
                 }`}
               >
                 <button
@@ -200,7 +200,7 @@ export function ScenarioImageModal({
                   onClick={() => vollbildOeffnen(img.id)}
                   disabled={loadingId !== null}
                   aria-label="Bild in voller Größe anzeigen"
-                  className="relative aspect-square w-full cursor-zoom-in bg-black/[0.03] dark:bg-white/[0.03]"
+                  className="relative aspect-square w-full cursor-zoom-in bg-muted"
                 >
                   {img.thumbnail ? (
                     <Image
@@ -217,7 +217,7 @@ export function ScenarioImageModal({
                     </span>
                   )}
                   {img.isPrimary && (
-                    <span className="absolute top-2 left-2 rounded-md bg-foreground px-2 py-0.5 text-xs font-medium text-background">
+                    <span className="absolute top-2 left-2 rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                       Primär
                     </span>
                   )}
@@ -229,7 +229,7 @@ export function ScenarioImageModal({
                 </button>
 
                 <div className="flex flex-col gap-1.5 p-2">
-                  <span className="text-xs text-foreground/50">
+                  <span className="text-xs text-muted-foreground">
                     {new Date(img.createdAt).toLocaleDateString("de-DE")}
                   </span>
                   <button
@@ -238,7 +238,7 @@ export function ScenarioImageModal({
                       run(() => setPrimaryScenarioImage(scenarioId, img.id))
                     }
                     disabled={busy || img.isPrimary}
-                    className="w-full rounded-md border border-black/15 px-2 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                    className="w-full rounded-md border border-border px-2 py-1 text-xs font-medium transition hover:bg-muted disabled:opacity-40"
                   >
                     {img.isPrimary ? "Primär ✓" : "Als primär"}
                   </button>
@@ -248,7 +248,7 @@ export function ScenarioImageModal({
                       onClick={() => exportieren(img.id)}
                       disabled={exportingId !== null}
                       title="Dieses Bild in voller Auflösung herunterladen"
-                      className="flex-1 rounded-md border border-black/15 px-2 py-1 text-xs font-medium transition hover:bg-black/[0.04] disabled:opacity-40 dark:border-white/15 dark:hover:bg-white/[0.06]"
+                      className="flex-1 rounded-md border border-border px-2 py-1 text-xs font-medium transition hover:bg-muted disabled:opacity-40"
                     >
                       {exportingId === img.id ? "Lade …" : "Exportieren"}
                     </button>
@@ -257,7 +257,7 @@ export function ScenarioImageModal({
                       onClick={() => loeschen(img.id)}
                       disabled={busy}
                       aria-label="Bild löschen"
-                      className="rounded-md border border-red-500/40 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-500/10 disabled:opacity-40 dark:text-red-400"
+                      className="rounded-md border border-destructive/40 px-2 py-1 text-xs font-medium text-destructive transition hover:bg-destructive/10 disabled:opacity-40"
                     >
                       Löschen
                     </button>
@@ -269,22 +269,22 @@ export function ScenarioImageModal({
         )}
 
         {/* Neues Bild ------------------------------------------------------ */}
-        <div className="border-t border-black/10 pt-5 dark:border-white/10">
-          <h3 className="mb-3 text-sm font-semibold tracking-wide text-foreground/60 uppercase">
+        <div className="border-t border-border pt-5">
+          <h3 className="mb-3 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Neues Weltbild
           </h3>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="flex flex-col gap-3">
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-foreground/60">
+                <span className="text-xs font-medium text-muted-foreground">
                   Stil
                 </span>
                 <select
                   value={stil}
                   onChange={(e) => setStil(e.target.value)}
                   disabled={busy}
-                  className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50"
                 >
                   {IMAGE_STYLES.map((s) => (
                     <option key={s.value} value={s.value}>
@@ -295,7 +295,7 @@ export function ScenarioImageModal({
               </label>
 
               <label
-                className="flex cursor-pointer items-start gap-2 text-sm text-foreground/70"
+                className="flex cursor-pointer items-start gap-2 text-sm text-muted-foreground"
                 title="An (Standard): das Weltbild zeigt keine Figuren. Aus: das Modell darf Menschen in die Szene setzen. Wird nicht gespeichert."
               >
                 <input
@@ -311,7 +311,7 @@ export function ScenarioImageModal({
 
             <div className="flex flex-col gap-3">
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-foreground/60">
+                <span className="text-xs font-medium text-muted-foreground">
                   Stichwörter (optional)
                 </span>
                 <input
@@ -321,7 +321,7 @@ export function ScenarioImageModal({
                   maxLength={1000}
                   placeholder="z. B. Regen, Dämmerung"
                   title="Zusätzliche Wünsche fürs Bild – Perspektive, Lichtstimmung, Wetter. Wird nicht gespeichert."
-                  className="w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none transition focus:border-primary/50 disabled:opacity-50"
                 />
               </label>
 
@@ -329,13 +329,13 @@ export function ScenarioImageModal({
                 type="button"
                 onClick={erzeugen}
                 disabled={busy}
-                className="w-full rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
               >
                 {busy ? "Einen Moment …" : "✨ Bild erzeugen"}
               </button>
 
               <label
-                className={`block w-full cursor-pointer rounded-md border border-black/15 px-4 py-2 text-center text-sm font-medium transition hover:bg-black/[0.04] dark:border-white/15 dark:hover:bg-white/[0.06] ${
+                className={`block w-full cursor-pointer rounded-md border border-border px-4 py-2 text-center text-sm font-medium transition hover:bg-muted ${
                   busy ? "pointer-events-none opacity-50" : ""
                 }`}
               >
@@ -350,14 +350,14 @@ export function ScenarioImageModal({
                 />
               </label>
 
-              <p className="text-xs text-foreground/50">
+              <p className="text-xs text-muted-foreground">
                 Neue Bilder werden automatisch das Primärbild.
               </p>
             </div>
           </div>
 
           {fehler && (
-            <p className="mt-3 text-xs text-red-600 dark:text-red-400">
+            <p className="mt-3 text-xs text-destructive">
               {fehler}
             </p>
           )}

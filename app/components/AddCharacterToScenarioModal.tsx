@@ -132,12 +132,12 @@ export function AddCharacterToScenarioModal({
     >
       <div
         ref={dialog}
-        className="my-8 flex w-full max-w-2xl flex-col rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/10"
+        className="my-8 flex w-full max-w-2xl flex-col rounded-xl border border-border bg-background p-6 shadow-xl"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold">Charakter hinzufügen</h2>
-            <p className="mt-1 text-sm text-foreground/60">
+            <p className="mt-1 text-sm text-muted-foreground">
               Nur Charaktere, die diesem Szenario noch nicht angehören.
             </p>
           </div>
@@ -145,7 +145,7 @@ export function AddCharacterToScenarioModal({
             type="button"
             onClick={onClose}
             aria-label="Schließen"
-            className="rounded-md px-2 py-1 text-xl leading-none text-foreground/50 transition hover:bg-black/[0.04] hover:text-foreground dark:hover:bg-white/[0.06]"
+            className="rounded-md px-2 py-1 text-xl leading-none text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             ✕
           </button>
@@ -166,7 +166,7 @@ export function AddCharacterToScenarioModal({
               eigenständig; spätere Änderungen wirken nicht auf das Original.
             </p>
             {fehler && (
-              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+              <p className="mt-2 text-xs text-destructive">
                 {fehler}
               </p>
             )}
@@ -175,7 +175,7 @@ export function AddCharacterToScenarioModal({
                 type="button"
                 onClick={() => setBestaetigung(null)}
                 disabled={busyId !== null}
-                className="text-sm text-foreground/60 transition hover:text-foreground disabled:opacity-50"
+                className="text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-50"
               >
                 Zurück
               </button>
@@ -183,7 +183,7 @@ export function AddCharacterToScenarioModal({
                 type="button"
                 onClick={() => kopieren(bestaetigung)}
                 disabled={busyId !== null}
-                className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
               >
                 {busyId ? "Lege Kopie an …" : "Kopie anlegen"}
               </button>
@@ -197,26 +197,26 @@ export function AddCharacterToScenarioModal({
               onChange={(e) => setSuche(e.target.value)}
               placeholder="Nach Name suchen …"
               aria-label="Charaktere nach Name durchsuchen"
-              className="mt-4 w-full rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40"
+              className="mt-4 w-full rounded-md border border-border bg-card px-3 py-2 text-sm outline-none transition focus:border-primary/50"
             />
 
             {fehler && (
-              <p className="mt-3 text-xs text-red-600 dark:text-red-400">
+              <p className="mt-3 text-xs text-destructive">
                 {fehler}
               </p>
             )}
 
             <div className="mt-4 max-h-[55vh] overflow-y-auto">
               {laden ? (
-                <p className="py-8 text-center text-sm text-foreground/60">
+                <p className="py-8 text-center text-sm text-muted-foreground">
                   Lade Charaktere …
                 </p>
               ) : ladeFehler ? (
-                <p className="py-8 text-center text-sm text-red-600 dark:text-red-400">
+                <p className="py-8 text-center text-sm text-destructive">
                   {ladeFehler}
                 </p>
               ) : gefiltert.length === 0 ? (
-                <p className="py-8 text-center text-sm text-foreground/60">
+                <p className="py-8 text-center text-sm text-muted-foreground">
                   {kandidaten.length === 0
                     ? "Alle vorhandenen Charaktere gehören bereits zu diesem Szenario."
                     : "Kein Charakter passt zur Suche."}
@@ -234,9 +234,9 @@ export function AddCharacterToScenarioModal({
                           onClick={() => waehlen(c)}
                           disabled={busyId !== null}
                           title={c.character.kurzbeschreibung}
-                          className="flex w-full items-center gap-3 rounded-lg border border-black/10 bg-white p-2 text-left transition hover:border-black/25 disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/25"
+                          className="flex w-full items-center gap-3 rounded-lg border border-border bg-card p-2 text-left transition hover:border-border disabled:opacity-50"
                         >
-                          <div className="relative aspect-square w-12 shrink-0 overflow-hidden rounded-md bg-black/[0.03] dark:bg-white/[0.03]">
+                          <div className="relative aspect-square w-12 shrink-0 overflow-hidden rounded-md bg-muted">
                             {preview ? (
                               <Image
                                 src={preview}
@@ -268,7 +268,7 @@ export function AddCharacterToScenarioModal({
                               Kopie
                             </span>
                           ) : (
-                            <span className="shrink-0 text-xs text-foreground/40">
+                            <span className="shrink-0 text-xs text-muted-foreground">
                               {busy ? "…" : "hinzufügen"}
                             </span>
                           )}

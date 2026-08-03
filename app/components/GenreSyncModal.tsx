@@ -53,7 +53,7 @@ export function GenreSyncModal({
       {...backdrop}
     >
       <div
-        className="my-8 w-full max-w-md rounded-xl border border-black/10 bg-background p-6 shadow-xl dark:border-white/15"
+        className="my-8 w-full max-w-md rounded-xl border border-border bg-background p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -66,25 +66,25 @@ export function GenreSyncModal({
               if (!busy) onClose();
             }}
             disabled={busy}
-            className="shrink-0 rounded-md px-2 py-1 text-foreground/60 transition hover:bg-black/5 disabled:opacity-50 dark:hover:bg-white/10"
+            className="shrink-0 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted disabled:opacity-50"
             aria-label="Schließen"
           >
             ✕
           </button>
         </div>
 
-        <p className="text-sm text-foreground/70">
+        <p className="text-sm text-muted-foreground">
           Das Genre des Szenarios wurde auf <strong>{genreLabel}</strong>{" "}
           geändert. Soll dieses Genre auch auf {anzahl} zugeordnete {figurWort}{" "}
           mit abweichendem Genre übertragen werden?
         </p>
-        <p className="mt-2 text-xs text-foreground/50">
+        <p className="mt-2 text-xs text-muted-foreground">
           Das Genre der Figuren wird sofort gespeichert. Ihr Beschreibungstext
           und ihre Merkmale bleiben unverändert.
         </p>
 
         {fehler && (
-          <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+          <p className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {fehler}
           </p>
         )}
@@ -94,7 +94,7 @@ export function GenreSyncModal({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="w-full rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
           >
             {busy
               ? "Übertrage …"
@@ -104,7 +104,7 @@ export function GenreSyncModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="w-full rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/[0.06]"
+            className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
           >
             Nein, nur das Szenario
           </button>
