@@ -782,40 +782,16 @@ export function CharacterDetailModal({
           <TraitsTable traits={edited.merkmale} onChange={setTrait} compact />
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs text-muted-foreground tabular-nums">
-              {new Date(c.createdAt).toLocaleDateString("de-DE")}
-            </span>
+        <div className="mt-6 border-t border-border pt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+            {new Date(c.createdAt).toLocaleDateString("de-DE")}
+          </span>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             {/*
-              Die Gegenrichtung zu „+ Charakter für dieses Szenario" in der
-              Szenario-Detailansicht: dort prägt eine Welt eine neue Figur,
-              hier spannt eine Figur die Welt auf.
-            */}
-            <Button
-              variant="secondary"
-              onClick={() => setScenarioDraftOpen(true)}
-              title="Leitet aus Beschreibung, Merkmalen und Ansatzpunkten ein neues Szenario ab und ordnet den Charakter ihm zu"
-            >
-              <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
-              Szenario ableiten
-            </Button>
-            <Button variant="secondary" onClick={() => setInputOpen(true)}>
-              <FileText size={16} strokeWidth={1.75} aria-hidden="true" />
-              Vorgaben anzeigen
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={exportPdf}
-              disabled={exporting}
-            >
-              <Download size={16} strokeWidth={1.75} aria-hidden="true" />
-              {exporting ? "Erstelle PDF …" : "Als PDF exportieren"}
-            </Button>
-            {/*
-              „mit Bild" (Default an) direkt vor dem Datei-Export: Ohne Häkchen
-              geht der Charakter **ohne Bilder** in die Datei – kleiner und
-              schneller. Betrifft nur den Datei-Export, nicht das PDF.
+              „mit Bild" (Default an) gehört zum Datei-Export: Ohne Häkchen geht
+              der Charakter **ohne Bilder** in die Datei. Betrifft nur den
+              Datei-Export, nicht das PDF.
             */}
             <label
               className="flex items-center gap-1.5 text-xs text-muted-foreground"
@@ -832,26 +808,63 @@ export function CharacterDetailModal({
             </label>
             <Button
               variant="secondary"
+              size="sm"
               onClick={exportJson}
               disabled={exportingJson}
               title="Charakter als Datei – lässt sich anderswo wieder importieren. Mit oder ohne Bild je nach Häkchen."
             >
-              <Download size={16} strokeWidth={1.75} aria-hidden="true" />
+              <Download size={15} strokeWidth={1.75} aria-hidden="true" />
               {exportingJson
                 ? exportMitBild
                   ? "Sammle Bilder …"
                   : "Exportiere …"
-                : "Als Datei exportieren"}
+                : "Datei"}
             </Button>
-            <Button variant="danger" onClick={onDelete}>
-              <Trash2 size={16} strokeWidth={1.75} aria-hidden="true" />
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={exportPdf}
+              disabled={exporting}
+            >
+              <Download size={15} strokeWidth={1.75} aria-hidden="true" />
+              {exporting ? "PDF …" : "PDF"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setInputOpen(true)}
+            >
+              <FileText size={15} strokeWidth={1.75} aria-hidden="true" />
+              Vorgaben
+            </Button>
+            {/*
+              Die Gegenrichtung zu „+ Charakter für dieses Szenario": dort prägt
+              eine Welt eine neue Figur, hier spannt eine Figur die Welt auf.
+            */}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setScenarioDraftOpen(true)}
+              title="Leitet aus Beschreibung, Merkmalen und Ansatzpunkten ein neues Szenario ab und ordnet den Charakter ihm zu"
+            >
+              <Sparkles size={15} strokeWidth={1.75} aria-hidden="true" />
+              Szenario ableiten
+            </Button>
+            {/* Destruktiv abgesetzt (eigener Trenner). */}
+            <span
+              aria-hidden="true"
+              className="mx-1 hidden h-6 w-px bg-border sm:block"
+            />
+            <Button variant="danger" size="sm" onClick={onDelete}>
+              <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
               Löschen
             </Button>
           </div>
+          </div>
           {exportError && (
-            <span className="w-full text-right text-xs text-destructive">
+            <p className="mt-2 text-right text-xs text-destructive">
               {exportError}
-            </span>
+            </p>
           )}
         </div>
       </div>

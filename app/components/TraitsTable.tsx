@@ -35,16 +35,21 @@ export function TraitsTable({
                 >
                   {TRAIT_LABELS[key]}
                 </th>
-                <td className={`px-4 py-0.5 ${numeric ? "tabular-nums" : ""}`}>
+                <td
+                  className={`px-2 py-0.5 ${numeric ? "tabular-nums" : ""}`}
+                >
                   {onChange ? (
+                    // Randlos wie die übrigen Inline-Editoren der App: Rahmen und
+                    // Fläche erscheinen erst bei Hover/Fokus, damit die Tabelle
+                    // als Tabelle liest statt als Reihe umrandeter Pillen.
                     <input
                       value={String(traits[key])}
                       onChange={(e) => onChange(key, e.target.value)}
                       inputMode={numeric ? "numeric" : undefined}
-                      className={`w-full rounded-md border border-border bg-background px-2 py-0.5 ${inputSize} ${numeric ? "tabular-nums" : ""} text-foreground outline-none transition focus:border-primary/50`}
+                      className={`w-full rounded-md border border-transparent bg-transparent px-2 py-1 ${inputSize} ${numeric ? "tabular-nums" : ""} text-foreground outline-none transition hover:border-border focus:border-primary/50 focus:bg-background`}
                     />
                   ) : (
-                    String(traits[key])
+                    <span className="px-2">{String(traits[key])}</span>
                   )}
                 </td>
               </tr>
