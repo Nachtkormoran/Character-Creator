@@ -31,6 +31,18 @@ import {
 import { downloadBlob, safeFileName } from "@/lib/download";
 import { scenarioFileName } from "@/lib/scenarioFile";
 import { ladeRunParams, speichereRunParams } from "@/lib/scenarioRunParams";
+import {
+  Copy,
+  Images,
+  Mountain,
+  Pencil,
+  Plus,
+  Search,
+  Sparkles,
+  Star,
+  User,
+  X,
+} from "../../components/ui/icons";
 import { GENRE_TEMPLATES } from "@/lib/templates";
 import {
   DEFAULT_ARC_FORMAT,
@@ -1692,9 +1704,13 @@ export default function ScenarioDetailPage({
             }
             title="Namen aus Beschreibung, Ort, Zeit und Regeln erzeugen"
             aria-label="Namen per KI erzeugen"
-            className="shrink-0 rounded-md border border-border px-2.5 py-1.5 text-lg transition hover:bg-muted disabled:opacity-40"
+            className="inline-flex shrink-0 items-center justify-center rounded-md border border-border px-2.5 py-2 transition hover:bg-muted disabled:opacity-40"
           >
-            {nameBusy ? "…" : "✨"}
+            {nameBusy ? (
+              <span className="animate-pulse">…</span>
+            ) : (
+              <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+            )}
           </button>
         </div>
         {nameFehler && (
@@ -1801,8 +1817,8 @@ export default function ScenarioDetailPage({
                   unoptimized
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-4xl opacity-25">
-                  🏞️
+                <div className="flex h-full items-center justify-center text-muted-foreground">
+                  <Mountain size={44} strokeWidth={1.25} aria-hidden="true" />
                 </div>
               )}
               {bilder.length > 1 && (
@@ -1815,11 +1831,19 @@ export default function ScenarioDetailPage({
             <button
               type="button"
               onClick={() => setBildModalOffen(true)}
-              className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
             >
-              {bilder.length > 0
-                ? "🖼️ Weltbilder verwalten"
-                : "🏞️ Weltbild hinzufügen"}
+              {bilder.length > 0 ? (
+                <>
+                  <Images size={16} strokeWidth={1.75} aria-hidden="true" />
+                  Weltbilder verwalten
+                </>
+              ) : (
+                <>
+                  <Mountain size={16} strokeWidth={1.75} aria-hidden="true" />
+                  Weltbild hinzufügen
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -1939,8 +1963,8 @@ export default function ScenarioDetailPage({
                           unoptimized
                         />
                       ) : (
-                        <div className="flex h-full items-center justify-center text-2xl opacity-30">
-                          🧑
+                        <div className="flex h-full items-center justify-center text-muted-foreground">
+                          <User size={28} strokeWidth={1.25} aria-hidden="true" />
                         </div>
                       )}
                     </div>
@@ -1968,13 +1992,18 @@ export default function ScenarioDetailPage({
                         ? "Protagonist – klicken zum Aufheben"
                         : "Als Protagonist markieren (der Handlungsentwurf dreht sich dann um die Protagonisten)"
                     }
-                    className={`absolute right-1 top-1 rounded-full bg-black/45 px-1.5 py-0.5 text-sm leading-none backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-50 ${
+                    className={`absolute right-1 top-1 inline-flex items-center justify-center rounded-full bg-black/45 p-1.5 leading-none backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-50 ${
                       c.isProtagonist
                         ? "text-amber-300"
                         : "text-white/75 hover:text-amber-200"
                     }`}
                   >
-                    {c.isProtagonist ? "⭐" : "☆"}
+                    <Star
+                      size={15}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                      className={c.isProtagonist ? "fill-current" : ""}
+                    />
                   </button>
                 </div>
               );
@@ -2140,7 +2169,14 @@ export default function ScenarioDetailPage({
                           : "text-foreground/30 hover:text-amber-500"
                     }`}
                   >
-                    {meta.favorit ? "⭐" : "☆"}
+                    <Star
+                      size={15}
+                      strokeWidth={1.75}
+                      aria-hidden="true"
+                      className={
+                        meta.favorit ? "fill-amber-400 text-amber-400" : ""
+                      }
+                    />
                   </button>
                   {/* Titel ändern – nur am aktiven Reiter, um die Leiste ruhig zu halten. */}
                   {i === aktiv && (
@@ -2152,7 +2188,7 @@ export default function ScenarioDetailPage({
                       aria-label={`Titel von Entwurf ${i + 1} ändern`}
                       className="flex items-center px-1 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40"
                     >
-                      ✎
+                      <Pencil size={14} strokeWidth={1.75} aria-hidden="true" />
                     </button>
                   )}
                   {loeschbar && (
@@ -2168,7 +2204,7 @@ export default function ScenarioDetailPage({
                           : "hover:text-destructive dark:hover:text-red-400"
                       }`}
                     >
-                      ✕
+                      <X size={14} strokeWidth={1.75} aria-hidden="true" />
                     </button>
                   )}
                 </span>
@@ -2183,9 +2219,10 @@ export default function ScenarioDetailPage({
               onClick={() => varianteKopieren(aktiv)}
               disabled={saving || generatingField !== null}
               title="Den aktiven Handlungsentwurf kopieren – als eigenständige neue Variante"
-              className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-40"
             >
-              ⧉ Kopieren
+              <Copy size={13} strokeWidth={1.75} aria-hidden="true" />
+              Kopieren
             </button>
             {/*
               Leeren Entwurf anhängen – der Gegenpol zu „✨ Neu erzeugen": kein
@@ -2197,9 +2234,10 @@ export default function ScenarioDetailPage({
               onClick={leerenEntwurfHinzufuegen}
               disabled={saving || generatingField !== null}
               title="Einen leeren Handlungsentwurf zum Selbstschreiben anlegen"
-              className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-40"
             >
-              ➕ Leerer Entwurf
+              <Plus size={13} strokeWidth={1.75} aria-hidden="true" />
+              Leerer Entwurf
             </button>
             {/*
               Bei genau einem Entwurf ist die Leiste keine Umschaltung, sondern
@@ -2454,9 +2492,16 @@ export default function ScenarioDetailPage({
                 onClick={personenSuchen}
                 disabled={suchend}
                 title="Sucht im Handlungsentwurf nach Personen, die dem Szenario noch nicht zugeordnet sind"
-                className="rounded-md border border-border px-2.5 py-1 text-xs font-medium transition hover:bg-muted disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium transition hover:bg-muted disabled:opacity-50"
               >
-                {suchend ? "Sucht …" : "🔍 Personen im Entwurf suchen"}
+                {suchend ? (
+                  "Sucht …"
+                ) : (
+                  <>
+                    <Search size={13} strokeWidth={1.75} aria-hidden="true" />
+                    Personen im Entwurf suchen
+                  </>
+                )}
               </button>
               {personen === null && !suchend && (
                 <span className="text-xs text-muted-foreground">
