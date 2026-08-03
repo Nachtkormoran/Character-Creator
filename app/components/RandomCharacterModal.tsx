@@ -1,5 +1,7 @@
 "use client";
 
+import { Sparkles } from "./ui/icons";
+
 import { useEffect, useRef, useState } from "react";
 import { generateRandomInput } from "@/lib/client";
 import type { CharacterInput } from "@/lib/schema";
@@ -141,9 +143,16 @@ export function RandomCharacterModal({
             type="button"
             onClick={erzeugen}
             disabled={busy}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
           >
-            {busy ? "Erzeuge …" : "✨ Formular ausfüllen"}
+            {busy ? (
+              "Erzeuge …"
+            ) : (
+              <>
+                <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+                Formular ausfüllen
+              </>
+            )}
           </button>
         </div>
       </div>

@@ -13,6 +13,7 @@ import {
   GENRE_TEMPLATES,
 } from "@/lib/templates";
 import { RandomCharacterModal } from "./RandomCharacterModal";
+import { Dices, Loader2, Sparkles } from "./ui/icons";
 
 const EMPTY: CharacterInput = {
   genre: DEFAULT_GENRE,
@@ -71,9 +72,9 @@ function DiceButton({
       disabled={disabled}
       aria-label={label}
       title={title}
-      className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
+      className="inline-flex shrink-0 items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
     >
-      🎲
+      <Dices size={16} strokeWidth={1.75} aria-hidden="true" />
     </button>
   );
 }
@@ -104,9 +105,13 @@ function AiButton({
       disabled={disabled}
       aria-label={label}
       title={title}
-      className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
+      className="inline-flex shrink-0 items-center justify-center rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
     >
-      {busy ? "…" : "✨"}
+      {busy ? (
+        <Loader2 size={16} className="animate-spin" aria-hidden="true" />
+      ) : (
+        <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+      )}
     </button>
   );
 }
@@ -272,9 +277,10 @@ export function CharacterForm({
           onClick={() => setRandomOpen(true)}
           disabled={loading}
           title="Das ganze Formular per KI ausfüllen – bereits ausgefüllte Felder bleiben erhalten"
-          className="rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
         >
-          ✨ Zufälligen Charakter erzeugen
+          <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+          Zufälligen Charakter erzeugen
         </button>
       </div>
 
@@ -312,18 +318,20 @@ export function CharacterForm({
             onClick={rollName}
             disabled={loading}
             title="Zufallsname passend zur Genre-Vorlage – sofort und ohne KI"
-            className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
+            className="inline-flex shrink-0 items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
           >
-            🎲 Würfeln
+            <Dices size={16} strokeWidth={1.75} aria-hidden="true" />
+            Würfeln
           </button>
           <button
             type="button"
             onClick={suggestName}
             disabled={loading || namingAI}
             title="Namensvorschlag der KI, passend zu Herkunft, Setting, Beruf und Hintergrund"
-            className="shrink-0 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
+            className="inline-flex shrink-0 items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
           >
-            {namingAI ? "Denkt nach …" : "✨ Zu den Angaben"}
+            <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+            {namingAI ? "Denkt nach …" : "Zu den Angaben"}
           </button>
         </div>
         {nameError && (

@@ -12,6 +12,7 @@ import {
 import { primaryImage, type StoredScenario } from "@/lib/serialize";
 import { genreLabel } from "@/lib/templates";
 import { StoryReaderModal } from "../components/StoryReaderModal";
+import { Star } from "../components/ui/icons";
 
 /**
  * **Bibliothek** – die lesefertigen Geschichten, unabhängig von Charakteren und
@@ -352,8 +353,15 @@ function BuchKarte({
 
         {/* Favorit als kleines Eck-Zeichen. */}
         {buch.meta.favorit && (
-          <span className="absolute top-2.5 right-2.5 text-sm drop-shadow" title="Favorit">
-            ⭐
+          <span
+            className="absolute top-2.5 right-2.5 drop-shadow"
+            title="Favorit"
+          >
+            <Star
+              size={16}
+              className="fill-amber-400 text-amber-400"
+              aria-hidden="true"
+            />
           </span>
         )}
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { X } from "./ui/icons";
+
 import { useEffect } from "react";
 import { useBackdropClose } from "./useBackdropClose";
 
@@ -66,10 +68,10 @@ export function GenreSyncModal({
               if (!busy) onClose();
             }}
             disabled={busy}
-            className="shrink-0 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted disabled:opacity-50"
             aria-label="Schließen"
           >
-            ✕
+            <X size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
 

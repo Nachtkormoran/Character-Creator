@@ -1,5 +1,7 @@
 "use client";
 
+import { X } from "./ui/icons";
+
 import { useEffect, useRef } from "react";
 import {
   INPUT_LABELS,
@@ -75,10 +77,10 @@ export function CharacterInputModal({
               e.stopPropagation();
               onClose();
             }}
-            className="shrink-0 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted"
             aria-label="Schließen"
           >
-            ✕
+            <X size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { User, X } from "./ui/icons";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { cloneCharacter, listCharacters, updateCharacterScenario } from "@/lib/client";
@@ -145,9 +147,9 @@ export function AddCharacterToScenarioModal({
             type="button"
             onClick={onClose}
             aria-label="Schließen"
-            className="rounded-md px-2 py-1 text-xl leading-none text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
-            ✕
+            <X size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
 
@@ -247,8 +249,12 @@ export function AddCharacterToScenarioModal({
                                 unoptimized
                               />
                             ) : (
-                              <div className="flex h-full items-center justify-center text-lg opacity-30">
-                                🧑
+                              <div className="flex h-full items-center justify-center text-muted-foreground">
+                                <User
+                                  size={22}
+                                  strokeWidth={1.25}
+                                  aria-hidden="true"
+                                />
                               </div>
                             )}
                           </div>

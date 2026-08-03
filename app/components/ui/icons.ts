@@ -27,9 +27,15 @@ export {
   Moon,
   Monitor,
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
   Loader2,
   AlertTriangle,
   CheckCircle2,
+  Check,
+  Mountain,
+  ListTree,
+  BookText,
 } from "lucide-react";
 
 /** Einheitliche Icon-Größe (px) und Strichstärke fürs ganze UI. */

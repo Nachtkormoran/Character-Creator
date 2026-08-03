@@ -1,5 +1,7 @@
 "use client";
 
+import { Mountain, Sparkles, X } from "./ui/icons";
+
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
@@ -172,10 +174,10 @@ export function ScenarioImageModal({
               e.stopPropagation();
               onClose();
             }}
-            className="shrink-0 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted"
             aria-label="Bilder-Ansicht schließen"
           >
-            ✕
+            <X size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
         <p className="mb-6 text-sm text-muted-foreground">
@@ -212,8 +214,8 @@ export function ScenarioImageModal({
                       unoptimized
                     />
                   ) : (
-                    <span className="flex h-full items-center justify-center text-3xl opacity-30">
-                      🏞️
+                    <span className="flex h-full items-center justify-center text-muted-foreground">
+                      <Mountain size={36} strokeWidth={1.25} aria-hidden="true" />
                     </span>
                   )}
                   {img.isPrimary && (
@@ -329,9 +331,16 @@ export function ScenarioImageModal({
                 type="button"
                 onClick={erzeugen}
                 disabled={busy}
-                className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
               >
-                {busy ? "Einen Moment …" : "✨ Bild erzeugen"}
+                {busy ? (
+                  "Einen Moment …"
+                ) : (
+                  <>
+                    <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+                    Bild erzeugen
+                  </>
+                )}
               </button>
 
               <label

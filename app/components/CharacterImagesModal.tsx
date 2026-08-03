@@ -1,5 +1,7 @@
 "use client";
 
+import { User, X } from "./ui/icons";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
@@ -239,10 +241,10 @@ export function CharacterImagesModal({
           </h2>
           <button
             onClick={onClose}
-            className="shrink-0 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted"
             aria-label="Bilder-Ansicht schließen"
           >
-            ✕
+            <X size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
         <p className="mb-6 text-sm text-muted-foreground">
@@ -279,8 +281,8 @@ export function CharacterImagesModal({
                       unoptimized
                     />
                   ) : (
-                    <span className="flex h-full items-center justify-center text-3xl opacity-30">
-                      🧑
+                    <span className="flex h-full items-center justify-center text-muted-foreground">
+                      <User size={36} strokeWidth={1.25} aria-hidden="true" />
                     </span>
                   )}
                   {img.isPrimary && (
@@ -472,10 +474,10 @@ export function CharacterImagesModal({
               <button
                 type="button"
                 onClick={() => setOwnPicker(false)}
-                className="shrink-0 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted"
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted"
                 aria-label="Auswahl schließen"
               >
-                ✕
+                <X size={18} strokeWidth={1.75} aria-hidden="true" />
               </button>
             </div>
             <p className="mb-4 text-sm text-muted-foreground">
@@ -502,8 +504,8 @@ export function CharacterImagesModal({
                       unoptimized
                     />
                   ) : (
-                    <span className="flex h-full items-center justify-center text-3xl opacity-30">
-                      🧑
+                    <span className="flex h-full items-center justify-center text-muted-foreground">
+                      <User size={36} strokeWidth={1.25} aria-hidden="true" />
                     </span>
                   )}
                   {img.isPrimary && (

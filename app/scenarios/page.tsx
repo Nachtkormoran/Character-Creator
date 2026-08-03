@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { Sparkles } from "../components/ui/icons";
 import {
   createScenario,
   generateScenarioDescription,
@@ -396,9 +397,10 @@ export default function ScenariosPage() {
               onClick={() => setRandomOpen(true)}
               disabled={saving}
               title="Das ganze Formular per KI ausfüllen – bereits ausgefüllte Felder bleiben erhalten"
-              className="rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
             >
-              ✨ Zufälliges Szenario
+              <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+              Zufälliges Szenario
             </button>
           </div>
 

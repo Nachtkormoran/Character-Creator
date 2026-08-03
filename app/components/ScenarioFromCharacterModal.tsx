@@ -1,5 +1,7 @@
 "use client";
 
+import { Sparkles, X } from "./ui/icons";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createScenario, generateScenarioFromCharacter } from "@/lib/client";
@@ -245,10 +247,10 @@ export function ScenarioFromCharacterModal({
               e.stopPropagation();
               onClose();
             }}
-            className="shrink-0 rounded-md px-2 py-1 text-muted-foreground transition hover:bg-muted"
+            className="inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted"
             aria-label="Schließen"
           >
-            ✕
+            <X size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
 
@@ -405,9 +407,20 @@ export function ScenarioFromCharacterModal({
                           ? "Mit Würfel-Beispielen als Stilvorlage"
                           : "Ohne Würfel-Beispiele"
                       } (umstellen: Dialog schließen und neu öffnen).`}
-                      className="rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
+                      className="inline-flex items-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
                     >
-                      {busy ? "Entwirft …" : "✨ Neu ableiten"}
+                      {busy ? (
+                        "Entwirft …"
+                      ) : (
+                        <>
+                          <Sparkles
+                            size={16}
+                            strokeWidth={1.75}
+                            aria-hidden="true"
+                          />
+                          Neu ableiten
+                        </>
+                      )}
                     </button>
                   </>
                 ) : (
@@ -415,9 +428,20 @@ export function ScenarioFromCharacterModal({
                     onClick={() => void ableiten()}
                     disabled={busy || saving}
                     title="Fragt das Modell – kostet einen Modellaufruf"
-                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                   >
-                    {busy ? "Entwirft …" : "✨ Ableiten"}
+                    {busy ? (
+                      "Entwirft …"
+                    ) : (
+                      <>
+                        <Sparkles
+                          size={16}
+                          strokeWidth={1.75}
+                          aria-hidden="true"
+                        />
+                        Ableiten
+                      </>
+                    )}
                   </button>
                 )}
                 <button
