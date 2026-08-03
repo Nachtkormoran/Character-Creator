@@ -76,7 +76,7 @@ export default function ThemeToggle() {
             onClick={() => store(option)}
             aria-pressed={active}
             title={THEME_LABELS[option]}
-            className={`rounded px-2 py-1.5 leading-none transition-colors ${
+            className={`flex size-9 cursor-pointer items-center justify-center rounded transition-colors ${
               active
                 ? "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:text-foreground"

@@ -36,9 +36,13 @@ import {
   X,
 } from "../components/ui/icons";
 
-/** Token-getriebene Basisklasse für Selects/Inputs in der Filterleiste. */
+/**
+ * Token-getriebene Basisklasse für Selects/Inputs in der Filterleiste.
+ * Mobil 16px (`text-base`), damit iOS beim Fokus nicht automatisch hineinzoomt;
+ * ab `sm` kompakter (14px).
+ */
 const controlClass =
-  "rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary/50 disabled:opacity-50";
+  "rounded-md border border-border bg-card px-3 py-2 text-base text-foreground outline-none transition focus:border-primary/50 disabled:opacity-50 sm:text-sm";
 
 type SortKey = "newest" | "oldest" | "name-asc" | "name-desc";
 
@@ -385,7 +389,7 @@ export default function GalleryPage() {
               type="button"
               onClick={() => setQuery("")}
               aria-label="Suche zurücksetzen"
-              className="absolute right-2 text-muted-foreground transition hover:text-foreground"
+              className="absolute right-1 flex size-9 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition hover:text-foreground"
             >
               <X size={16} strokeWidth={1.75} aria-hidden="true" />
             </button>
@@ -412,6 +416,7 @@ export default function GalleryPage() {
               value={newScenarioName}
               onChange={(e) => setNewScenarioName(e.target.value)}
               placeholder="Neues Szenario …"
+              aria-label="Name des neuen Szenarios"
               maxLength={80}
               className={`${controlClass} w-36`}
             />
@@ -544,7 +549,7 @@ function CharacterTafel({
       onClick={onOpen}
       // Der Stagger deckelt bei ~12, damit späte Karten nicht spürbar nachhinken.
       style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
-      className="cc-reveal group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition duration-200 hover:-translate-y-1 hover:shadow-[var(--shadow-md)]"
+      className="cc-reveal group flex cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition duration-200 hover:-translate-y-1 hover:shadow-[var(--shadow-md)]"
     >
       <div className="relative aspect-square w-full bg-muted">
         {preview ? (

@@ -29,7 +29,8 @@ export function IconButton({
       type={rest.type ?? "button"}
       aria-label={label}
       title={label}
-      className={`inline-flex size-9 items-center justify-center rounded-md transition disabled:opacity-40 ${VARIANTS[variant]} ${className}`}
+      // 44px Trefferfläche (Touch-Ziel), auch wenn das Icon kleiner ist.
+      className={`inline-flex size-11 cursor-pointer items-center justify-center rounded-md transition disabled:cursor-not-allowed disabled:opacity-40 ${VARIANTS[variant]} ${className}`}
     >
       {children}
     </button>
