@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useSyncExternalStore } from "react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import {
   applyTheme,
   THEME_LABELS,
@@ -9,10 +10,10 @@ import {
   type Theme,
 } from "@/lib/theme";
 
-const ICONS: Record<Theme, string> = {
-  light: "☀️",
-  dark: "🌙",
-  system: "🖥️",
+const ICONS: Record<Theme, typeof Sun> = {
+  light: Sun,
+  dark: Moon,
+  system: Monitor,
 };
 
 /* Kleiner Store über localStorage: getSnapshot muss einen stabilen Wert
@@ -63,25 +64,29 @@ export default function ThemeToggle() {
     <div
       role="group"
       aria-label="Farbschema"
-      className="flex items-center gap-0.5 rounded-md border border-black/10 p-0.5 dark:border-white/10"
+      className="flex items-center gap-0.5 rounded-md border border-border p-0.5"
     >
-      {THEMES.map((option) => (
-        <button
-          key={option}
-          type="button"
-          onClick={() => store(option)}
-          aria-pressed={theme === option}
-          title={THEME_LABELS[option]}
-          className={`rounded px-2 py-1 text-sm leading-none transition ${
-            theme === option
-              ? "bg-foreground/10"
-              : "opacity-60 hover:opacity-100"
-          }`}
-        >
-          <span aria-hidden="true">{ICONS[option]}</span>
-          <span className="sr-only">{THEME_LABELS[option]}</span>
-        </button>
-      ))}
+      {THEMES.map((option) => {
+        const Icon = ICONS[option];
+        const active = theme === option;
+        return (
+          <button
+            key={option}
+            type="button"
+            onClick={() => store(option)}
+            aria-pressed={active}
+            title={THEME_LABELS[option]}
+            className={`rounded px-2 py-1.5 leading-none transition-colors ${
+              active
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Icon size={16} strokeWidth={1.75} aria-hidden="true" />
+            <span className="sr-only">{THEME_LABELS[option]}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

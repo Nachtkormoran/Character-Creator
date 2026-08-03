@@ -20,9 +20,25 @@ import {
   type StoredScenario,
 } from "@/lib/serialize";
 import { CharacterDetailModal } from "../components/CharacterDetailModal";
+import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
+import { EmptyState } from "../components/ui/EmptyState";
+import { CharacterCardSkeleton } from "../components/ui/Skeleton";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+  User,
+  Users,
+  X,
+} from "../components/ui/icons";
 
+/** Token-getriebene Basisklasse für Selects/Inputs in der Filterleiste. */
 const controlClass =
-  "rounded-md border border-black/15 bg-white px-3 py-2 text-sm outline-none transition focus:border-black/40 disabled:opacity-50 dark:border-white/15 dark:bg-white/5 dark:focus:border-white/40";
+  "rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition focus:border-primary/50 disabled:opacity-50";
 
 type SortKey = "newest" | "oldest" | "name-asc" | "name-desc";
 
@@ -90,7 +106,8 @@ export default function GalleryPage() {
   // Charakter-Anzahl je Szenario (clientseitig, immer aktuell)
   const scenarioCounts = useMemo(() => {
     const m: Record<string, number> = {};
-    for (const c of characters) if (c.scenarioId) m[c.scenarioId] = (m[c.scenarioId] ?? 0) + 1;
+    for (const c of characters)
+      if (c.scenarioId) m[c.scenarioId] = (m[c.scenarioId] ?? 0) + 1;
     return m;
   }, [characters]);
   const noneCount = characters.filter((c) => !c.scenarioId).length;
@@ -181,7 +198,9 @@ export default function GalleryPage() {
     setScenarioError(null);
     try {
       const scenario = await createScenario(name);
-      setScenarios((gs) => [...gs, scenario].sort((a, b) => a.name.localeCompare(b.name)));
+      setScenarios((gs) =>
+        [...gs, scenario].sort((a, b) => a.name.localeCompare(b.name)),
+      );
       setNewScenarioName("");
       setFilter(scenario.id);
     } catch (err) {
@@ -249,7 +268,9 @@ export default function GalleryPage() {
     setCharacters((cs) =>
       cs.map((c) => (c.scenarioId === id ? { ...c, scenarioId: null } : c)),
     );
-    setSelected((s) => (s && s.scenarioId === id ? { ...s, scenarioId: null } : s));
+    setSelected((s) =>
+      s && s.scenarioId === id ? { ...s, scenarioId: null } : s,
+    );
     if (filter === id) setFilter("all");
     try {
       await deleteScenario(id);
@@ -262,16 +283,17 @@ export default function GalleryPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-semibold tracking-tight">Charaktere</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight">
+          Charaktere
+        </h1>
         <div className="flex flex-wrap items-center gap-3">
           <label
             title="Zuvor exportierte Charakter-Dateien einspielen – sie kommen zum Bestand hinzu"
-            className={`rounded-md border border-black/15 px-4 py-2 text-sm font-medium transition dark:border-white/15 ${
-              importing
-                ? "cursor-not-allowed opacity-50"
-                : "cursor-pointer hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+            className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted ${
+              importing ? "cursor-not-allowed opacity-50" : ""
             }`}
           >
+            <Upload size={16} strokeWidth={1.75} aria-hidden="true" />
             {importing ? "Importiere …" : "Charakter importieren"}
             <input
               type="file"
@@ -284,28 +306,31 @@ export default function GalleryPage() {
           </label>
           <Link
             href="/"
-            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition hover:opacity-90"
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
           >
-            + Neuer Charakter
+            <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
+            Neuer Charakter
           </Link>
         </div>
       </div>
 
       {importMessage && (
-        <p className="rounded-md border border-green-600/30 bg-green-600/10 px-3 py-2 text-sm text-green-800 dark:text-green-300">
+        <p className="flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground">
+          <CheckCircle2 size={16} className="text-primary" aria-hidden="true" />
           {importMessage}
         </p>
       )}
       {importError && (
-        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+        <p className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          <AlertTriangle size={16} aria-hidden="true" />
           {importError}
         </p>
       )}
 
       {/* Szenario-Filter & -Verwaltung */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-black/10 bg-white p-3 dark:border-white/10 dark:bg-white/[0.03]">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-border bg-card p-3">
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-foreground/60">Anzeigen:</span>
+          <span className="text-muted-foreground">Anzeigen:</span>
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -322,7 +347,7 @@ export default function GalleryPage() {
         </label>
 
         <label className="flex items-center gap-2 text-sm">
-          <span className="text-foreground/60">Sortieren:</span>
+          <span className="text-muted-foreground">Sortieren:</span>
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
@@ -338,52 +363,51 @@ export default function GalleryPage() {
 
         {/*
           Die Suche füllt den Rest der Zeile und gibt bei Platzmangel als erste
-          nach (`flex-1` statt fester Breite). Mit `w-64` rutschte die
-          Szenario-Anlage schon auf eine zweite Zeile, obwohl rechts noch Platz
-          war – die feste Breite gab ihn nicht her.
+          nach (`flex-1` statt fester Breite).
         */}
         <div className="relative flex min-w-48 flex-1 items-center">
+          <Search
+            size={16}
+            strokeWidth={1.75}
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 text-muted-foreground"
+          />
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            // Kurz halten: das Feld schrumpft mit, ein langer Platzhalter
-            // würde abgeschnitten. Der volle Umfang steht im aria-label.
             placeholder="Suchen …"
             aria-label="Charaktere durchsuchen (Name, Text, Merkmale)"
-            className={`${controlClass} w-full`}
+            className={`${controlClass} w-full pl-9`}
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery("")}
               aria-label="Suche zurücksetzen"
-              className="absolute right-2 text-foreground/40 transition hover:text-foreground"
+              className="absolute right-2 text-muted-foreground transition hover:text-foreground"
             >
-              ×
+              <X size={16} strokeWidth={1.75} aria-hidden="true" />
             </button>
           )}
         </div>
 
-        {/*
-          Die beiden Szenario-Bedienelemente bleiben als Block zusammen. Sobald
-          der Löschen-Knopf dazukommt, passen fünf Elemente nicht mehr in die
-          Zeile (der Rahmen ist `max-w-5xl`); dann rutscht der ganze Block nach
-          unten statt nur das Eingabefeld. Kein `ml-auto` nötig – die Suche
-          schiebt ihn nach rechts.
-        */}
         <div className="flex shrink-0 items-center gap-2">
           {filter !== "all" && filter !== "none" && (
-            <button
-              type="button"
+            <Button
+              variant="danger"
+              size="sm"
               onClick={() => handleDeleteScenario(filter)}
-              className="rounded-md border border-red-500/40 px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-500/10 dark:text-red-400"
             >
+              <Trash2 size={15} strokeWidth={1.75} aria-hidden="true" />
               Szenario löschen
-            </button>
+            </Button>
           )}
 
-          <form onSubmit={handleCreateScenario} className="flex items-center gap-2">
+          <form
+            onSubmit={handleCreateScenario}
+            className="flex items-center gap-2"
+          >
             <input
               value={newScenarioName}
               onChange={(e) => setNewScenarioName(e.target.value)}
@@ -391,90 +415,86 @@ export default function GalleryPage() {
               maxLength={80}
               className={`${controlClass} w-36`}
             />
-            <button
+            <Button
               type="submit"
+              size="sm"
               disabled={creatingScenario || !newScenarioName.trim()}
-              className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
             >
               {creatingScenario ? "…" : "Anlegen"}
-            </button>
+            </Button>
           </form>
         </div>
         {scenarioError && (
-          <span className="w-full text-xs text-red-600 dark:text-red-400">
+          <span className="w-full text-xs text-destructive">
             {scenarioError}
           </span>
         )}
       </div>
 
-      {loading && <p className="text-foreground/60">Lade Charaktere …</p>}
+      {loading && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <CharacterCardSkeleton key={i} />
+          ))}
+        </div>
+      )}
       {error && (
-        <p className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+        <p className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <AlertTriangle size={16} aria-hidden="true" />
           {error}
         </p>
       )}
 
       {!loading && !error && characters.length === 0 && (
-        <div className="rounded-xl border border-dashed border-black/15 p-10 text-center text-foreground/60 dark:border-white/15">
-          Noch keine Charaktere gespeichert.{" "}
-          <Link href="/" className="underline">
-            Jetzt einen erstellen
-          </Link>
-          .
-        </div>
+        <EmptyState
+          icon={<Users size={40} strokeWidth={1.25} />}
+          title="Noch keine Charaktere"
+          description="Erschaffe deine erste Figur – Text, Merkmale und Portrait in einem Zug."
+          action={
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+            >
+              <Plus size={16} strokeWidth={1.75} aria-hidden="true" />
+              Neuer Charakter
+            </Link>
+          }
+        />
       )}
 
-      {!loading && !error && characters.length > 0 && visibleCharacters.length === 0 && (
-        <div className="rounded-xl border border-dashed border-black/15 p-10 text-center text-foreground/60 dark:border-white/15">
-          {query.trim()
-            ? `Keine Treffer für „${query.trim()}" in dieser Auswahl.`
-            : "Keine Charaktere in dieser Auswahl."}
-        </div>
-      )}
+      {!loading &&
+        !error &&
+        characters.length > 0 &&
+        visibleCharacters.length === 0 && (
+          <EmptyState
+            icon={<Search size={40} strokeWidth={1.25} />}
+            title="Keine Treffer"
+            description={
+              query.trim()
+                ? `Für „${query.trim()}" gibt es in dieser Auswahl nichts.`
+                : "In dieser Auswahl liegt kein Charakter."
+            }
+          />
+        )}
 
       {!loading && !error && query.trim() && visibleCharacters.length > 0 && (
-        <p className="text-sm text-foreground/60">
+        <p className="text-sm text-muted-foreground">
           {`${visibleCharacters.length} Treffer für „${query.trim()}"`}
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {visibleCharacters.map((c) => {
-          // Anzeigequelle ist das Thumbnail des Primärbilds; Originale liefert
-          // die Listen-Route bewusst nicht mit (je ~2 MB).
-          const preview = primaryImage(c)?.thumbnail;
-          return (
-          <button
-            key={c.id}
-            onClick={() => setSelected(c)}
-            className="group flex flex-col overflow-hidden rounded-xl border border-black/10 bg-white text-left transition hover:shadow-md dark:border-white/10 dark:bg-white/[0.03]"
-          >
-            <div className="relative aspect-square w-full bg-black/[0.03] dark:bg-white/[0.03]">
-              {preview ? (
-                <Image
-                  src={preview}
-                  alt={c.character.name}
-                  fill
-                  sizes="(max-width: 640px) 50vw, 25vw"
-                  className="object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-3xl opacity-30">
-                  🧑
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-1 p-3">
-              <span className="truncate font-medium">{c.character.name}</span>
-              <span className="line-clamp-2 text-xs text-foreground/60">
-                {c.character.kurzbeschreibung}
-              </span>
-            </div>
-          </button>
-          );
-        })}
-      </div>
+      {!loading && !error && visibleCharacters.length > 0 && (
+        <div className="grid grid-cols-2 gap-x-5 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+          {visibleCharacters.map((c, i) => (
+            <CharacterTafel
+              key={c.id}
+              character={c}
+              index={i}
+              onOpen={() => setSelected(c)}
+            />
+          ))}
+        </div>
+      )}
 
       {selected && (
         <CharacterDetailModal
@@ -487,7 +507,9 @@ export default function GalleryPage() {
             handleSaveContent(selected.id, character, storyHooks, genre)
           }
           onCharacterUpdated={applyUpdate}
-          onAssignScenario={(scenarioId) => handleAssignScenario(selected.id, scenarioId)}
+          onAssignScenario={(scenarioId) =>
+            handleAssignScenario(selected.id, scenarioId)
+          }
           onScenarioCreated={(scenario) =>
             setScenarios((gs) =>
               [...gs, scenario].sort((a, b) => a.name.localeCompare(b.name)),
@@ -499,3 +521,63 @@ export default function GalleryPage() {
   );
 }
 
+/**
+ * Signature-Element: die Charakter-„Tafel" – eine Manuskript-/Sammelkarten-
+ * Platte. Portrait mit feinem Innen-Passepartout, Name in Fraunces, ein paar
+ * Kern-Merkmale als Chips; ruhiger Hover-Lift, gestaffeltes Auftauchen.
+ */
+function CharacterTafel({
+  character: c,
+  index,
+  onOpen,
+}: {
+  character: StoredCharacter;
+  index: number;
+  onOpen: () => void;
+}) {
+  const preview = primaryImage(c)?.thumbnail;
+  const alter = String(c.character.merkmale.alter ?? "").trim();
+  const beruf = String(c.character.merkmale.beruf ?? "").trim();
+
+  return (
+    <button
+      onClick={onOpen}
+      // Der Stagger deckelt bei ~12, damit späte Karten nicht spürbar nachhinken.
+      style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+      className="cc-reveal group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition duration-200 hover:-translate-y-1 hover:shadow-[var(--shadow-md)]"
+    >
+      <div className="relative aspect-square w-full bg-muted">
+        {preview ? (
+          <Image
+            src={preview}
+            alt={c.character.name}
+            fill
+            sizes="(max-width: 640px) 50vw, 25vw"
+            className="object-cover transition duration-300 group-hover:scale-[1.02]"
+            unoptimized
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-muted-foreground">
+            <User size={40} strokeWidth={1.25} aria-hidden="true" />
+          </div>
+        )}
+        {/* Passepartout: feine Innenkante, gibt der Karte den Tafel-Charakter. */}
+        <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-black/10 dark:ring-white/10" />
+      </div>
+      <div className="flex flex-col gap-1.5 p-3">
+        <span className="truncate font-display text-base font-medium">
+          {c.character.name}
+        </span>
+        <span className="line-clamp-2 text-xs text-muted-foreground">
+          {c.character.kurzbeschreibung}
+        </span>
+        {(alter || beruf) && (
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {alter && alter !== "0" && <Badge tabular>{alter} J.</Badge>}
+            {beruf && <Badge className="max-w-full truncate">{beruf}</Badge>}
+          </div>
+        )}
+      </div>
+    </button>
+  );
+}

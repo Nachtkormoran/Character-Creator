@@ -4,23 +4,72 @@
    nicht über prefers-color-scheme – sonst wäre er nicht umschaltbar. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+  Design-System „Modernes Atelier": warm-neutrale Fläche, ein Iris-/Tinten-
+  Violett-Akzent, ein Display-Serif (Fraunces) sparsam für Titel/Namen. Alle
+  Farben sind semantische Tokens (background/card/muted/border/primary/…) und
+  werden unten über @theme als Tailwind-Utilities verfügbar gemacht
+  (bg-card, text-muted-foreground, border-border, bg-primary, ring-ring …).
+*/
 :root {
-  --background: #f7f7f8;
+  --background: #faf9f6;
+  --card: #ffffff;
   --foreground: #1a1a1e;
+  --muted: #f0efea;
+  --muted-foreground: #6b6b72;
+  --border: rgba(0, 0, 0, 0.09);
+  --primary: #5b4fc4;
+  --primary-foreground: #ffffff;
+  --ring: #5b4fc4;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  /* Weiche, konsistente Elevation (Atelier ist nicht schattenlastig). */
+  --shadow-sm: 0 1px 2px rgba(20, 19, 26, 0.06);
+  --shadow-md: 0 6px 20px rgba(20, 19, 26, 0.1);
+  --shadow-lg: 0 16px 40px rgba(20, 19, 26, 0.14);
+
   color-scheme: light;
 }
 
 .dark {
-  --background: #0d0d10;
+  --background: #16151a;
+  --card: #1e1d24;
   --foreground: #ececee;
+  --muted: #24232b;
+  --muted-foreground: #a0a0ac;
+  --border: rgba(255, 255, 255, 0.1);
+  /* Im Dunkeln heller/entsättigt (color-dark-mode-Regel). */
+  --primary: #8b80e8;
+  --primary-foreground: #16151a;
+  --ring: #8b80e8;
+  --destructive: #f87171;
+  --destructive-foreground: #16151a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 18px 44px rgba(0, 0, 0, 0.6);
+
   color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-card: var(--card);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Display-Serif – bewusst sparsam (Titel, Charakter-/Werknamen). */
+  --font-display: var(--font-fraunces);
 }
 
 /* Das native Clear-Icon von type="search" (nur WebKit/Blink) ausblenden –
@@ -34,4 +83,46 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/*
+  Quality-Floor: **ein** sichtbarer Fokusring app-weit (vorher gab es keinen).
+  Gilt für native Elemente und Primitives gleichermaßen; Komponenten müssen ihn
+  nicht einzeln nachziehen.
+*/
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Sanftes Auftauchen für gestaffelte Listen/Grids (Galerie-Karten). Der
+   `both`-Fill hält den Endzustand; unter reduced-motion springt es (s. u.)
+   praktisch sofort auf sichtbar. */
+@keyframes cc-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.cc-reveal {
+  animation: cc-fade-up 300ms ease-out both;
+}
+
+/*
+  Reduced-Motion respektieren – an **einer** Stelle statt in jeder Komponente.
+  Wer die OS-Einstellung setzt, bekommt keine Übergänge/Animationen mehr.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
