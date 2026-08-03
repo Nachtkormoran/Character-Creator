@@ -46,6 +46,7 @@ import {
   Pencil,
   Sparkles,
   Star,
+  User,
   X,
 } from "./ui/icons";
 
@@ -676,8 +677,8 @@ export function StoryArcSection({
                       unoptimized
                     />
                   ) : (
-                    <span className="flex h-full items-center justify-center text-2xl opacity-30">
-                      🧑
+                    <span className="flex h-full items-center justify-center text-muted-foreground">
+                      <User size={24} strokeWidth={1.25} aria-hidden="true" />
                     </span>
                   )}
                 </CoverKachel>
@@ -892,7 +893,7 @@ export function StoryArcSection({
           */}
           {arcs.length === 1 && (
             <span className="text-xs text-muted-foreground">
-              · „📖 Neu ableiten“ legt einen weiteren an, statt diesen zu
+              · „Neu ableiten“ legt einen weiteren an, statt diesen zu
               ersetzen
             </span>
           )}
@@ -942,7 +943,7 @@ export function StoryArcSection({
           disabled={disabled || busy}
           className="size-4 accent-primary"
         />
-        🧵 Handlung weiterspinnen – zur vollständigen Geschichte
+        Handlung weiterspinnen – zur vollständigen Geschichte
       </label>
 
       {/*

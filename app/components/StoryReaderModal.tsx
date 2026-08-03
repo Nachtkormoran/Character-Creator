@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { StoryArc } from "@/lib/schema";
 import { useBackdropClose } from "./useBackdropClose";
+import { BookOpen, ScrollText } from "./ui/icons";
 
 /**
  * **Buch-Reader** für die erzeugten Kapitel eines Story Arcs.
@@ -250,14 +251,24 @@ export function StoryReaderModal({
         <span className="mx-0.5 h-4 w-px bg-white/25" />
         <button
           onClick={modusWechseln}
-          className="rounded-full px-2.5 py-1 text-sm transition hover:bg-white/15"
+          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm transition hover:bg-white/15"
           title={
             modus === "scroll"
               ? "Seitenweise blättern wie ein E-Book"
               : "Fortlaufend scrollen"
           }
         >
-          {modus === "scroll" ? "📖 Blättern" : "📜 Fortlaufend"}
+          {modus === "scroll" ? (
+            <>
+              <BookOpen size={15} strokeWidth={1.75} aria-hidden="true" />
+              Blättern
+            </>
+          ) : (
+            <>
+              <ScrollText size={15} strokeWidth={1.75} aria-hidden="true" />
+              Fortlaufend
+            </>
+          )}
         </button>
       </div>
 

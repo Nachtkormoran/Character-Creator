@@ -27,6 +27,7 @@ export {
   Moon,
   Monitor,
   ChevronRight,
+  ChevronsRight,
   ChevronUp,
   ChevronDown,
   Loader2,
@@ -36,6 +37,7 @@ export {
   Mountain,
   ListTree,
   BookText,
+  ScrollText,
 } from "lucide-react";
 
 /** Einheitliche Icon-Größe (px) und Strichstärke fürs ganze UI. */

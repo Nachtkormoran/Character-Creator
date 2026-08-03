@@ -32,6 +32,7 @@ import { downloadBlob, safeFileName } from "@/lib/download";
 import { scenarioFileName } from "@/lib/scenarioFile";
 import { ladeRunParams, speichereRunParams } from "@/lib/scenarioRunParams";
 import {
+  ChevronsRight,
   Copy,
   Images,
   Mountain,
@@ -41,6 +42,7 @@ import {
   Sparkles,
   Star,
   User,
+  Users,
   X,
 } from "../../components/ui/icons";
 import { GENRE_TEMPLATES } from "@/lib/templates";
@@ -1913,7 +1915,7 @@ export default function ScenarioDetailPage({
         </div>
         {characters.length > 0 && (
           <p className="mb-3 text-xs text-muted-foreground">
-            Mit dem ⭐ markierst du <strong>Protagonisten</strong> – der
+            Mit dem Stern markierst du <strong>Protagonisten</strong> – der
             Handlungsentwurf dreht sich dann um sie, die übrigen sind
             Nebenfiguren. Ohne Markierung bleibt alles wie bisher.
           </p>
@@ -2362,7 +2364,7 @@ export default function ScenarioDetailPage({
               disabled={saving || generatingField !== null}
               className="size-4 accent-primary"
             />
-            🧵 Handlung weiterspinnen – vollständige Geschichte statt offener
+            Handlung weiterspinnen – vollständige Geschichte statt offener
             Ausgangslage
           </label>
 
@@ -2404,7 +2406,10 @@ export default function ScenarioDetailPage({
           */}
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <label className="flex items-center gap-2">
-              <span>👥 Neue Personen:</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Users size={15} strokeWidth={1.75} aria-hidden="true" />
+                Neue Personen:
+              </span>
               <select
                 value={handlungNeuePersonen}
                 onChange={(e) =>
@@ -2466,11 +2471,20 @@ export default function ScenarioDetailPage({
               onClick={handlungFortsetzen}
               disabled={saving || generatingField !== null}
               title="Knüpft an das Ende des aktuellen Entwurfs an und schreibt weiter. Die Fortsetzung wird an den vorhandenen Text angehängt (nicht als neuer Reiter). Nutzt Ton, Erzählform, „Weiterspinnen“ und die Stichwörter wie „Neu erzeugen“."
-              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
             >
-              {generatingField === "handlung"
-                ? "Setze fort …"
-                : "⏩ Entwurf fortsetzen"}
+              {generatingField === "handlung" ? (
+                "Setze fort …"
+              ) : (
+                <>
+                  <ChevronsRight
+                    size={16}
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                  />
+                  Entwurf fortsetzen
+                </>
+              )}
             </button>
           </div>
         )}
