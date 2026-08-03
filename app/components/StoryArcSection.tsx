@@ -33,6 +33,21 @@ import {
 } from "@/lib/schema";
 import { AutoTextarea } from "./AutoTextarea";
 import { StoryReaderModal } from "./StoryReaderModal";
+import {
+  BookOpen,
+  BookText,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Images,
+  Library,
+  ListTree,
+  Mountain,
+  Pencil,
+  Sparkles,
+  Star,
+  X,
+} from "./ui/icons";
 
 /**
  * Der **Story Arc** eines Szenarios – die dramaturgische Zerlegung des aktiven
@@ -74,13 +89,13 @@ const PHASE_STYLE: Record<ArcPhase, { dot: string; chip: string }> = {
   },
 };
 
-/** Kleiner quadratischer Icon-Knopf (▲ ▼ ✕) – gleiche Optik überall. */
+/** Kleiner quadratischer Icon-Knopf (hoch/runter/entfernen) – gleiche Optik überall. */
 const MINI_BTN =
-  "rounded px-1.5 py-0.5 text-xs leading-none text-muted-foreground transition hover:bg-muted hover:text-muted-foreground disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-muted-foreground";
+  "inline-flex size-6 items-center justify-center rounded text-muted-foreground transition hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent";
 
 /** Knopf im Feld-/Kopfstil – gleiche Höhe und Rand wie in `ScenarioFields`. */
 const CHIP_BTN =
-  "rounded-md border border-border px-2.5 py-1 text-xs font-medium transition hover:bg-muted disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium transition hover:bg-muted disabled:opacity-50";
 
 export function StoryArcSection({
   storyArc,
@@ -396,9 +411,10 @@ export function StoryArcSection({
                   type="button"
                   onClick={() => setReaderOffen(true)}
                   title="Die erzeugten Kapitel ablenkungsfrei als Buch lesen"
-                  className="rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted"
+                  className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted"
                 >
-                  📖 Als Buch lesen
+                  <BookOpen size={15} strokeWidth={1.75} aria-hidden="true" />
+                  Als Buch lesen
                 </button>
               )}
               <button
@@ -406,9 +422,10 @@ export function StoryArcSection({
                 onClick={() => setCoverOffen((o) => !o)}
                 disabled={disabled || busy}
                 title="Titelbild dieses Buches in der Bibliothek wählen (Weltbild oder ein Charakterporträt)"
-                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
               >
-                🖼️ Cover: {coverLabel}
+                <Images size={15} strokeWidth={1.75} aria-hidden="true" />
+                Cover: {coverLabel}
               </button>
               {/* Ob dieser Arc überhaupt als Buch in der Bibliothek erscheint –
                   Default aus. Ein frisch abgeleiteter Arc ist ein Arbeitsstand. */}
@@ -423,7 +440,8 @@ export function StoryArcSection({
                   onChange={(e) => onArcAlsBuch(arcAktiv, e.target.checked)}
                   className="h-4 w-4 accent-current disabled:opacity-50"
                 />
-                📚 In Bibliothek
+                <Library size={15} strokeWidth={1.75} aria-hidden="true" />
+                In Bibliothek
               </label>
             </div>
           )}
@@ -604,9 +622,9 @@ export function StoryArcSection({
               type="button"
               onClick={() => setCoverOffen(false)}
               aria-label="Cover-Auswahl schließen"
-              className="px-1 text-muted-foreground transition hover:text-foreground"
+              className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-card hover:text-foreground"
             >
-              ✕
+              <X size={16} strokeWidth={1.75} aria-hidden="true" />
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -629,8 +647,8 @@ export function StoryArcSection({
                   unoptimized
                 />
               ) : (
-                <span className="flex h-full items-center justify-center text-2xl opacity-60">
-                  🏞️
+                <span className="flex h-full items-center justify-center text-muted-foreground">
+                  <Mountain size={24} strokeWidth={1.5} aria-hidden="true" />
                 </span>
               )}
             </CoverKachel>
@@ -785,7 +803,14 @@ export function StoryArcSection({
                         : "text-foreground/30 hover:text-amber-500"
                   }`}
                 >
-                  {meta.favorit ? "⭐" : "☆"}
+                  <Star
+                    size={15}
+                    strokeWidth={1.75}
+                    aria-hidden="true"
+                    className={
+                      meta.favorit ? "fill-amber-400 text-amber-400" : ""
+                    }
+                  />
                 </button>
                 {/* Titel ändern (✎) und neu per KI erzeugen (✨) – nur am
                     aktiven Reiter. */}
@@ -799,7 +824,7 @@ export function StoryArcSection({
                       aria-label={`Titel von Story Arc ${i + 1} ändern`}
                       className="flex items-center px-1 leading-none opacity-70 transition hover:opacity-100 disabled:opacity-40"
                     >
-                      ✎
+                      <Pencil size={14} strokeWidth={1.75} aria-hidden="true" />
                     </button>
                     <button
                       type="button"
@@ -817,7 +842,11 @@ export function StoryArcSection({
                       {arcTitelBusy === i ? (
                         <span className="animate-pulse">…</span>
                       ) : (
-                        "✨"
+                        <Sparkles
+                          size={14}
+                          strokeWidth={1.75}
+                          aria-hidden="true"
+                        />
                       )}
                     </button>
                   </>
@@ -835,7 +864,7 @@ export function StoryArcSection({
                         : "hover:text-destructive dark:hover:text-red-400"
                     }`}
                   >
-                    ✕
+                    <X size={14} strokeWidth={1.75} aria-hidden="true" />
                   </button>
                 )}
               </span>
@@ -851,9 +880,10 @@ export function StoryArcSection({
             onClick={() => onArcKopieren(arcAktiv)}
             disabled={disabled || busy}
             title="Den aktiven Story Arc kopieren – als eigenständige neue Variante"
-            className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted disabled:opacity-40"
           >
-            ⧉ Kopieren
+            <Copy size={13} strokeWidth={1.75} aria-hidden="true" />
+            Kopieren
           </button>
           {/*
             Bei genau einem Arc ist die Leiste keine Umschaltung, sondern ein
@@ -935,7 +965,10 @@ export function StoryArcSection({
           disabled={disabled}
           className="size-4 accent-primary"
         />
-        ✨ Kreativ – Impulse und lebendigere Ausarbeitung
+        <span className="flex items-center gap-1.5">
+          <Sparkles size={14} strokeWidth={1.75} aria-hidden="true" />
+          Kreativ – Impulse und lebendigere Ausarbeitung
+        </span>
       </label>
 
       {/*
@@ -975,11 +1008,14 @@ export function StoryArcSection({
           }
           className={`${CHIP_BTN} whitespace-nowrap`}
         >
-          {busy
-            ? "Leite ab …"
-            : hatArc
-              ? "📖 Neu ableiten"
-              : "📖 Story Arc ableiten"}
+          {busy ? (
+            "Leite ab …"
+          ) : (
+            <>
+              <BookOpen size={14} strokeWidth={1.75} aria-hidden="true" />
+              {hatArc ? "Neu ableiten" : "Story Arc ableiten"}
+            </>
+          )}
         </button>
       </div>
 
@@ -1066,7 +1102,7 @@ export function StoryArcSection({
                         title="Nach oben"
                         className={MINI_BTN}
                       >
-                        ▲
+                        <ChevronUp size={15} strokeWidth={1.75} aria-hidden="true" />
                       </button>
                       <button
                         type="button"
@@ -1076,7 +1112,7 @@ export function StoryArcSection({
                         title="Nach unten"
                         className={MINI_BTN}
                       >
-                        ▼
+                        <ChevronDown size={15} strokeWidth={1.75} aria-hidden="true" />
                       </button>
                       <button
                         type="button"
@@ -1086,7 +1122,7 @@ export function StoryArcSection({
                         title="Station löschen"
                         className={MINI_BTN}
                       >
-                        ✕
+                        <X size={15} strokeWidth={1.75} aria-hidden="true" />
                       </button>
                     </div>
                   </div>
@@ -1144,9 +1180,9 @@ export function StoryArcSection({
                             disabled={disabled}
                             aria-label={`${f} aus Station ${i + 1} entfernen`}
                             title="Figur entfernen"
-                            className="rounded-full px-1 leading-none text-muted-foreground transition hover:text-destructive disabled:opacity-40 dark:hover:text-red-400"
+                            className="inline-flex items-center rounded-full leading-none text-muted-foreground transition hover:text-destructive disabled:opacity-40"
                           >
-                            ✕
+                            <X size={13} strokeWidth={1.75} aria-hidden="true" />
                           </button>
                         </span>
                       ))}
@@ -1207,11 +1243,20 @@ export function StoryArcSection({
                           }
                           className={CHIP_BTN}
                         >
-                          {kapitelLaeuft
-                            ? "Leite ab …"
-                            : s.kapitel.length
-                              ? "📑 Neu ableiten"
-                              : "📑 Kapitel ableiten"}
+                          {kapitelLaeuft ? (
+                            "Leite ab …"
+                          ) : (
+                            <>
+                              <ListTree
+                                size={14}
+                                strokeWidth={1.75}
+                                aria-hidden="true"
+                              />
+                              {s.kapitel.length
+                                ? "Neu ableiten"
+                                : "Kapitel ableiten"}
+                            </>
+                          )}
                         </button>
                         <button
                           type="button"
@@ -1274,7 +1319,7 @@ export function StoryArcSection({
                                 title="Nach oben"
                                 className={MINI_BTN}
                               >
-                                ▲
+                                <ChevronUp size={15} strokeWidth={1.75} aria-hidden="true" />
                               </button>
                               <button
                                 type="button"
@@ -1286,7 +1331,7 @@ export function StoryArcSection({
                                 title="Nach unten"
                                 className={MINI_BTN}
                               >
-                                ▼
+                                <ChevronDown size={15} strokeWidth={1.75} aria-hidden="true" />
                               </button>
                               <button
                                 type="button"
@@ -1296,7 +1341,7 @@ export function StoryArcSection({
                                 title="Kapitel löschen"
                                 className={MINI_BTN}
                               >
-                                ✕
+                                <X size={15} strokeWidth={1.75} aria-hidden="true" />
                               </button>
                             </div>
                             <AutoTextarea
@@ -1329,7 +1374,8 @@ export function StoryArcSection({
                                   <span className="text-[0.6rem]">
                                     {textOffen(i, ki) ? "▾" : "▸"}
                                   </span>
-                                  📖 Story
+                                  <BookText size={13} strokeWidth={1.75} aria-hidden="true" />
+                                  Story
                                   {k.text.trim() ? ` (${k.text.length})` : ""}
                                 </button>
                                 <button
@@ -1351,11 +1397,20 @@ export function StoryArcSection({
                                   className={CHIP_BTN}
                                 >
                                   {kapitelTextBusy?.stufe === i &&
-                                  kapitelTextBusy?.kapitel === ki
-                                    ? "Erzeuge …"
-                                    : k.text.trim()
-                                      ? "✨ Neu erzeugen"
-                                      : "✨ Story generieren"}
+                                  kapitelTextBusy?.kapitel === ki ? (
+                                    "Erzeuge …"
+                                  ) : (
+                                    <>
+                                      <Sparkles
+                                        size={14}
+                                        strokeWidth={1.75}
+                                        aria-hidden="true"
+                                      />
+                                      {k.text.trim()
+                                        ? "Neu erzeugen"
+                                        : "Story generieren"}
+                                    </>
+                                  )}
                                 </button>
                               </div>
 
