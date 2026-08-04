@@ -4,6 +4,7 @@ import { getTextClient } from "@/lib/openai";
 import { buildScenarioPlotPrompt, type PlotCharacter } from "@/lib/prompts";
 import {
   MAX_NEUE_PLOT_PERSONEN,
+  SCENARIO_MAXLENGTHS,
   normalizeTraits,
   scenarioDetailsSchema,
 } from "@/lib/schema";
@@ -173,10 +174,14 @@ export async function POST(request: Request) {
         },
       ],
       temperature: 0.9,
-      // Verlangt sind ca. 900–1400 Zeichen; der Prompt ist mit sechs Figuren
-      // und ihren Ansatzpunkten ohnehin lang, hier zählt der Ausgabe-Puffer.
-      // Neue Personen brauchen etwas mehr Platz (Einführung + Rolle je Figur).
-      max_tokens: 1100 + neuePersonen * 120,
+      // Der Ausgabe-Deckel muss zum **Zeichenlimit** des Feldes passen, sonst
+      // bricht ein langer Entwurf mitten im Satz ab (v. a. beim **Einweben**, das
+      // Basis + neue Fäden zusammenführt, oder beim Weiterspinnen). Aus dem
+      // Zeichenlimit bemessen (Deutsch konservativ ~3 Zeichen/Token) plus Puffer;
+      // ein kurzer Entwurf bleibt trotzdem kurz (die Längen-Vorgabe im Prompt
+      // steuert das Ziel, `max_tokens` ist nur die Obergrenze). Neue Personen
+      // brauchen etwas mehr Platz (Einführung + Rolle je Figur).
+      max_tokens: Math.ceil(SCENARIO_MAXLENGTHS.handlung / 3) + 200 + neuePersonen * 120,
     });
 
     const choice = completion.choices?.[0];
