@@ -1,86 +1,13 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  buildScenarioFile,
-  deleteCharacter,
-  deleteScenario,
-  findFigurePersons,
-  findPlotPersons,
-  generateScenarioDescription,
-  generateScenarioField,
-  generateScenarioFigures,
-  generateScenarioName,
-  generateScenarioPlot,
-  generateStoryArc,
-  generateStoryTitle,
-  generateChapterText,
-  generateStoryArcChapters,
-  getScenario,
-  getSettings,
-  listScenarios,
-  updateCharacterContent,
-  updateCharacterGenre,
-  updateCharacterProtagonist,
-  updateCharacterScenario,
-  updateScenario,
-} from "@/lib/client";
-import { downloadBlob, safeFileName } from "@/lib/download";
-import { scenarioFileName } from "@/lib/scenarioFile";
-import { ladeRunParams, speichereRunParams } from "@/lib/scenarioRunParams";
+import { getSettings } from "@/lib/client";
 import { GENRE_TEMPLATES } from "@/lib/templates";
-import {
-  DEFAULT_ARC_FORMAT,
-  DEFAULT_ARC_LENGTH,
-  DEFAULT_KAPITEL_COUNT,
-  DEFAULT_KAPITEL_LAENGE,
-  DEFAULT_STORY_FORM,
-  DEFAULT_STORY_TONE,
-  DEFAULT_WERKFORM,
-  MAX_PLOT_VARIANTS,
-  MAX_STORY_ARCS,
-  SCENARIO_LABELS,
-  normalizeScenarioDetails,
-  type ArcFormat,
-  type ArcLength,
-  type KapitelCount,
-  type KapitelLaenge,
-  type StoryForm,
-  type StoryTone,
-  type TextProvider,
-  type Werkform,
-  type GeneratedCharacter,
-  type PlotPerson,
-  type PlotVariants,
-  type ScenarioDetails,
-  type StoryArc,
-  type StoryArcVariants,
-  type VariantMeta,
-} from "@/lib/schema";
-import { stashPlotPerson } from "@/lib/personHandoff";
-import {
-  ausgerichtet,
-  currentSnapshot,
-  isDirty,
-  LEER_META,
-  mergeArcs,
-  mergeVarianten,
-  savedSnapshot,
-} from "@/lib/scenarioDocument";
-import {
-  aktiveEintraege,
-  aktiveFiguren,
-  joinFigurenDetail,
-  splitFigurenDetail,
-} from "@/lib/figuren";
-import {
-  primaryImage,
-  type StoredCharacter,
-  type StoredImage,
-  type StoredScenario,
-} from "@/lib/serialize";
+import { type TextProvider, type ScenarioDetails } from "@/lib/schema";
+import { ausgerichtet } from "@/lib/scenarioDocument";
+import { primaryImage } from "@/lib/serialize";
 import { AddCharacterToScenarioModal } from "../../components/AddCharacterToScenarioModal";
 import { CharacterDetailModal } from "../../components/CharacterDetailModal";
 import { GenreSyncModal } from "../../components/GenreSyncModal";
@@ -92,6 +19,14 @@ import { ScenarioHeader } from "./sections/ScenarioHeader";
 import { WeltKarte } from "./sections/WeltKarte";
 import { CharaktereKarte } from "./sections/CharaktereKarte";
 import { HandlungsentwurfKarte } from "./sections/HandlungsentwurfKarte";
+import { useScenarioDocument } from "./hooks/useScenarioDocument";
+import { usePlotVarianten } from "./hooks/usePlotVarianten";
+import { useScenarioExport } from "./hooks/useScenarioExport";
+import { useStoryArc } from "./hooks/useStoryArc";
+import { useKapitel } from "./hooks/useKapitel";
+import { useScenarioFeldGen } from "./hooks/useScenarioFeldGen";
+import { useScenarioCharacters } from "./hooks/useScenarioCharacters";
+import { usePlotPersonen } from "./hooks/usePlotPersonen";
 
 // `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
 // getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
@@ -104,114 +39,44 @@ export default function ScenarioDetailPage({
   const { id } = use(params);
   const router = useRouter();
 
-  const [name, setName] = useState("");
-  // KI-Namensvorschlag aus den Welt-Feldern (Beschreibung/Ort/Zeit/Regeln).
-  // Der Name geht in den Bearbeitungs-Zustand; gespeichert wird über „Änderungen
-  // speichern" wie jede andere Namensänderung. Nicht gespeichert: nur Busy/Fehler.
-  const [nameBusy, setNameBusy] = useState(false);
-  const [nameFehler, setNameFehler] = useState<string | null>(null);
-  const [details, setDetails] = useState<ScenarioDetails>(
-    normalizeScenarioDetails({}),
-  );
-  /**
-   * Alle Handlungsentwürfe und der Index des aktiven. Die aktive Variante ist
-   * **zugleich** `details.handlung` – das Textfeld editiert sie dort live;
-   * `varianten` hält alle (auch die aktive, in stabiler Reihenfolge). Beide
-   * werden erst in `aktuelleVarianten()` zusammengeführt, damit nicht jeder
-   * Tastendruck in die Liste gespiegelt werden muss.
-   */
-  const [varianten, setVarianten] = useState<string[]>([]);
-  const [aktiv, setAktiv] = useState(0);
-  /**
-   * Anzeige-Metadaten je Entwurf (KI-Titel, Erzählform, Ton), index-gleich zur
-   * vollen Variantenliste (`aktuelleVarianten()`). Getrennt gehalten wie die
-   * Ansatzpunkte neben `edited`: Erzählform/Ton sind sonst reine Lauf-Parameter,
-   * hier werden sie **zum Erzeugungszeitpunkt** an der Variante festgehalten.
-   * `ausgerichtet(...)` hält die Länge deckungsgleich, falls der Zustand einmal
-   * auseinanderläuft.
-   */
-  const [variantenMeta, setVariantenMeta] = useState<VariantMeta[]>([]);
-  /**
-   * Der Story Arc – die dramaturgische Zerlegung des aktiven Handlungsentwurfs.
-   * Wie die Varianten lebt er im Bearbeitungs-Zustand: „Änderungen speichern"
-   * legt ihn ab, „Verwerfen" holt den gespeicherten zurück. `stufen: []` ist
-   * der ruhende Zustand (noch keiner abgeleitet).
-   */
-  const [storyArc, setStoryArc] = useState<StoryArc>({ stufen: [] });
-  /**
-   * Alle Story Arcs und der aktive Index – genau wie `varianten`/`aktiv` bei den
-   * Handlungsentwürfen. Der aktive Arc ist zugleich `storyArc` (dort editiert
-   * ihn die Zeitleiste live); `arcVarianten` hält die übrigen. Zusammengeführt
-   * wird erst in `aktuelleArcs()`.
-   */
-  const [arcVarianten, setArcVarianten] = useState<StoryArc[]>([]);
-  const [arcAktiv, setArcAktiv] = useState(0);
-  /** Anzeige-Metadaten je Arc (Titel, Erzählform, Ton) – wie `variantenMeta`. */
-  const [arcMeta, setArcMeta] = useState<VariantMeta[]>([]);
-  const [arcBusy, setArcBusy] = useState(false);
-  const [arcFehler, setArcFehler] = useState<string | null>(null);
-  // Welcher Arc gerade einen neuen Titel per KI erzeugt (Index) – für Sperre
-  // und Spinner am ✨-Knopf des Reiters.
-  const [arcTitelBusy, setArcTitelBusy] = useState<number | null>(null);
-  /**
-   * Länge, Format und Zusatzwunsch für die Arc-Erzeugung – wie beim
-   * Handlungsentwurf **nicht gespeichert**: Sie beschreiben einen Lauf, nicht
-   * den Arc.
-   */
-  const [arcParams, setArcParams] = useState<{
-    /**
-     * **Werkform** (Kurzgeschichte/Novelle/Roman/frei) – die führende Einstellung.
-     * Belegt beim Wählen `laenge`/`kapitelAnzahl`/`kapitelLaenge` vor (in der UI)
-     * und prägt live den Prosastil der Kapitel. `frei` = keine Vorgabe.
-     */
-    werkform: Werkform;
-    laenge: ArcLength;
-    format: ArcFormat;
-    zusatz: string;
-    /** Zufällige Impulse + höhere Temperatur, für Arc **und** Kapitel. */
-    kreativ: boolean;
-    /** Aus der offenen Ausgangslage eine vollständige Geschichte entwickeln. */
-    weiterspinnen: boolean;
-    /** Wie viele Kapitel ein „Kapitel ableiten" erzeugt. */
-    kapitelAnzahl: KapitelCount;
-    /** **Kapitellänge** – wie viel Prosa je Kapitel (entkoppelt von „kreativ"). */
-    kapitelLaenge: KapitelLaenge;
-    /** Ton und Sprache – für Arc **und** Kapitel. */
-    ton: StoryTone;
-    /** Erzählform (Krimi, Liebe, …) – für Arc **und** Kapitel. */
-    form: StoryForm;
-  }>({
-    werkform: DEFAULT_WERKFORM,
-    laenge: DEFAULT_ARC_LENGTH,
-    format: DEFAULT_ARC_FORMAT,
-    zusatz: "",
-    kreativ: false,
-    weiterspinnen: false,
-    kapitelAnzahl: DEFAULT_KAPITEL_COUNT,
-    kapitelLaenge: DEFAULT_KAPITEL_LAENGE,
-    ton: DEFAULT_STORY_TONE,
-    form: DEFAULT_STORY_FORM,
-  });
-  /** Welche Station gerade Kapitel erzeugt, und ein etwaiger Fehler dazu. */
-  const [kapitelBusy, setKapitelBusy] = useState<number | null>(null);
-  const [kapitelFehler, setKapitelFehler] = useState<{
-    index: number;
-    text: string;
-  } | null>(null);
-  /**
-   * Welches Kapitel gerade seinen **Prosatext** erzeugt (Station + Kapitel), und
-   * ein etwaiger Fehler dazu. Getrennt vom Kapitel-Ableiten oben, weil beides
-   * unabhängig läuft.
-   */
-  const [kapitelTextBusy, setKapitelTextBusy] = useState<{
-    stufe: number;
-    kapitel: number;
-  } | null>(null);
-  const [kapitelTextFehler, setKapitelTextFehler] = useState<{
-    stufe: number;
-    kapitel: number;
-    text: string;
-  } | null>(null);
+  // Der Dokument-Kern: geteilte Speicher-Einheit (Name/Festlegungen/Entwürfe/
+  // Arcs), Laden, `dirty`/`speichern`/`verwerfen`, Lauf-Parameter. Alles Weitere
+  // baut darauf auf (s. `hooks/useScenarioDocument`).
+  const doc = useScenarioDocument(id);
+  const {
+    name,
+    setName,
+    details,
+    setDetails,
+    aktiv,
+    variantenMeta,
+    storyArc,
+    setStoryArc,
+    arcAktiv,
+    arcMeta,
+    characters,
+    bilder,
+    setBilder,
+    loading,
+    error,
+    saving,
+    saveError,
+    handlungForm,
+    setHandlungForm,
+    handlungTon,
+    setHandlungTon,
+    arcParams,
+    setArcParams,
+    aktuelleVarianten,
+    aktuelleArcs,
+    dirty,
+    nameValid,
+    save,
+    verwerfen,
+  } = doc;
+
+  // Feld-Erzeugung (✨-Knöpfe, Fortsetzen, KI-Name) samt ihrer Lauf-Parameter und
+  // Arc-/Kapitel-Busy-Zustände liegen in eigenen Hooks (s. weiter unten).
   /**
    * Einstellung „Verwendetes Modell anzeigen" (aus den App-Einstellungen). Steuert
    * nur die Anzeige, nicht die Erzeugung. Default aus, bis die Einstellung geladen ist.
@@ -229,125 +94,41 @@ export default function ScenarioDetailPage({
     "",
   );
   const [arcProvider, setArcProvider] = useState<TextProvider | "">("");
-  /**
-   * **Transiente** Modell-Anzeige für die Kapitel-Ableitung je Station (Index →
-   * Modellname). Anders als bei Entwurf/Arc nicht in den Metadaten persistiert –
-   * die Station kennt keine `meta`-Liste; hier genügt der Hinweis für die Sitzung.
-   */
-  const [kapitelModell, setKapitelModell] = useState<Record<number, string>>({});
-  /** Transiente Modell-Anzeige für die Kapitel-Prosa, Schlüssel `"stufe-kapitel"`. */
-  const [storyTextModell, setStoryTextModell] = useState<Record<string, string>>(
-    {},
-  );
-  const [characters, setCharacters] = useState<StoredCharacter[]>([]);
-  /**
-   * Rückfrage nach einer Genre-Änderung: Soll das neue Genre auch auf die
-   * zugeordneten Figuren übertragen werden? `betroffen` sind die Figuren mit
-   * abweichendem Genre (Snapshot zum Änderungszeitpunkt). Null = keine Rückfrage.
-   */
-  const [genreSync, setGenreSync] = useState<{
-    genre: string;
-    betroffen: StoredCharacter[];
-  } | null>(null);
-  const [genreSyncBusy, setGenreSyncBusy] = useState(false);
-  const [genreSyncFehler, setGenreSyncFehler] = useState<string | null>(null);
-  /**
-   * Der angeklickte Charakter – öffnet dasselbe Detail-Modal wie in der
-   * Galerie (`CharacterDetailModal`, dort herausgelöst), aber **hier in der
-   * Szenario-Seite**: Schließen führt zurück ins Szenario, nicht in die Galerie.
-   */
-  const [selectedChar, setSelectedChar] = useState<StoredCharacter | null>(null);
-  /**
-   * Alle Szenarien – nur für das Zuordnungs-Menü und die Szenario-Ableitung im
-   * Detail-Modal. Die Detailseite selbst braucht sie sonst nicht (sie kennt ihr
-   * eigenes Szenario aus `getScenario`).
-   */
-  const [allScenarios, setAllScenarios] = useState<StoredScenario[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Besetzung (Detail-Modal, Zuordnung, Protagonist, Genre-Sync, Szenarienliste)
+  // liegt im Hook `useScenarioCharacters` (weiter unten).
 
-  /**
-   * Der zuletzt gespeicherte Stand, als JSON. Daran hängt der „Ungespeicherte
-   * Änderungen"-Balken – dasselbe Muster wie in der Charakter-Detailansicht.
-   */
-  const [saved, setSaved] = useState<string>("");
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  /**
-   * Export. `mitCharakteren` steht auf **an**: Ein Szenario weiterzugeben und
-   * seine Besetzung dabei wegzulassen ist der seltenere Fall – und der
-   * teurere Weg (Bild-Originale, einige Dutzend MB) ist derselbe, den man
-   * sonst von Hand über je einen Charakter-Export nachbauen müsste.
-   */
-  const [mitCharakteren, setMitCharakteren] = useState(true);
-  /**
-   * Bilder (Weltbild + Charakter-Bilder) mit exportieren. Default **an** – ohne
-   * Häkchen entsteht eine schlanke Datei nur aus Texten/Festlegungen.
-   */
-  const [mitBildern, setMitBildern] = useState(true);
-  const [exportiert, setExportiert] = useState(false);
-  const [exportFehler, setExportFehler] = useState<string | null>(null);
-  const [generatingField, setGeneratingField] = useState<
-    keyof ScenarioDetails | null
-  >(null);
-
-  /**
-   * Zusätzliche Wünsche für die Erzeugung, je Feld.
-   *
-   * **Wird nicht gespeichert** – wie „Bindung" und „Richtung" bei den
-   * Ansatzpunkten beschreibt der Wunsch nichts am Szenario, sondern wie man es
-   * gerade befragen will. Beim nächsten Öffnen der Seite ist das Feld leer,
-   * und das ist richtig so: Der Entwurf steht dann längst da.
-   *
-   * Er bleibt aber **nach** dem Erzeugen stehen, statt geleert zu werden – der
-   * häufigste Fall ist, dass man den Entwurf nicht mag und mit demselben
-   * Wunsch plus einer Ergänzung noch einmal drückt.
-   */
-  const [zusatz, setZusatz] = useState<
-    Partial<Record<keyof ScenarioDetails, string>>
-  >({});
-
-  /**
-   * Ob der nächste Handlungsentwurf den **aktuellen** als Grundlage nimmt
-   * (Checkbox „aktuellen Handlungsentwurf verwenden"). Dann geht `details.handlung`
-   * als `basis` mit, und die Stichwörter steuern zusätzlich, wohin sich die
-   * neue Fassung verschiebt. Wie der Zusatzwunsch **nicht gespeichert** – die
-   * Wahl beschreibt einen Lauf, nicht das Szenario.
-   */
-  const [handlungAlsBasis, setHandlungAlsBasis] = useState(false);
-
-  /**
-   * Ob der nächste Handlungsentwurf eine **vollständige Geschichte** skizziert
-   * (Checkbox „Handlung weiterspinnen") statt einer offenen Ausgangslage. Gilt
-   * unabhängig von der Basis-Option – frisch wie auf Basis eines vorhandenen
-   * Entwurfs. Nicht gespeichert (beschreibt einen Lauf).
-   */
-  const [handlungWeiterspinnen, setHandlungWeiterspinnen] = useState(false);
-
-  /**
-   * Ton und Sprache des Handlungsentwurfs (eigen neben dem Story-Arc-Ton, damit
-   * man Entwurf und Arc unabhängig einstellen kann). Nicht gespeichert.
-   */
-  const [handlungTon, setHandlungTon] = useState<StoryTone>(DEFAULT_STORY_TONE);
-
-  /**
-   * **Erzählform** des Handlungsentwurfs (Krimi, Liebe, Abenteuer …) – die dritte
-   * Achse neben Genre (Welt) und Ton (wie): sie prägt Konflikt und Aufbau. Eigen
-   * neben dem Story-Arc-Wert, damit Entwurf und Arc unabhängig einstellbar sind.
-   * Nicht gespeichert (beschreibt einen Lauf).
-   */
-  const [handlungForm, setHandlungForm] = useState<StoryForm>(DEFAULT_STORY_FORM);
-
-  /**
-   * Wie viele **neue benannte Personen** der nächste Entwurf zusätzlich einführt
-   * (0 = keine, wie bisher). Dazu optionale Namens-/Rollen-Vorgaben. Beides gilt
-   * für „Neu erzeugen" – frisch wie auf Basis eines vorhandenen Entwurfs – und
-   * wird **nicht gespeichert** (beschreibt einen Lauf, wie Ton und Weiterspinnen).
-   */
-  const [handlungNeuePersonen, setHandlungNeuePersonen] = useState(0);
-  const [handlungNeuePersonenWunsch, setHandlungNeuePersonenWunsch] =
-    useState("");
+  // Export/Löschen (Optionen + Handler) liegen im Hook `useScenarioExport` auf
+  // dem Dokument-Kern.
+  const {
+    mitCharakteren,
+    setMitCharakteren,
+    mitBildern,
+    setMitBildern,
+    exportiert,
+    exportFehler,
+    exportieren,
+    entfernen,
+  } = useScenarioExport(doc, id, router);
+  // Feld-Erzeugung + Handlungsentwurf-Lauf-Parameter (nicht gespeichert) im Hook
+  // `useScenarioFeldGen`. `generatingField` sperrt u. a. die Varianten-Knöpfe.
+  const {
+    generatingField,
+    zusatz,
+    setZusatz,
+    handlungAlsBasis,
+    setHandlungAlsBasis,
+    handlungWeiterspinnen,
+    setHandlungWeiterspinnen,
+    handlungNeuePersonen,
+    setHandlungNeuePersonen,
+    handlungNeuePersonenWunsch,
+    setHandlungNeuePersonenWunsch,
+    nameBusy,
+    nameFehler,
+    handleGenerate,
+    handlungFortsetzen,
+    nameErzeugen,
+  } = useScenarioFeldGen(doc, id, handlungProvider);
 
   /**
    * Ob eine Figur in Handlungsentwurf/Story Arc einfließt, entscheidet ihr
@@ -359,39 +140,34 @@ export default function ScenarioDetailPage({
    * es dafür nicht mehr.
    */
 
-  /**
-   * Aus einer einzelnen Figur einen Charakter ableiten (Knopf je Figur-Karte).
-   * `figurBusy` hält die gerade ausgelesene Figur (sperrt die Knöpfe),
-   * `figurFehler` einen Fehler dazu, `figurKandidat` die ausgelesene Person samt
-   * ihrer Figur – sie öffnet denselben `PlotPersonModal` wie die Plot-Suche.
-   */
-  const [figurBusy, setFigurBusy] = useState<string | null>(null);
-  const [figurFehler, setFigurFehler] = useState<{
-    figur: string;
-    text: string;
-  } | null>(null);
-  const [figurKandidat, setFigurKandidat] = useState<{
-    person: PlotPerson;
-    figur: string;
-  } | null>(null);
+  // Personensuche im Entwurf + Figur→Charakter-Extraktion liegen im Hook
+  // `usePlotPersonen` (inkl. dem speichern-vor-Navigation-Trick).
+  const {
+    suchend,
+    personen,
+    suchFehler,
+    gewaehlt,
+    setGewaehlt,
+    figurBusy,
+    figurFehler,
+    figurKandidat,
+    setFigurKandidat,
+    personenSuchen,
+    personAnlegen,
+    figurCharakterExtrahieren,
+    figurCharakterAnlegen,
+  } = usePlotPersonen(doc, id, router);
 
   // -------------------------------------------------------------------------
   // Weltbild des Szenarios
   // -------------------------------------------------------------------------
 
-  /**
-   * Die **gespeicherten** Weltbilder (ohne Originale). Wie beim Charakter kann
-   * ein Szenario mehrere Bilder haben; das Primärbild zeigt die Detailseite an,
-   * die gesamte Bedienung liegt in `ScenarioImageModal`. Das Modal meldet das
-   * geänderte Szenario über `onChange` zurück, damit die Liste hier aktuell bleibt.
-   */
-  const [bilder, setBilder] = useState<StoredImage[]>([]);
+  // Die Weltbilder (`bilder`) liegen jetzt im Dokument-Kern (`useScenarioDocument`),
+  // weil sie mit dem Szenario geladen werden; hier nur das Modal-Flag.
   const [bildModalOffen, setBildModalOffen] = useState(false);
 
   /** Ob das „Charakter hinzufügen"-Modal (bestehende Figur zuordnen) offen ist. */
   const [addOffen, setAddOffen] = useState(false);
-  /** Welche Figur gerade ihre Protagonisten-Markierung umschaltet (sperrt sie). */
-  const [protagonistBusy, setProtagonistBusy] = useState<string | null>(null);
 
   /**
    * Hier ist alles erzeugbar: Ort, Zeit und Regeln lassen sich ergänzen, die
@@ -407,259 +183,65 @@ export default function ScenarioDetailPage({
     "handlung",
   ]);
 
-  /**
-   * Die volle Variantenliste mit der aktiven Zelle auf dem **live editierten**
-   * Text: `details.handlung` ist die Wahrheit über die aktive Variante,
-   * `varianten` hält die übrigen. Zusammengeführt wird erst hier – so kostet das
-   * Tippen im Feld keine Spiegelung in die Liste. Hat ein Szenario noch gar
-   * keine gespeicherte Liste, wird ein von Hand getippter Entwurf zu Variante 1.
-   */
-  function aktuelleVarianten(): string[] {
-    return mergeVarianten(varianten, aktiv, details.handlung);
-  }
+  // Verwaltung der Handlungsentwurf-Varianten (Reiter) liegt in einem eigenen
+  // Hook auf dem Dokument-Kern (s. `hooks/usePlotVarianten`).
+  const {
+    varianteWaehlen,
+    titelAendern,
+    favoritUmschalten,
+    varianteKopieren,
+    varianteLoeschen,
+    alleVariantenLoeschen,
+    leerenEntwurfHinzufuegen,
+  } = usePlotVarianten(doc, generatingField);
 
-  /** Auf einen anderen Entwurf umschalten – der bisherige wird zuvor gesichert. */
-  function varianteWaehlen(i: number) {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (i < 0 || i >= items.length || i === aktiv) return;
-    setVarianten(items);
-    setAktiv(i);
-    setDetails((d) => ({ ...d, handlung: items[i] }));
-  }
-
-  /**
-   * Den Titel eines Entwurfs ändern (✎ am Reiter). Der Titel gehört zu den
-   * Metadaten und wird wie alles über „Änderungen speichern" abgelegt; leer
-   * lassen holt den Rückfall „Entwurf N" zurück. `prompt` bewusst schlicht – wie
-   * das `confirm` beim Löschen.
-   */
-  function titelAendern(i: number) {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(variantenMeta, items.length);
-    const neu = window.prompt(`Titel für Entwurf ${i + 1}:`, meta[i].titel);
-    if (neu === null) return;
-    setVariantenMeta(
-      meta.map((m, k) =>
-        k === i ? { ...m, titel: neu.trim().slice(0, 120) } : m,
-      ),
-    );
-  }
-
-  /**
-   * Einen Entwurf als **Favorit** markieren/entmarken (Stern am Reiter). Wie der
-   * Titel Teil der Metadaten – geht über „Änderungen speichern" (dirty).
-   */
-  function favoritUmschalten(i: number) {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(variantenMeta, items.length);
-    setVariantenMeta(
-      meta.map((m, k) => (k === i ? { ...m, favorit: !m.favorit } : m)),
-    );
-  }
-
-  /**
-   * Einen bestehenden Handlungsentwurf **kopieren** – analog zu `arcKopieren`:
-   * eine eigenständige Kopie des Entwurfs am Index `i`, angehängt und aktiv
-   * geschaltet. Der Titel bekommt „(Kopie)", Erzählform/Ton/Modell reisen mit, die
-   * Favorit-Markierung nicht. Ein Entwurf ist ein String – anders als der Arc
-   * braucht es keine tiefe Kopie. Kein KI-Aufruf; nur im Bearbeitungs-Zustand und
-   * gegen `MAX_PLOT_VARIANTS` geprüft.
-   */
-  function varianteKopieren(i: number) {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (i < 0 || i >= items.length) return;
-    if (items.length >= MAX_PLOT_VARIANTS) {
-      setSaveError(
-        `Mehr als ${MAX_PLOT_VARIANTS} Entwürfe werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
-      );
-      return;
-    }
-    const meta = ausgerichtet(variantenMeta, items.length);
-    const q = meta[i];
-    const kopieMeta: VariantMeta = {
-      ...q,
-      titel: q.titel.trim() ? `${q.titel.trim()} (Kopie)` : "",
-      favorit: false,
-    };
-    setVarianten([...items, items[i]]);
-    setAktiv(items.length);
-    setDetails((d) => ({ ...d, handlung: items[i] }));
-    setVariantenMeta([...meta, kopieMeta]);
-  }
-
-  /**
-   * Einen Entwurf löschen. Anders als beim einzelnen Ansatzpunkt fragt es hier
-   * nach – ein Handlungsentwurf ist ein großer, teuer erzeugter Text. Der letzte
-   * verbliebene lässt sich nicht über die Leiste löschen (dann verschwände die
-   * Umschaltung ganz); dafür ist das Feld selbst da.
-   */
-  function varianteLoeschen(i: number) {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (items.length <= 1) return;
-    if (!confirm(`Entwurf ${i + 1} löschen?`)) return;
-    const rest = items.filter((_, k) => k !== i);
-    const na =
-      i === aktiv ? Math.min(i, rest.length - 1) : i < aktiv ? aktiv - 1 : aktiv;
-    setVarianten(rest);
-    setAktiv(na);
-    setDetails((d) => ({ ...d, handlung: rest[na] }));
-    setVariantenMeta(ausgerichtet(variantenMeta, items.length).filter((_, k) => k !== i));
-  }
-
-  /**
-   * Alle Entwürfe auf einmal löschen. Anders als `varianteLoeschen` bleibt hier
-   * **keiner** stehen: das Feld wird geleert, die Leiste verschwindet. Rückfrage
-   * mit Zahl, weil hier mehrere teuer erzeugte Texte auf einmal gehen. Wie das
-   * einzelne Löschen nur im Bearbeitungs-Zustand – „Verwerfen" holt die
-   * gespeicherten Entwürfe zurück, „Änderungen speichern" macht die Leerung
-   * dauerhaft.
-   */
-  function alleVariantenLoeschen() {
-    if (generatingField || saving) return;
-    const anzahl = aktuelleVarianten().length;
-    if (anzahl === 0) return;
-    if (!confirm(`Alle ${anzahl} Entwürfe löschen?`)) return;
-    setVarianten([]);
-    setAktiv(0);
-    setDetails((d) => ({ ...d, handlung: "" }));
-    setVariantenMeta([]);
-  }
-
-  /**
-   * Einen **leeren** Entwurf anhängen und auf ihn umschalten – der Gegenpol zu
-   * „✨ Neu erzeugen": kein KI-Aufruf, sondern ein leeres Feld zum
-   * Selbstschreiben (wie „➕ Station hinzufügen" beim Story Arc). Nur im
-   * Bearbeitungs-Zustand; „Verwerfen" nimmt ihn wieder zurück.
-   */
-  function leerenEntwurfHinzufuegen() {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (items.length >= MAX_PLOT_VARIANTS) {
-      setSaveError(
-        `Mehr als ${MAX_PLOT_VARIANTS} Entwürfe werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
-      );
-      return;
-    }
-    const neu = [...items, ""];
-    setVarianten(neu);
-    setAktiv(neu.length - 1);
-    setDetails((d) => ({ ...d, handlung: "" }));
-    setVariantenMeta([...ausgerichtet(variantenMeta, items.length), LEER_META]);
-  }
-
-  // --- Story-Arc-Varianten (analog zu den Handlungsentwürfen) --------------
-
-  /**
-   * Die volle Arc-Liste mit der aktiven Zelle auf dem **live bearbeiteten** Arc
-   * (`storyArc`): dieser ist die Wahrheit über die aktive Variante, `arcVarianten`
-   * hält die übrigen. Zusammengeführt erst hier – so kostet keine Bearbeitung
-   * eine Spiegelung in die Liste. Ohne gespeicherte Liste wird ein von Hand
-   * aufgebauter Arc zu Arc 1.
-   */
-  function aktuelleArcs(): StoryArc[] {
-    return mergeArcs(arcVarianten, arcAktiv, storyArc);
-  }
-
-  /** Auf einen anderen Arc umschalten – der bisherige wird zuvor gesichert. */
-  function arcWaehlen(i: number) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length || i === arcAktiv) return;
-    setArcVarianten(items);
-    setArcAktiv(i);
-    setStoryArc(items[i]);
-  }
-
-  /** Den Titel eines Story Arcs ändern (✎ am Reiter) – analog zu `titelAendern`. */
-  function arcTitelAendern(i: number) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(arcMeta, items.length);
-    const neu = window.prompt(`Titel für Story Arc ${i + 1}:`, meta[i].titel);
-    if (neu === null) return;
-    setArcMeta(
-      meta.map((m, k) =>
-        k === i ? { ...m, titel: neu.trim().slice(0, 120) } : m,
-      ),
-    );
-  }
-
-  /**
-   * Einen **neuen Titel per KI** für einen Story Arc erzeugen (✨ am Reiter) –
-   * dieselbe Zusammenfassung der Stationen wie beim Ableiten (`generateStoryTitle`
-   * mit `art: "arc"`). Ersetzt den bisherigen Titel in `meta[i]`; das geht wie
-   * die manuelle Änderung in `dirty` ein und wird über „Änderungen speichern"
-   * abgelegt. Persistiert selbst nichts.
-   */
-  async function arcTitelNeu(i: number) {
-    if (arcBusy || saving || arcTitelBusy !== null) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    const arcText = items[i].stufen
-      .map((s) => [s.titel, s.beschreibung].filter(Boolean).join(": "))
-      .join("\n")
-      // Die Route deckelt den Text bei 8000 Zeichen; für einen Titel genügt eine
-      // Zusammenfassung, also vorsorglich kappen.
-      .slice(0, 8000);
-    if (!arcText.trim()) return;
-    setArcTitelBusy(i);
-    setArcFehler(null);
-    try {
-      const titel = await generateStoryTitle(arcText, "arc");
-      const neu = titel.trim().slice(0, 120);
-      if (neu) {
-        const meta = ausgerichtet(arcMeta, items.length);
-        setArcMeta(meta.map((m, k) => (k === i ? { ...m, titel: neu } : m)));
-      }
-    } catch (e) {
-      setArcFehler(e instanceof Error ? e.message : "Titel fehlgeschlagen.");
-    } finally {
-      setArcTitelBusy(null);
-    }
-  }
-
-  /** Einen Story Arc als **Favorit** markieren/entmarken – analog zu `favoritUmschalten`. */
-  function arcFavoritUmschalten(i: number) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(arcMeta, items.length);
-    setArcMeta(meta.map((m, k) => (k === i ? { ...m, favorit: !m.favorit } : m)));
-  }
-
-  /**
-   * Das **Cover** eines Story Arcs setzen (`""` = Weltbild, `"char:<id>"` =
-   * Charakterporträt). Steuert das Titelbild in der Bibliothek; geht wie Titel/
-   * Favorit in `dirty` ein und wird über „Änderungen speichern" abgelegt.
-   */
-  function arcCoverSetzen(i: number, cover: string) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(arcMeta, items.length);
-    setArcMeta(meta.map((m, k) => (k === i ? { ...m, cover } : m)));
-  }
-
-  /**
-   * Den Story Arc `i` als **Buch in der Bibliothek** an-/abwählen
-   * (`meta.alsBuch`, Default aus). Wie Cover/Titel/Favorit ein Metadaten-Belang:
-   * geht in `dirty` ein und wird über „Änderungen speichern" abgelegt.
-   */
-  function arcAlsBuchSetzen(i: number, alsBuch: boolean) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(arcMeta, items.length);
-    setArcMeta(meta.map((m, k) => (k === i ? { ...m, alsBuch } : m)));
-  }
+  // Story-Arc-Varianten (Reiter + Ableiten) und die Kapitel-Erzeugung liegen in
+  // eigenen Hooks auf dem Dokument-Kern. `arcProvider` (Pro-Lauf-Modell) deckt
+  // Arc, Kapitelableitung und Kapitel-Prosa gemeinsam ab.
+  const {
+    arcBusy,
+    arcFehler,
+    arcTitelBusy,
+    arcWaehlen,
+    arcTitelAendern,
+    arcTitelNeu,
+    arcFavoritUmschalten,
+    arcCoverSetzen,
+    arcAlsBuchSetzen,
+    arcKopieren,
+    arcLoeschen,
+    alleArcsLoeschen,
+    storyArcAbleiten,
+  } = useStoryArc(doc, id, arcProvider);
+  const {
+    kapitelBusy,
+    kapitelFehler,
+    kapitelTextBusy,
+    kapitelTextFehler,
+    kapitelModell,
+    storyTextModell,
+    kapitelAbleiten,
+    kapitelTextGenerieren,
+  } = useKapitel(doc, id, arcProvider);
+  const {
+    selectedChar,
+    setSelectedChar,
+    genreSync,
+    setGenreSync,
+    genreSyncBusy,
+    genreSyncFehler,
+    protagonistBusy,
+    allScenarios,
+    setAllScenarios,
+    charLoeschen,
+    charInhaltSpeichern,
+    charAktualisiert,
+    festlegungenAendern,
+    genreUebertragen,
+    charZuordnen,
+    charHinzugefuegt,
+    protagonistUmschalten,
+  } = useScenarioCharacters(doc, id);
 
   /** Charaktere in der Form, die der Cover-Picker braucht (Name, Porträt, Protagonist). */
   const coverCharaktere = characters.map((c) => ({
@@ -668,251 +250,6 @@ export default function ScenarioDetailPage({
     thumbnail: primaryImage(c)?.thumbnail ?? null,
     isProtagonist: c.isProtagonist,
   }));
-
-  /**
-   * Einen bestehenden Story Arc **kopieren** – eine eigenständige Kopie des
-   * Arcs am Index `i` (tiefe Kopie samt Stationen und Kapiteln), angehängt und
-   * aktiv geschaltet. Der Titel bekommt „(Kopie)", Form/Ton/Quelle reisen mit,
-   * die Favorit-Markierung nicht. Kein KI-Aufruf; nur im Bearbeitungs-Zustand.
-   */
-  function arcKopieren(i: number) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    if (items.length >= MAX_STORY_ARCS) {
-      setArcFehler(
-        `Mehr als ${MAX_STORY_ARCS} Story Arcs werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
-      );
-      return;
-    }
-    // Tiefe Kopie, damit das Bearbeiten der Kopie das Original nicht anrührt.
-    const kopie = JSON.parse(JSON.stringify(items[i])) as StoryArc;
-    const meta = ausgerichtet(arcMeta, items.length);
-    const q = meta[i];
-    const kopieMeta: VariantMeta = {
-      ...q,
-      titel: q.titel.trim() ? `${q.titel.trim()} (Kopie)` : "",
-      favorit: false,
-      // Die Kopie ist ein frischer Arbeitsstand – nicht automatisch ein Buch.
-      alsBuch: false,
-    };
-    setArcVarianten([...items, kopie]);
-    setArcAktiv(items.length);
-    setStoryArc(kopie);
-    setArcMeta([...meta, kopieMeta]);
-  }
-
-  /**
-   * Einen Arc löschen. Wie beim Handlungsentwurf mit Rückfrage – ein Arc ist
-   * eine große, teuer erzeugte Struktur. Der letzte verbliebene lässt sich nicht
-   * über die Leiste löschen; dafür ist „Alle löschen" da.
-   */
-  function arcLoeschen(i: number) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (items.length <= 1) return;
-    if (!confirm(`Story Arc ${i + 1} löschen?`)) return;
-    const rest = items.filter((_, k) => k !== i);
-    const na =
-      i === arcAktiv
-        ? Math.min(i, rest.length - 1)
-        : i < arcAktiv
-          ? arcAktiv - 1
-          : arcAktiv;
-    setArcVarianten(rest);
-    setArcAktiv(na);
-    setStoryArc(rest[na]);
-    setArcMeta(ausgerichtet(arcMeta, items.length).filter((_, k) => k !== i));
-  }
-
-  /**
-   * Alle Arcs auf einmal löschen – zurück zum ruhenden Zustand `{ stufen: [] }`.
-   * Rückfrage mit Zahl. Nur im Bearbeitungs-Zustand; „Verwerfen" holt die
-   * gespeicherten Arcs zurück.
-   */
-  function alleArcsLoeschen() {
-    if (arcBusy || saving) return;
-    const anzahl = aktuelleArcs().length;
-    if (anzahl === 0) return;
-    if (!confirm(`Alle ${anzahl} Story Arcs löschen?`)) return;
-    setArcVarianten([]);
-    setArcAktiv(0);
-    setStoryArc({ stufen: [] });
-    setArcMeta([]);
-  }
-
-  /**
-   * Ein Textfeld per KI erzeugen. Das Ergebnis landet als **ungespeicherte
-   * Änderung** im Formular – wie überall sonst muss „Verwerfen" den alten Text
-   * zurückbringen können. Die Rückfrage schützt von Hand Geschriebenes.
-   *
-   * Die Festlegungen gehen im **aktuellen, womöglich ungespeicherten** Stand
-   * mit: wer gerade die Regeln umgeschrieben hat, meint die neuen. Die
-   * Charaktere für den Handlungsentwurf lädt dagegen die Route selbst – die
-   * gespeicherte Zuordnung ist dort die einzige, die es gibt.
-   */
-  async function handleGenerate(key: keyof ScenarioDetails, anzahl?: number) {
-    if (generatingField) return;
-    // Ort, Zeit und Regeln werden **ergänzt**, der Handlungsentwurf **angehängt**
-    // (als neue Variante) – in allen dreien kann nichts verlorengehen, also
-    // fragt nichts nach. Nur die Beschreibung wird ersetzt; von Hand
-    // Geschriebenes wäre dort sonst still weg.
-    const ersetzt = key === "beschreibung";
-    if (
-      ersetzt &&
-      details[key].trim() &&
-      !confirm(`${SCENARIO_LABELS[key]} wird ersetzt. Fortfahren?`)
-    )
-      return;
-    setGeneratingField(key);
-    setSaveError(null);
-    try {
-      if (key === "ort" || key === "zeit" || key === "regeln") {
-        // Ergänzen statt ersetzen: Was im Feld steht, geht als Vorgabe mit und
-        // kommt im Ergebnis wieder vor. Deshalb hier auch keine Rückfrage –
-        // es kann nichts verlorengehen.
-        const { wert } = await generateScenarioField(
-          key,
-          name.trim(),
-          details,
-          zusatz[key] ?? "",
-        );
-        setDetails((d) => ({ ...d, [key]: wert }));
-      } else if (key === "figuren") {
-        // Wie Ort/Zeit/Regeln **ergänzt**: Vorhandenes bleibt stehen und prägt
-        // die neuen Figuren; die Route gibt das ganze Feld zurück (Vorhandenes
-        // + etwa drei neue). Deshalb keine Rückfrage.
-        const { wert } = await generateScenarioFigures(
-          name.trim(),
-          details,
-          zusatz.figuren ?? "",
-          anzahl,
-        );
-        setDetails((d) => ({ ...d, figuren: wert }));
-      } else if (key === "handlung") {
-        // Jeder Lauf hängt einen **neuen** Entwurf an und schaltet auf ihn um –
-        // der vorige bleibt als Variante erhalten.
-        if (aktuelleVarianten().length >= MAX_PLOT_VARIANTS) {
-          setSaveError(
-            `Mehr als ${MAX_PLOT_VARIANTS} Entwürfe werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
-          );
-          return;
-        }
-        // Ist die Checkbox an, geht der **aktive** Entwurf als Grundlage mit –
-        // im live editierten Stand, wie überall. Sonst leer (Entwurf aus Welt
-        // und Figuren wie bisher).
-        const basis =
-          handlungAlsBasis && details.handlung.trim() ? details.handlung : "";
-        const { handlung, model } = await generateScenarioPlot(
-          id,
-          name.trim(),
-          // Nur **aktive** Figuren und **aktive** Handlungselemente (reiner Text
-          // ohne Markup) fließen ein; sind keine aktiv, ist das jeweilige Feld
-          // leer und der Prompt zeichengenau der von vorher.
-          {
-            ...details,
-            figuren: aktiveFiguren(details.figuren),
-            handlungselemente: aktiveEintraege(details.handlungselemente),
-          },
-          zusatz.handlung ?? "",
-          basis,
-          handlungWeiterspinnen,
-          handlungTon,
-          handlungNeuePersonen,
-          handlungNeuePersonenWunsch,
-          handlungForm,
-          handlungProvider,
-        );
-        // Kurzer Titel für die Reiter-Leiste. Scheitert der Aufruf, bleibt er
-        // leer – der Reiter zeigt dann „Entwurf N", der Entwurf entsteht trotzdem.
-        let titel = "";
-        try {
-          titel = await generateStoryTitle(handlung, "entwurf");
-        } catch {
-          // Titel ist Beiwerk.
-        }
-        const alt = aktuelleVarianten();
-        setVarianten([...alt, handlung]);
-        setAktiv(alt.length);
-        setDetails((d) => ({ ...d, handlung }));
-        setVariantenMeta([
-          ...ausgerichtet(variantenMeta, alt.length),
-          {
-            titel,
-            form: handlungForm,
-            ton: handlungTon,
-            favorit: false,
-            quelle: "",
-            modell: model,
-            // Handlungsentwürfe kennen keine Werkform – leer.
-            werkform: "",
-            // Cover ist ein Buch-/Arc-Belang; Handlungsentwürfe tragen keins.
-            cover: "",
-            // „Als Buch" ist ein Arc-Belang; Handlungsentwürfe tragen es nicht.
-            alsBuch: false,
-          },
-        ]);
-      } else {
-        const { beschreibung } = await generateScenarioDescription(
-          name.trim(),
-          details,
-          zusatz.beschreibung ?? "",
-        );
-        setDetails((d) => ({ ...d, beschreibung }));
-      }
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setGeneratingField(null);
-    }
-  }
-
-  /**
-   * **Den aktiven Handlungsentwurf fortsetzen** – anders als „✨ Neu erzeugen"
-   * kein neuer Reiter, sondern der vorhandene Text im Feld wächst weiter. Die
-   * Route bekommt den aktuellen Text als `basis` und liefert **nur die
-   * Fortsetzung**; die wird an `details.handlung` angehängt (die live-Wahrheit
-   * der aktiven Variante). Geht damit in `dirty` – gespeichert wird über
-   * „Änderungen speichern". Nutzt dieselben Lauf-Parameter wie „Neu erzeugen"
-   * (Ton, Erzählform, Weiterspinnen, neue Personen, Modell, Stichwörter).
-   */
-  async function handlungFortsetzen() {
-    if (generatingField || saving) return;
-    if (!details.handlung.trim()) return;
-    setGeneratingField("handlung");
-    setSaveError(null);
-    try {
-      const { handlung: fortsetzung } = await generateScenarioPlot(
-        id,
-        name.trim(),
-        {
-          ...details,
-          figuren: aktiveFiguren(details.figuren),
-          handlungselemente: aktiveEintraege(details.handlungselemente),
-        },
-        zusatz.handlung ?? "",
-        details.handlung, // basis = der fortzusetzende Text
-        handlungWeiterspinnen,
-        handlungTon,
-        handlungNeuePersonen,
-        handlungNeuePersonenWunsch,
-        handlungForm,
-        handlungProvider,
-        true, // fortsetzen
-      );
-      const neu = fortsetzung.trim();
-      if (neu) {
-        setDetails((d) => ({
-          ...d,
-          handlung: `${d.handlung.trimEnd()}\n\n${neu}`,
-        }));
-      }
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setGeneratingField(null);
-    }
-  }
 
   // Anzeige-Einstellung laden (ob das verwendete Modell mit angezeigt wird).
   // Scheitert der Aufruf, bleibt es beim Default aus.
@@ -926,247 +263,9 @@ export default function ScenarioDetailPage({
       .catch(() => {});
   }, []);
 
-  // --- Zuletzt gewählte Lauf-Parameter je Szenario (localStorage) -----------
-  // Handlungsentwurf (Form/Ton) und Story Arc (`arcParams` ohne `zusatz`) merken
-  // sich pro Szenario. Bewusst clientseitig und getrennt von „Änderungen
-  // speichern": es sind Lauf-Parameter, kein Szenario-Inhalt (s.
-  // `scenarioRunParams.ts`). Geladen werden sie unten im getScenario-`.then`
-  // (dort ist setState ohnehin üblich); `runParamsGeladen` schaltet den
-  // Schreib-Effekt erst danach scharf, damit er die geladenen Werte nicht mit
-  // Defaults überschreibt.
-  const runParamsGeladen = useRef(false);
+  // Laden, Speichern/Verwerfen und das localStorage-Gedächtnis der Lauf-Parameter
+  // liegen jetzt im Dokument-Kern (`useScenarioDocument`, oben).
 
-  useEffect(() => {
-    runParamsGeladen.current = false; // beim (Neu-)Laden erst nach dem .then scharf
-    getScenario(id)
-      .then(({ scenario, characters }) => {
-        setName(scenario.name);
-        setDetails(scenario.details);
-        setVarianten(scenario.plotVariants.items);
-        setAktiv(scenario.plotVariants.aktiv);
-        setVariantenMeta(scenario.plotVariants.meta);
-        setStoryArc(scenario.storyArc);
-        setArcVarianten(scenario.storyArcVariants.items);
-        setArcAktiv(scenario.storyArcVariants.aktiv);
-        setArcMeta(scenario.storyArcVariants.meta);
-        setCharacters(characters);
-        setBilder(scenario.images);
-        setSaved(
-          savedSnapshot({
-            name: scenario.name,
-            details: scenario.details,
-            plotVariants: scenario.plotVariants,
-            storyArcVariants: scenario.storyArcVariants,
-          }),
-        );
-        // Gemerkte Lauf-Parameter dieses Szenarios anwenden, dann den
-        // Schreib-Effekt scharf schalten.
-        const g = ladeRunParams(id);
-        setHandlungForm(g.handlung.form);
-        setHandlungTon(g.handlung.ton);
-        setArcParams((p) => ({ ...p, ...g.arc }));
-        runParamsGeladen.current = true;
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Fehler."))
-      .finally(() => setLoading(false));
-  }, [id]);
-
-  // Merken (bei Änderung). Erst nach dem Laden, und ohne den `zusatz` (der
-  // beschreibt einen einzelnen Lauf, keine dauerhafte Vorliebe).
-  useEffect(() => {
-    if (!runParamsGeladen.current) return;
-    speichereRunParams(id, {
-      handlung: { form: handlungForm, ton: handlungTon },
-      arc: {
-        werkform: arcParams.werkform,
-        laenge: arcParams.laenge,
-        format: arcParams.format,
-        kapitelAnzahl: arcParams.kapitelAnzahl,
-        kapitelLaenge: arcParams.kapitelLaenge,
-        ton: arcParams.ton,
-        form: arcParams.form,
-        kreativ: arcParams.kreativ,
-        weiterspinnen: arcParams.weiterspinnen,
-      },
-    });
-  }, [id, handlungForm, handlungTon, arcParams]);
-
-  // Alle Szenarien fürs Zuordnungs-Menü des Detail-Modals. Getrennt vom
-  // Haupt-Load, weil es unabhängig und nicht kritisch ist – schlägt es fehl,
-  // bleibt die Liste leer (das Menü zeigt dann nur „kein Szenario").
-  useEffect(() => {
-    listScenarios()
-      .then(setAllScenarios)
-      .catch(() => {});
-  }, []);
-
-  // ---------------------------------------------------------------------------
-  // Angehängten Charakter bearbeiten (dasselbe Detail-Modal wie in der Galerie)
-  // ---------------------------------------------------------------------------
-
-  async function charLoeschen(cid: string) {
-    await deleteCharacter(cid);
-    setCharacters((cs) => cs.filter((c) => c.id !== cid));
-    setSelectedChar(null);
-  }
-
-  async function charInhaltSpeichern(
-    cid: string,
-    character: GeneratedCharacter,
-    storyHooks: string,
-    genre: string,
-  ) {
-    const updated = await updateCharacterContent(
-      cid,
-      character,
-      storyHooks,
-      genre,
-    );
-    setCharacters((cs) => cs.map((c) => (c.id === cid ? updated : c)));
-    setSelectedChar(updated);
-  }
-
-  // Bild-Operationen im Modal liefern den vollständigen aktualisierten Charakter
-  // zurück – hier in Liste und Auswahl übernehmen.
-  function charAktualisiert(updated: StoredCharacter) {
-    setCharacters((cs) => cs.map((c) => (c.id === updated.id ? updated : c)));
-    setSelectedChar(updated);
-  }
-
-  /**
-   * Genre-Änderung an den Festlegungen abfangen: Wird das Genre auf ein
-   * **anderes, nicht-leeres** Genre gesetzt und tragen zugeordnete Figuren ein
-   * abweichendes Genre, öffnet sich die Rückfrage `GenreSyncModal`. Der
-   * Feld-Wert selbst wird immer übernommen (`setDetails`) – die Übertragung auf
-   * die Figuren ist davon unabhängig und nur auf Bestätigung. Ein Wechsel auf
-   * „— keins —" fragt nicht (den Figuren ein leeres Genre aufzudrücken hieße,
-   * sie auf „Gegenwart" zurückzustufen).
-   */
-  function festlegungenAendern(next: ScenarioDetails) {
-    if (
-      next.genre &&
-      next.genre !== details.genre &&
-      characters.some((c) => c.input.genre !== next.genre)
-    ) {
-      const betroffen = characters.filter((c) => c.input.genre !== next.genre);
-      setGenreSyncFehler(null);
-      setGenreSync({ genre: next.genre, betroffen });
-    }
-    setDetails(next);
-  }
-
-  /**
-   * Das neue Genre auf die betroffenen Figuren übertragen (Teil-PATCH je Figur,
-   * nur das Genre). Sofort persistiert – unabhängig vom „Änderungen speichern"
-   * der Festlegungen, wie die übrigen Figuren-Operationen dieser Seite.
-   */
-  async function genreUebertragen() {
-    if (!genreSync || genreSyncBusy) return;
-    setGenreSyncBusy(true);
-    setGenreSyncFehler(null);
-    try {
-      const aktualisiert = await Promise.all(
-        genreSync.betroffen.map((c) => updateCharacterGenre(c.id, genreSync.genre)),
-      );
-      const beiId = new Map(aktualisiert.map((c) => [c.id, c]));
-      setCharacters((cs) => cs.map((c) => beiId.get(c.id) ?? c));
-      setSelectedChar((sel) => (sel ? beiId.get(sel.id) ?? sel : sel));
-      setGenreSync(null);
-    } catch (e) {
-      setGenreSyncFehler(e instanceof Error ? e.message : "Übertragen fehlgeschlagen.");
-    } finally {
-      setGenreSyncBusy(false);
-    }
-  }
-
-  /**
-   * Namen aus den Welt-Feldern (Beschreibung/Ort/Zeit/Regeln) per KI erzeugen.
-   * Der Vorschlag geht ins Namensfeld (Bearbeitungs-Zustand → `dirty`); die
-   * Route persistiert nichts, gespeichert wird über „Änderungen speichern".
-   */
-  async function nameErzeugen() {
-    if (nameBusy) return;
-    setNameBusy(true);
-    setNameFehler(null);
-    try {
-      const vorschlag = await generateScenarioName(details);
-      if (vorschlag) setName(vorschlag);
-    } catch (e) {
-      setNameFehler(e instanceof Error ? e.message : "Name fehlgeschlagen.");
-    } finally {
-      setNameBusy(false);
-    }
-  }
-
-  /**
-   * Zuordnung ändern. Wird der Charakter einem **anderen** Szenario (oder
-   * keinem) zugewiesen, gehört er nicht mehr hierher – dann fällt seine Kachel
-   * weg und das Modal schließt. Bleibt er bei diesem Szenario, wird er nur
-   * aktualisiert.
-   */
-  async function charZuordnen(cid: string, scenarioId: string | null) {
-    const updated = await updateCharacterScenario(cid, scenarioId);
-    if (updated.scenarioId === id) {
-      setCharacters((cs) => cs.map((c) => (c.id === cid ? updated : c)));
-      setSelectedChar(updated);
-    } else {
-      setCharacters((cs) => cs.filter((c) => c.id !== cid));
-      setSelectedChar(null);
-    }
-  }
-
-  /**
-   * Ein über „Charakter hinzufügen" zugeordneter oder kopierter Charakter –
-   * in die Kachelliste einreihen. Dedupe nach Id, falls er (z. B. nach einem
-   * Reload im Modal) schon dabei wäre.
-   */
-  function charHinzugefuegt(neu: StoredCharacter) {
-    setCharacters((cs) =>
-      cs.some((c) => c.id === neu.id) ? cs : [...cs, neu],
-    );
-  }
-
-  /**
-   * Eine Figur als Protagonist markieren/entmarken. Wie die Zuordnung sofort
-   * persistiert (eigener PATCH, kann nichts halb geändert sein). Ist das
-   * Detail-Modal für dieselbe Figur offen, zieht seine Auswahl mit.
-   */
-  async function protagonistUmschalten(c: StoredCharacter) {
-    if (protagonistBusy) return;
-    setProtagonistBusy(c.id);
-    try {
-      const updated = await updateCharacterProtagonist(c.id, !c.isProtagonist);
-      setCharacters((cs) => cs.map((x) => (x.id === c.id ? updated : x)));
-      setSelectedChar((sel) => (sel && sel.id === c.id ? updated : sel));
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setProtagonistBusy(null);
-    }
-  }
-
-  // Der aktuelle Stand als Vergleichswert für den „Ungespeichert"-Balken. Die
-  // Handlungsvarianten gehören dazu: Umschalten und Anhängen sind Änderungen,
-  // die gespeichert werden wollen.
-  // `meta` geht mit in den Vergleich – sonst wiche er schon an der fehlenden
-  // Metadaten-Liste ab (die `saved` enthält). Ein neuer Titel oder eine
-  // gelöschte Variante markiert damit korrekt „ungespeichert". Die exakte
-  // (asymmetrische) Form steckt in `@/lib/scenarioDocument` und ist dort getestet.
-  const dirty = isDirty(
-    saved,
-    currentSnapshot({
-      name,
-      details,
-      varianten,
-      aktiv,
-      variantenMeta,
-      storyArc,
-      arcVarianten,
-      arcAktiv,
-      arcMeta,
-    }),
-  );
-  const nameValid = name.trim().length > 0;
   // Das anzuzeigende Weltbild – das Primärbild (wie beim Charakter abgeleitet).
   const weltbildVorschau = primaryImage({ images: bilder })?.thumbnail ?? null;
   // Für die Reiter-Leiste: die Entwürfe im aktuellen (womöglich ungespeicherten)
@@ -1174,479 +273,8 @@ export default function ScenarioDetailPage({
   // wählen, und der Handlungsentwurf steht ohnehin im Feld darunter.
   const variantenAnzeige = aktuelleVarianten();
 
-  // -------------------------------------------------------------------------
-  // Personen aus dem Handlungsentwurf
-  // -------------------------------------------------------------------------
-
-  /**
-   * Das Suchergebnis **zusammen mit dem Text, zu dem es gehört**.
-   *
-   * Ändert sich der Entwurf, ist das Ergebnis hinfällig – es verweist auf
-   * Sätze, die so nicht mehr dastehen. Statt es in einem Effekt zurückzusetzen
-   * (was einen Moment lang die falsche Liste zeigt und das Zurücksetzen an
-   * jeder Änderungsstelle erzwingt), wird die Gültigkeit **abgeleitet**: Ein
-   * Ergebnis zählt nur, solange sein Text noch der aktuelle ist.
-   */
-  const [ergebnis, setErgebnis] = useState<{
-    handlung: string;
-    personen: PlotPerson[] | null;
-    fehler: string | null;
-  } | null>(null);
-  const [suchend, setSuchend] = useState(false);
-  /** Die Person, für die gerade die Rückfrage offen ist. */
-  const [gewaehlt, setGewaehlt] = useState<PlotPerson | null>(null);
-
-  const aktuell =
-    ergebnis && ergebnis.handlung === details.handlung ? ergebnis : null;
-  /** `null` heißt „noch nicht gesucht", `[]` heißt „gesucht, nichts gefunden". */
-  const personen = aktuell?.personen ?? null;
-  const suchFehler = aktuell?.fehler ?? null;
-
-  async function personenSuchen() {
-    const handlung = details.handlung;
-    if (suchend || !handlung.trim()) return;
-    setSuchend(true);
-    setErgebnis(null);
-    try {
-      const { personen } = await findPlotPersons(id, handlung);
-      setErgebnis({ handlung, personen, fehler: null });
-    } catch (e) {
-      setErgebnis({
-        handlung,
-        personen: null,
-        fehler: e instanceof Error ? e.message : "Fehler.",
-      });
-    } finally {
-      setSuchend(false);
-    }
-  }
-
-  /**
-   * Die Person ans Erstellen-Formular übergeben. Der Umweg über
-   * `sessionStorage` statt über die Adresse ist in `personHandoff.ts`
-   * begründet; `?scenario=` bleibt daneben stehen, weil es die Zuordnung und
-   * die Weltvorbelegung auslöst – beides gilt hier genauso.
-   *
-   * Von **beiden** Suchen genutzt (Handlungsentwurf und Figuren-Feld) – die
-   * Übergabe ist gleich, nur die Quelle des Vorschlags unterscheidet sich.
-   */
-  function personAnlegen(person: PlotPerson) {
-    stashPlotPerson(person);
-    router.push(`/?scenario=${id}`);
-  }
-
-  /**
-   * Aus **einer** Figur einen Charakter ableiten – der Knopf je Figur-Karte.
-   * Er löst dieselbe Extraktion aus wie die frühere „Personen im Figuren-Feld
-   * suchen", nur auf genau diese eine Notiz statt auf das ganze Feld: Die Route
-   * liest daraus Name, Rolle und die weiteren Angaben und schlägt eine Person
-   * vor, die dann `PlotPersonModal` zur Bestätigung zeigt (`figurKandidat`).
-   *
-   * Findet die Route nichts Neues (etwa weil es die Figur schon als Charakter
-   * gibt), erscheint der Hinweis an der Karte statt eines leeren Dialogs.
-   */
-  async function figurCharakterExtrahieren(figur: string) {
-    if (figurBusy) return;
-    const text = figur.trim();
-    if (!text) return;
-    setFigurBusy(figur);
-    setFigurFehler(null);
-    try {
-      const { personen } = await findFigurePersons(id, text);
-      if (personen.length === 0) {
-        setFigurFehler({
-          figur,
-          text: "Kein neuer Charakter ableitbar – vielleicht gibt es die Figur schon.",
-        });
-      } else {
-        setFigurKandidat({ person: personen[0], figur });
-      }
-    } catch (e) {
-      setFigurFehler({
-        figur,
-        text: e instanceof Error ? e.message : "Fehler.",
-      });
-    } finally {
-      setFigurBusy(null);
-    }
-  }
-
-  /**
-   * Die aus einer Figur abgeleitete Person ans Erstellen-Formular übergeben –
-   * und **die Figur aus der Liste nehmen**: Sie wird zum Charakter, die Notiz ist
-   * damit erledigt. Damit die Entfernung den Seitenwechsel überlebt (die
-   * Navigation zum Formular verwirft ungespeicherte Änderungen), wird der
-   * bearbeitete Stand mit der entfernten Figur zuvor **gespeichert** – das nimmt
-   * dem „erst speichern"-Hinweis zugleich seinen Grund. Schlägt das Speichern
-   * fehl, bleibt man auf der Seite (mit Fehlermeldung) statt den Charakter ohne
-   * gesicherte Entfernung anzulegen.
-   */
-  async function figurCharakterAnlegen() {
-    if (!figurKandidat) return;
-    const { person, figur } = figurKandidat;
-    // Über die **normalisierte** Form vergleichen: Die Karte kann einen internen
-    // Umbruch tragen, den `details.figuren` längst zu einem Leerzeichen eingeebnet
-    // hat – ein roher `!==`-Vergleich träfe die Figur dann nicht. Die Aktiv-Wahl
-    // der übrigen Figuren bleibt dabei erhalten (`splitFigurenDetail`).
-    const ziel = figur.replace(/\s*\n\s*/g, " ").trim();
-    const rest = splitFigurenDetail(details.figuren).filter(
-      (f) => f.text !== ziel,
-    );
-    const neueDetails = { ...details, figuren: joinFigurenDetail(rest) };
-    setDetails(neueDetails);
-    setFigurKandidat(null);
-    if (nameValid) {
-      const ok = await speichern(neueDetails);
-      if (!ok) return;
-    }
-    stashPlotPerson(person);
-    router.push(`/?scenario=${id}`);
-  }
-
-  /**
-   * Den Story Arc aus dem **aktiven** Handlungsentwurf ableiten. Das Ergebnis
-   * landet als ungespeicherte Änderung im Bearbeitungs-Zustand – wie überall
-   * muss „Verwerfen" den vorherigen Arc zurückbringen können. Der Entwurf geht
-   * im aktuellen, womöglich ungespeicherten Stand mit (`details.handlung`); die
-   * Figuren lädt die Route selbst über die gespeicherte Zuordnung.
-   *
-   * Wie beim Handlungsentwurf **hängt** jedes Ableiten einen weiteren Arc an,
-   * statt den vorigen zu ersetzen – der häufigste Fall ist, dass ein Arc den
-   * Aufbau besser trifft und ein anderer das Ende, und man will beide
-   * nebeneinander halten. Die Reiter-Leiste schaltet um. Keine Rückfrage: der
-   * Knopf ersetzt nichts mehr, „Verwerfen" bleibt der Rückweg.
-   */
-  async function storyArcAbleiten() {
-    if (arcBusy || !details.handlung.trim()) return;
-    if (aktuelleArcs().length >= MAX_STORY_ARCS) {
-      setArcFehler(
-        `Mehr als ${MAX_STORY_ARCS} Story Arcs werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
-      );
-      return;
-    }
-    setArcBusy(true);
-    setArcFehler(null);
-    try {
-      const { storyArc: neu, model } = await generateStoryArc(id, details.handlung, {
-        laenge: arcParams.laenge,
-        format: arcParams.format,
-        zusatz: arcParams.zusatz,
-        kreativ: arcParams.kreativ,
-        weiterspinnen: arcParams.weiterspinnen,
-        ton: arcParams.ton,
-        form: arcParams.form,
-        // Nur die **aktiven** Figuren (reiner Text); sind keine aktiv, leer.
-        figuren: aktiveFiguren(details.figuren),
-        textProvider: arcProvider,
-      });
-      // Titel für die Reiter-Leiste – aus einer Zusammenfassung der Stationen
-      // (Titel + Beschreibung). Scheitert er, bleibt er leer („Arc N").
-      const arcText = neu.stufen
-        .map((s) => [s.titel, s.beschreibung].filter(Boolean).join(": "))
-        .join("\n");
-      let titel = "";
-      try {
-        titel = await generateStoryTitle(arcText, "arc");
-      } catch {
-        // Titel ist Beiwerk.
-      }
-      // Label des Handlungsentwurfs, aus dem dieser Arc abgeleitet wird – als
-      // Schnappschuss an der Arc-Variante festgehalten (Reiter zeigen ihn an).
-      const quelle =
-        variantenMeta[aktiv]?.titel?.trim() || `Entwurf ${aktiv + 1}`;
-      const alt = aktuelleArcs();
-      setArcVarianten([...alt, neu]);
-      setArcAktiv(alt.length);
-      setStoryArc(neu);
-      setArcMeta([
-        ...ausgerichtet(arcMeta, alt.length),
-        {
-          titel,
-          form: arcParams.form,
-          ton: arcParams.ton,
-          favorit: false,
-          quelle,
-          modell: model,
-          // Werkform zum Erzeugungszeitpunkt an der Arc-Variante festhalten.
-          werkform: arcParams.werkform,
-          // Cover wählt man später in der Story-Arc-Sektion; Default = Weltbild.
-          cover: "",
-          // Frisch abgeleitet ist ein Arbeitsstand: erst per Häkchen ein Buch.
-          alsBuch: false,
-        },
-      ]);
-    } catch (e) {
-      setArcFehler(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setArcBusy(false);
-    }
-  }
-
-  /**
-   * Kapitel für eine Station ableiten (zwei bis drei). Die Station geht im
-   * **aktuell bearbeiteten** Stand mit; das Ergebnis ersetzt ihre Kapitel als
-   * ungespeicherte Änderung – „Verwerfen" bringt die alten zurück. Ein
-   * funktionales Update, damit parallele Bearbeitungen nicht verlorengehen.
-   */
-  async function kapitelAbleiten(stufeIndex: number) {
-    if (kapitelBusy !== null) return;
-    const stufe = storyArc.stufen[stufeIndex];
-    if (!stufe || !stufe.beschreibung.trim()) return;
-    setKapitelBusy(stufeIndex);
-    setKapitelFehler(null);
-    try {
-      const { kapitel, model } = await generateStoryArcChapters(
-        {
-          titel: stufe.titel,
-          beschreibung: stufe.beschreibung,
-          figuren: stufe.figuren,
-        },
-        {
-          kreativ: arcParams.kreativ,
-          anzahl: arcParams.kapitelAnzahl,
-          ton: arcParams.ton,
-          form: arcParams.form,
-          textProvider: arcProvider,
-        },
-      );
-      setKapitelModell((m) => ({ ...m, [stufeIndex]: model }));
-      // Die Route liefert nur Titel und Inhalt; der Prosatext (`text`) entsteht
-      // erst später auf Knopfdruck – hier leer auffüllen, damit das Kapitel dem
-      // Typ genügt und die Ausklapp-Ansicht kein `undefined` bekommt.
-      setStoryArc((arc) => ({
-        stufen: arc.stufen.map((s, k) =>
-          k === stufeIndex
-            ? { ...s, kapitel: kapitel.map((c) => ({ ...c, text: c.text ?? "" })) }
-            : s,
-        ),
-      }));
-    } catch (e) {
-      setKapitelFehler({
-        index: stufeIndex,
-        text: e instanceof Error ? e.message : "Fehler.",
-      });
-    } finally {
-      setKapitelBusy(null);
-    }
-  }
-
-  /**
-   * Den **Prosatext** eines Kapitels erzeugen (Personen + Tätigkeiten,
-   * Atmosphäre, Dialog). Station und Kapitel gehen im aktuell bearbeiteten Stand
-   * mit; die Figuren lädt die Route selbst über die Zuordnung. Das Ergebnis
-   * ersetzt `kapitel.text` als ungespeicherte Änderung – „Verwerfen" bringt den
-   * alten zurück. Funktionales Update gegen verlorene Parallel-Bearbeitungen.
-   */
-  async function kapitelTextGenerieren(stufeIndex: number, kapitelIndex: number) {
-    if (kapitelTextBusy) return;
-    const stufe = storyArc.stufen[stufeIndex];
-    const kapitel = stufe?.kapitel[kapitelIndex];
-    if (!kapitel || (!kapitel.inhalt.trim() && !kapitel.titel.trim())) return;
-    setKapitelTextBusy({ stufe: stufeIndex, kapitel: kapitelIndex });
-    setKapitelTextFehler(null);
-    try {
-      const { text, model } = await generateChapterText(
-        id,
-        details,
-        {
-          titel: stufe.titel,
-          beschreibung: stufe.beschreibung,
-          figuren: stufe.figuren,
-        },
-        // Die **ganze** Kapitelliste der Station plus der Index – so schreibt die
-        // Route nur dieses eine Kapitel aus, nicht die ganze Station.
-        stufe.kapitel.map((c) => ({ titel: c.titel, inhalt: c.inhalt })),
-        kapitelIndex,
-        {
-          ton: arcParams.ton,
-          kreativ: arcParams.kreativ,
-          form: arcParams.form,
-          kapitelLaenge: arcParams.kapitelLaenge,
-          werkform: arcParams.werkform,
-          textProvider: arcProvider,
-        },
-      );
-      setStoryTextModell((m) => ({
-        ...m,
-        [`${stufeIndex}-${kapitelIndex}`]: model,
-      }));
-      setStoryArc((arc) => ({
-        stufen: arc.stufen.map((s, si) =>
-          si === stufeIndex
-            ? {
-                ...s,
-                kapitel: s.kapitel.map((c, ki) =>
-                  ki === kapitelIndex ? { ...c, text } : c,
-                ),
-              }
-            : s,
-        ),
-      }));
-    } catch (e) {
-      setKapitelTextFehler({
-        stufe: stufeIndex,
-        kapitel: kapitelIndex,
-        text: e instanceof Error ? e.message : "Fehler.",
-      });
-    } finally {
-      setKapitelTextBusy(null);
-    }
-  }
-
-  /**
-   * Den bearbeiteten Stand persistieren und die „gespeichert"-Grundlinie neu
-   * setzen. `overrideDetails` erlaubt es, mit einem bereits berechneten
-   * `details` zu speichern, ohne auf das (asynchrone) `setState` zu warten –
-   * genutzt beim Ableiten eines Charakters aus einer Figur, wo die Entfernung
-   * der Figur den Seitenwechsel überleben muss. Gibt zurück, ob es geklappt hat.
-   */
-  async function speichern(overrideDetails?: ScenarioDetails): Promise<boolean> {
-    if (!nameValid || saving) return false;
-    const zuSpeichern = overrideDetails ?? details;
-    setSaving(true);
-    setSaveError(null);
-    try {
-      const aktualisiert = await updateScenario(id, {
-        name: name.trim(),
-        details: zuSpeichern,
-        plotVariants: {
-          items: aktuelleVarianten(),
-          aktiv,
-          meta: ausgerichtet(variantenMeta, aktuelleVarianten().length),
-        },
-        storyArcVariants: {
-          items: aktuelleArcs(),
-          aktiv: arcAktiv,
-          meta: ausgerichtet(arcMeta, aktuelleArcs().length),
-        },
-      });
-      setName(aktualisiert.name);
-      setDetails(aktualisiert.details);
-      setVarianten(aktualisiert.plotVariants.items);
-      setAktiv(aktualisiert.plotVariants.aktiv);
-      setVariantenMeta(aktualisiert.plotVariants.meta);
-      setStoryArc(aktualisiert.storyArc);
-      setArcVarianten(aktualisiert.storyArcVariants.items);
-      setArcAktiv(aktualisiert.storyArcVariants.aktiv);
-      setArcMeta(aktualisiert.storyArcVariants.meta);
-      setSaved(
-        savedSnapshot({
-          name: aktualisiert.name,
-          details: aktualisiert.details,
-          plotVariants: aktualisiert.plotVariants,
-          storyArcVariants: aktualisiert.storyArcVariants,
-        }),
-      );
-      return true;
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Fehler.");
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function save() {
-    if (!dirty) return;
-    await speichern();
-  }
-
-  /**
-   * „Verwerfen" – holt den zuletzt gespeicherten Stand aus `saved` zurück
-   * (Name, Festlegungen, alle Entwürfe und Story Arcs samt aktivem Index). Der
-   * aktive Arc wird zusätzlich in `storyArc` gespiegelt (die Merge-Invariante).
-   */
-  function verwerfen() {
-    const s = JSON.parse(saved) as {
-      name: string;
-      details: ScenarioDetails;
-      plot: PlotVariants;
-      arc: StoryArcVariants;
-    };
-    setName(s.name);
-    setDetails(s.details);
-    setVarianten(s.plot.items);
-    setAktiv(s.plot.aktiv);
-    setVariantenMeta(s.plot.meta);
-    setArcVarianten(s.arc.items);
-    setArcAktiv(s.arc.aktiv);
-    setArcMeta(s.arc.meta);
-    setStoryArc(s.arc.items[s.arc.aktiv] ?? { stufen: [] });
-  }
-
-  /**
-   * Das Szenario als Datei sichern – wahlweise mit seiner Besetzung.
-   *
-   * Wie beim Charakter-Export **ohne eigene Route**: Festlegungen und Texte
-   * liegen längst im Client, nur die Bild-Originale holt `buildScenarioFile`
-   * einzeln nach (die Listen-Antworten führen sie aus Größengründen nicht mit).
-   *
-   * Exportiert wird der **bearbeitete** Stand, so wie er auf dem Bildschirm
-   * steht – dieselbe Regel wie bei „Text neu erzeugen", der Ableitung und dem
-   * Handlungsentwurf: Wer gerade die Regeln umgeschrieben hat und dann
-   * exportiert, meint die neuen. Speichern und Exportieren sind zwei
-   * verschiedene Handlungen, und die Datei ist keine Kopie der Datenbank,
-   * sondern dessen, was man vor sich hat.
-   *
-   * Die Charaktere sind davon nicht betroffen: Sie lassen sich auf dieser Seite
-   * gar nicht bearbeiten, es gibt also nur einen Stand.
-   */
-  async function exportieren() {
-    setExportiert(true);
-    setExportFehler(null);
-    try {
-      const datei = await buildScenarioFile(
-        {
-          name: name.trim(),
-          details,
-          // Der **bearbeitete** Stand, wie bei den Festlegungen: alle Entwürfe
-          // und alle Story Arcs samt aktivem Index und Metadaten (Titel/Form/Ton).
-          plotVariants: {
-            items: aktuelleVarianten(),
-            aktiv,
-            meta: ausgerichtet(variantenMeta, aktuelleVarianten().length),
-          },
-          storyArc,
-          storyArcVariants: {
-            items: aktuelleArcs(),
-            aktiv: arcAktiv,
-            meta: ausgerichtet(arcMeta, aktuelleArcs().length),
-          },
-        },
-        mitCharakteren ? characters : [],
-        // Die Weltbilder sind unabhängig vom bearbeiteten Stand (eigene Route,
-        // sofort gespeichert) – `buildScenarioFile` holt je Bild das Original.
-        { scenarioId: id, images: bilder },
-        // Ohne Häkchen „mit Bildern" bleibt Weltbild + Charakter-Bilder weg.
-        !mitBildern,
-      );
-      const blob = new Blob([JSON.stringify(datei, null, 2)], {
-        type: "application/json",
-      });
-      downloadBlob(blob, scenarioFileName(safeFileName(name.trim())));
-    } catch (e) {
-      setExportFehler(
-        e instanceof Error ? e.message : "Export fehlgeschlagen.",
-      );
-    } finally {
-      setExportiert(false);
-    }
-  }
-
-  async function entfernen() {
-    if (
-      !confirm(
-        `Szenario „${name}" löschen? Die ${characters.length} zugeordneten Charaktere bleiben erhalten und sind danach ohne Szenario.`,
-      )
-    )
-      return;
-    try {
-      await deleteScenario(id);
-      router.push("/scenarios");
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
-    }
-  }
+  // `speichern`/`save`/`verwerfen` sowie Export/Löschen liegen jetzt in Hooks
+  // auf dem Dokument-Kern (`useScenarioDocument`/`useScenarioExport`).
 
   if (loading) return <p className="text-muted-foreground">Lade Szenario …</p>;
   if (error) {
