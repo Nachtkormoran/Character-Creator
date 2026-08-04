@@ -98,9 +98,10 @@ export async function POST(request: Request) {
             maxLen,
             anzahl,
             charaktere,
-            // Frische Namens-Bausteine aus dem genre-passenden Kulturkreis –
-            // gegen die „Lieblingsnamen" des Modells; je Aufruf ein anderer Satz.
-            namensBausteine(details.genre),
+            // Frische Namens-Bausteine – gegen die „Lieblingsnamen" des Modells;
+            // je Aufruf ein anderer Satz. Der **Ort** bestimmt den Kulturkreis
+            // (z. B. „York" → britisch), sonst der Genre-Mix.
+            namensBausteine(details.genre, details.ort),
           ),
         },
       ],

@@ -455,24 +455,36 @@ const FALLBACK_CULTURES = GENRE_CULTURES.gegenwart;
  * KI-Knopf da. Eine falsche Zuordnung wäre schlechter als gar keine.
  */
 const HERKUNFT_HINTS: Record<string, string[]> = {
-  deutsch: ["deutsch", "österreich", "schweiz", "bayer", "preuß", "sächsisch"],
+  deutsch: [
+    "deutsch", "österreich", "schweiz", "bayer", "preuß", "sächsisch",
+    // Länder-/Ortsnamen (für den Ort eines Szenarios)
+    "deutschland", "berlin", "münchen", "hamburg", "frankfurt", "köln",
+    "dresden", "leipzig", "wien",
+  ],
   britisch: [
     "britisch", "englisch", "irisch", "schottisch", "walisisch",
     "amerikanisch", "kanadisch", "australisch",
+    "england", "britann", "london", "york", "schottland", "wales", "irland",
+    "amerika", "kanada", "australien",
   ],
   nordisch: [
     "nordisch", "skandinav", "schwed", "norweg", "dän", "isländ", "finn",
     "wiking",
+    "schweden", "norwegen", "finnland", "stockholm", "kopenhagen", "helsinki",
+    "reykjavik",
   ],
   slawisch: [
     "slaw", "russ", "poln", "tschech", "ukrain", "serb", "kroat", "bulgar",
     "slowak",
+    "russland", "polen", "moskau", "warschau",
   ],
   romanisch: [
     "italien", "spanisch", "portugies", "romanisch", "mexikan", "argentin",
     "brasilian", "latein",
+    "spanien", "portugal", "madrid", "barcelona", "lissabon", "mailand",
+    "mexiko",
   ],
-  japanisch: ["japan", "nippon"],
+  japanisch: ["japan", "nippon", "tokio", "tokyo", "kyoto", "osaka"],
 };
 
 /** Dasselbe für ein frei formuliertes Setting (Galerie kennt keine Genre-Id). */
@@ -565,9 +577,19 @@ export function randomName(options: {
  */
 export function namensBausteine(
   genre: string | undefined,
+  /**
+   * Der **Ort** des Szenarios (Freitext). Nennt er ein Land/eine Region, die zu
+   * einem Kulturkreis passt (z. B. „York" → britisch), gewinnt er über den
+   * Genre-Mix – sonst landet bei „Gegenwart" (globaler Mix) auch mal eine
+   * Japanerin in York. Kein Treffer → der Genre-Mix wie bisher.
+   */
+  ort = "",
   anzahl = 8,
 ): { kultur: string; vornamen: string[]; nachnamen: string[] } {
-  const ids = (genre && GENRE_CULTURES[genre]) || FALLBACK_CULTURES;
+  const viaOrt = matchHints(ort, HERKUNFT_HINTS);
+  const ids = viaOrt
+    ? [viaOrt]
+    : (genre && GENRE_CULTURES[genre]) || FALLBACK_CULTURES;
   const cultureId = pick(ids);
   const culture =
     NAME_CULTURES.find((c) => c.id === cultureId) ?? NAME_CULTURES[0];
