@@ -809,12 +809,23 @@ export function generateScenarioFigures(
   zusatz = "",
   /** Wie viele Figuren erzeugt/ergänzt werden (Selektor am Feld). */
   anzahl = 3,
+  /**
+   * Die schon angelegten Charaktere des Szenarios (Protagonisten markiert) –
+   * gehen als Kontext mit, damit neue Figuren sich auf sie beziehen und sie nicht
+   * doppeln. Im Anlege-Formular leer (das Szenario existiert dort noch nicht).
+   */
+  charaktere: {
+    name: string;
+    kurzbeschreibung: string;
+    isProtagonist: boolean;
+  }[] = [],
 ) {
   return postJson<{ wert: string }>("/api/scenario-figures", {
     name,
     details,
     zusatz,
     anzahl,
+    charaktere,
   });
 }
 

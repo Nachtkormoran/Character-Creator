@@ -32,6 +32,21 @@ const bodySchema = z.object({
   // Wie viele Figuren erzeugt/ergänzt werden (Selektor am Feld). Gedeckelt,
   // damit ein zu großer Wunsch nicht das Feld-Limit sprengt.
   anzahl: z.number().int().min(1).max(8).optional().default(3),
+  // Die schon angelegten Charaktere des Szenarios (Protagonisten markiert) –
+  // gehen als Kontext mit, damit neue Figuren sich auf sie beziehen und sie
+  // nicht doppeln. Aus dem Client (die Detailansicht kennt sie; im Anlege-
+  // Formular ist die Liste leer). Gedeckelt gegen zu große Bodies.
+  charaktere: z
+    .array(
+      z.object({
+        name: z.string().trim().max(200),
+        kurzbeschreibung: z.string().trim().max(500).optional().default(""),
+        isProtagonist: z.boolean().optional().default(false),
+      }),
+    )
+    .max(50)
+    .optional()
+    .default([]),
 });
 
 export async function POST(request: Request) {
@@ -45,7 +60,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { name, details, zusatz, anzahl } = parsed.data;
+    const { name, details, zusatz, anzahl, charaktere } = parsed.data;
 
     // Nur die erlaubten Nachbarfelder – alles andere sieht das Modell nicht.
     const umfeld: Partial<Record<string, string>> = {};
@@ -81,6 +96,7 @@ export async function POST(request: Request) {
             zusatz,
             maxLen,
             anzahl,
+            charaktere,
           ),
         },
       ],

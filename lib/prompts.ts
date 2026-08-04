@@ -2165,6 +2165,13 @@ Form der Antwort: ${
  * „Name: was sie tut; woran sie kippt." –, damit sich die drei Quellen im Feld
  * mischen lassen, ohne dass ein Bruch entsteht.
  */
+/** Eine bereits angelegte Person des Szenarios – Kontext für die Figuren-Erzeugung. */
+export interface FigurCharakterKontext {
+  name: string;
+  kurzbeschreibung: string;
+  isProtagonist: boolean;
+}
+
 export function buildScenarioFiguresPrompt(
   name: string,
   /** Nur die Felder, die `figuren` laut `SCENARIO_READS` lesen darf. */
@@ -2176,6 +2183,13 @@ export function buildScenarioFiguresPrompt(
   maxLen?: number,
   /** Wie viele Figuren erzeugt/ergänzt werden (Selektor am Feld). */
   anzahl = 3,
+  /**
+   * Die **schon angelegten Charaktere** des Szenarios (Protagonisten markiert).
+   * Sie gehen als Kontext mit: neue Figuren sollen zu ihnen in Beziehung treten,
+   * dürfen sie aber **nicht doppeln** – sonst erfindet das Modell einen bereits
+   * bestehenden Charakter als Figur nochmal (z. B. wenn ein Stichwort ihn nennt).
+   */
+  charaktere: FigurCharakterKontext[] = [],
 ): string {
   const kontext =
     line("Szenario", name) +
@@ -2184,6 +2198,17 @@ export function buildScenarioFiguresPrompt(
     line("Zeit", umfeld.zeit) +
     line("Regeln", umfeld.regeln) +
     line("Beschreibung", umfeld.beschreibung);
+
+  const charaktereBlock = charaktere.length
+    ? `\nDiese Personen sind in diesem Szenario **schon als Charaktere angelegt**. Sie sind **keine** Figuren-Notiz – erzeuge sie **niemals erneut als Figur** und verwende ihre Namen **nicht** für neue Figuren. Lass die neuen Figuren stattdessen zu ihnen in **Beziehung** treten (Abhängigkeit, Reibung, gemeinsame Geschichte), besonders zu den mit ★ markierten **Protagonisten**:\n${charaktere
+        .map(
+          (c) =>
+            `- ${c.isProtagonist ? "★ " : ""}${c.name}${
+              c.kurzbeschreibung.trim() ? ` – ${c.kurzbeschreibung.trim()}` : ""
+            }`,
+        )
+        .join("\n")}\n`
+    : "";
 
   const bestand = vorhanden.trim();
 
@@ -2217,7 +2242,7 @@ export function buildScenarioFiguresPrompt(
   }
 
 Was über dieses Szenario schon feststeht:
-${kontext || "- (noch nichts)\n"}${bestandBlock}
+${kontext || "- (noch nichts)\n"}${charaktereBlock}${bestandBlock}
 Anforderungen:
 - ${
     bestand
@@ -2227,7 +2252,11 @@ Anforderungen:
 - Form je Zeile: „Name: was die Figur in dieser Welt tut; woran sie kippt." – erst ein Name, dann ihre Rolle, dann nach einem Semikolon ihr **Riss**.
 - Der **Riss** ist der Kern: etwas Verschwiegenes, Ersehntes oder Ungelöstes, an dem sich eine Geschichte entzünden kann. Ein bloßer Beruf ist kein Riss.
 - Die Namen passen zu Herkunft und Genre; die Figuren passen zueinander und zur Welt und bergen Reibung.
-- **Alles muss zu den Festlegungen oben passen** – widersprich ihnen nie; das Genre bindet am stärksten.
+- **Alles muss zu den Festlegungen oben passen** – widersprich ihnen nie; das Genre bindet am stärksten.${
+    charaktere.length
+      ? "\n- Nenne **keine** neue Figur wie eine der oben gelisteten, bereits angelegten Personen. Nennt ein Stichwort eine solche Person, ist die neue Figur eine **andere** Person **mit Bezug zu ihr** – niemals diese Person selbst."
+      : ""
+  }
 ${budgetBlock}${zusatzBlock}
 Form der Antwort: **eine Figur je Zeile**, durch Zeilenumbrüche getrennt. Keine Nummerierung, keine Spiegelstriche, kein Markdown, keine Einleitung und keine Erklärung. Antworte mit **nichts als den Figuren-Zeilen**${
     bestand ? " – die vorhandenen zuerst, wörtlich, dann die neuen" : ""

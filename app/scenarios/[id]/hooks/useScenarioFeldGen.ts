@@ -39,6 +39,7 @@ export function useScenarioFeldGen(
     setDetails,
     saving,
     setSaveError,
+    characters,
     variantenMeta,
     handlungForm,
     handlungTon,
@@ -96,6 +97,13 @@ export function useScenarioFeldGen(
           details,
           zusatz.figuren ?? "",
           anzahl,
+          // Die angelegten Charaktere (Protagonisten markiert) als Kontext –
+          // damit neue Figuren sich auf sie beziehen und sie nicht doppeln.
+          characters.map((c) => ({
+            name: c.character.name,
+            kurzbeschreibung: c.character.kurzbeschreibung,
+            isProtagonist: c.isProtagonist,
+          })),
         );
         setDetails((d) => ({ ...d, figuren: wert }));
       } else if (key === "handlung") {
