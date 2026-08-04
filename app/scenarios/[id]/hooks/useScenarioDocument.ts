@@ -314,3 +314,6 @@ export function useScenarioDocument(id: string) {
     verwerfen,
   };
 }
+
+/** Rückgabetyp des Dokument-Kerns – die Basis, auf der die Feature-Hooks bauen. */
+export type ScenarioDocument = ReturnType<typeof useScenarioDocument>;

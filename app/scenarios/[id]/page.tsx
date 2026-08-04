@@ -40,7 +40,7 @@ import {
   type VariantMeta,
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
-import { ausgerichtet, LEER_META } from "@/lib/scenarioDocument";
+import { ausgerichtet } from "@/lib/scenarioDocument";
 import {
   aktiveEintraege,
   aktiveFiguren,
@@ -64,6 +64,7 @@ import { WeltKarte } from "./sections/WeltKarte";
 import { CharaktereKarte } from "./sections/CharaktereKarte";
 import { HandlungsentwurfKarte } from "./sections/HandlungsentwurfKarte";
 import { useScenarioDocument } from "./hooks/useScenarioDocument";
+import { usePlotVarianten } from "./hooks/usePlotVarianten";
 
 // `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
 // getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
@@ -316,141 +317,17 @@ export default function ScenarioDetailPage({
     "handlung",
   ]);
 
-  /** Auf einen anderen Entwurf umschalten – der bisherige wird zuvor gesichert. */
-  function varianteWaehlen(i: number) {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (i < 0 || i >= items.length || i === aktiv) return;
-    setVarianten(items);
-    setAktiv(i);
-    setDetails((d) => ({ ...d, handlung: items[i] }));
-  }
-
-  /**
-   * Den Titel eines Entwurfs ändern (✎ am Reiter). Der Titel gehört zu den
-   * Metadaten und wird wie alles über „Änderungen speichern" abgelegt; leer
-   * lassen holt den Rückfall „Entwurf N" zurück. `prompt` bewusst schlicht – wie
-   * das `confirm` beim Löschen.
-   */
-  function titelAendern(i: number) {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(variantenMeta, items.length);
-    const neu = window.prompt(`Titel für Entwurf ${i + 1}:`, meta[i].titel);
-    if (neu === null) return;
-    setVariantenMeta(
-      meta.map((m, k) =>
-        k === i ? { ...m, titel: neu.trim().slice(0, 120) } : m,
-      ),
-    );
-  }
-
-  /**
-   * Einen Entwurf als **Favorit** markieren/entmarken (Stern am Reiter). Wie der
-   * Titel Teil der Metadaten – geht über „Änderungen speichern" (dirty).
-   */
-  function favoritUmschalten(i: number) {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(variantenMeta, items.length);
-    setVariantenMeta(
-      meta.map((m, k) => (k === i ? { ...m, favorit: !m.favorit } : m)),
-    );
-  }
-
-  /**
-   * Einen bestehenden Handlungsentwurf **kopieren** – analog zu `arcKopieren`:
-   * eine eigenständige Kopie des Entwurfs am Index `i`, angehängt und aktiv
-   * geschaltet. Der Titel bekommt „(Kopie)", Erzählform/Ton/Modell reisen mit, die
-   * Favorit-Markierung nicht. Ein Entwurf ist ein String – anders als der Arc
-   * braucht es keine tiefe Kopie. Kein KI-Aufruf; nur im Bearbeitungs-Zustand und
-   * gegen `MAX_PLOT_VARIANTS` geprüft.
-   */
-  function varianteKopieren(i: number) {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (i < 0 || i >= items.length) return;
-    if (items.length >= MAX_PLOT_VARIANTS) {
-      setSaveError(
-        `Mehr als ${MAX_PLOT_VARIANTS} Entwürfe werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
-      );
-      return;
-    }
-    const meta = ausgerichtet(variantenMeta, items.length);
-    const q = meta[i];
-    const kopieMeta: VariantMeta = {
-      ...q,
-      titel: q.titel.trim() ? `${q.titel.trim()} (Kopie)` : "",
-      favorit: false,
-    };
-    setVarianten([...items, items[i]]);
-    setAktiv(items.length);
-    setDetails((d) => ({ ...d, handlung: items[i] }));
-    setVariantenMeta([...meta, kopieMeta]);
-  }
-
-  /**
-   * Einen Entwurf löschen. Anders als beim einzelnen Ansatzpunkt fragt es hier
-   * nach – ein Handlungsentwurf ist ein großer, teuer erzeugter Text. Der letzte
-   * verbliebene lässt sich nicht über die Leiste löschen (dann verschwände die
-   * Umschaltung ganz); dafür ist das Feld selbst da.
-   */
-  function varianteLoeschen(i: number) {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (items.length <= 1) return;
-    if (!confirm(`Entwurf ${i + 1} löschen?`)) return;
-    const rest = items.filter((_, k) => k !== i);
-    const na =
-      i === aktiv ? Math.min(i, rest.length - 1) : i < aktiv ? aktiv - 1 : aktiv;
-    setVarianten(rest);
-    setAktiv(na);
-    setDetails((d) => ({ ...d, handlung: rest[na] }));
-    setVariantenMeta(ausgerichtet(variantenMeta, items.length).filter((_, k) => k !== i));
-  }
-
-  /**
-   * Alle Entwürfe auf einmal löschen. Anders als `varianteLoeschen` bleibt hier
-   * **keiner** stehen: das Feld wird geleert, die Leiste verschwindet. Rückfrage
-   * mit Zahl, weil hier mehrere teuer erzeugte Texte auf einmal gehen. Wie das
-   * einzelne Löschen nur im Bearbeitungs-Zustand – „Verwerfen" holt die
-   * gespeicherten Entwürfe zurück, „Änderungen speichern" macht die Leerung
-   * dauerhaft.
-   */
-  function alleVariantenLoeschen() {
-    if (generatingField || saving) return;
-    const anzahl = aktuelleVarianten().length;
-    if (anzahl === 0) return;
-    if (!confirm(`Alle ${anzahl} Entwürfe löschen?`)) return;
-    setVarianten([]);
-    setAktiv(0);
-    setDetails((d) => ({ ...d, handlung: "" }));
-    setVariantenMeta([]);
-  }
-
-  /**
-   * Einen **leeren** Entwurf anhängen und auf ihn umschalten – der Gegenpol zu
-   * „✨ Neu erzeugen": kein KI-Aufruf, sondern ein leeres Feld zum
-   * Selbstschreiben (wie „➕ Station hinzufügen" beim Story Arc). Nur im
-   * Bearbeitungs-Zustand; „Verwerfen" nimmt ihn wieder zurück.
-   */
-  function leerenEntwurfHinzufuegen() {
-    if (generatingField || saving) return;
-    const items = aktuelleVarianten();
-    if (items.length >= MAX_PLOT_VARIANTS) {
-      setSaveError(
-        `Mehr als ${MAX_PLOT_VARIANTS} Entwürfe werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
-      );
-      return;
-    }
-    const neu = [...items, ""];
-    setVarianten(neu);
-    setAktiv(neu.length - 1);
-    setDetails((d) => ({ ...d, handlung: "" }));
-    setVariantenMeta([...ausgerichtet(variantenMeta, items.length), LEER_META]);
-  }
+  // Verwaltung der Handlungsentwurf-Varianten (Reiter) liegt in einem eigenen
+  // Hook auf dem Dokument-Kern (s. `hooks/usePlotVarianten`).
+  const {
+    varianteWaehlen,
+    titelAendern,
+    favoritUmschalten,
+    varianteKopieren,
+    varianteLoeschen,
+    alleVariantenLoeschen,
+    leerenEntwurfHinzufuegen,
+  } = usePlotVarianten(doc, generatingField);
 
   // --- Story-Arc-Varianten (analog zu den Handlungsentwürfen) --------------
 
