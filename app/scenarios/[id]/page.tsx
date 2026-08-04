@@ -4,31 +4,20 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  deleteCharacter,
   findFigurePersons,
   findPlotPersons,
   getSettings,
-  listScenarios,
-  updateCharacterContent,
-  updateCharacterGenre,
-  updateCharacterProtagonist,
-  updateCharacterScenario,
 } from "@/lib/client";
 import { GENRE_TEMPLATES } from "@/lib/templates";
 import {
   type TextProvider,
-  type GeneratedCharacter,
   type PlotPerson,
   type ScenarioDetails,
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
 import { ausgerichtet } from "@/lib/scenarioDocument";
 import { joinFigurenDetail, splitFigurenDetail } from "@/lib/figuren";
-import {
-  primaryImage,
-  type StoredCharacter,
-  type StoredScenario,
-} from "@/lib/serialize";
+import { primaryImage } from "@/lib/serialize";
 import { AddCharacterToScenarioModal } from "../../components/AddCharacterToScenarioModal";
 import { CharacterDetailModal } from "../../components/CharacterDetailModal";
 import { GenreSyncModal } from "../../components/GenreSyncModal";
@@ -46,6 +35,7 @@ import { useScenarioExport } from "./hooks/useScenarioExport";
 import { useStoryArc } from "./hooks/useStoryArc";
 import { useKapitel } from "./hooks/useKapitel";
 import { useScenarioFeldGen } from "./hooks/useScenarioFeldGen";
+import { useScenarioCharacters } from "./hooks/useScenarioCharacters";
 
 // `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
 // getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
@@ -74,14 +64,12 @@ export default function ScenarioDetailPage({
     arcAktiv,
     arcMeta,
     characters,
-    setCharacters,
     bilder,
     setBilder,
     loading,
     error,
     saving,
     saveError,
-    setSaveError,
     handlungForm,
     setHandlungForm,
     handlungTon,
@@ -116,29 +104,8 @@ export default function ScenarioDetailPage({
     "",
   );
   const [arcProvider, setArcProvider] = useState<TextProvider | "">("");
-  /**
-   * Rückfrage nach einer Genre-Änderung: Soll das neue Genre auch auf die
-   * zugeordneten Figuren übertragen werden? `betroffen` sind die Figuren mit
-   * abweichendem Genre (Snapshot zum Änderungszeitpunkt). Null = keine Rückfrage.
-   */
-  const [genreSync, setGenreSync] = useState<{
-    genre: string;
-    betroffen: StoredCharacter[];
-  } | null>(null);
-  const [genreSyncBusy, setGenreSyncBusy] = useState(false);
-  const [genreSyncFehler, setGenreSyncFehler] = useState<string | null>(null);
-  /**
-   * Der angeklickte Charakter – öffnet dasselbe Detail-Modal wie in der
-   * Galerie (`CharacterDetailModal`, dort herausgelöst), aber **hier in der
-   * Szenario-Seite**: Schließen führt zurück ins Szenario, nicht in die Galerie.
-   */
-  const [selectedChar, setSelectedChar] = useState<StoredCharacter | null>(null);
-  /**
-   * Alle Szenarien – nur für das Zuordnungs-Menü und die Szenario-Ableitung im
-   * Detail-Modal. Die Detailseite selbst braucht sie sonst nicht (sie kennt ihr
-   * eigenes Szenario aus `getScenario`).
-   */
-  const [allScenarios, setAllScenarios] = useState<StoredScenario[]>([]);
+  // Besetzung (Detail-Modal, Zuordnung, Protagonist, Genre-Sync, Szenarienliste)
+  // liegt im Hook `useScenarioCharacters` (weiter unten).
 
   // Export/Löschen (Optionen + Handler) liegen im Hook `useScenarioExport` auf
   // dem Dokument-Kern.
@@ -209,8 +176,6 @@ export default function ScenarioDetailPage({
 
   /** Ob das „Charakter hinzufügen"-Modal (bestehende Figur zuordnen) offen ist. */
   const [addOffen, setAddOffen] = useState(false);
-  /** Welche Figur gerade ihre Protagonisten-Markierung umschaltet (sperrt sie). */
-  const [protagonistBusy, setProtagonistBusy] = useState<string | null>(null);
 
   /**
    * Hier ist alles erzeugbar: Ort, Zeit und Regeln lassen sich ergänzen, die
@@ -266,6 +231,25 @@ export default function ScenarioDetailPage({
     kapitelAbleiten,
     kapitelTextGenerieren,
   } = useKapitel(doc, id, arcProvider);
+  const {
+    selectedChar,
+    setSelectedChar,
+    genreSync,
+    setGenreSync,
+    genreSyncBusy,
+    genreSyncFehler,
+    protagonistBusy,
+    allScenarios,
+    setAllScenarios,
+    charLoeschen,
+    charInhaltSpeichern,
+    charAktualisiert,
+    festlegungenAendern,
+    genreUebertragen,
+    charZuordnen,
+    charHinzugefuegt,
+    protagonistUmschalten,
+  } = useScenarioCharacters(doc, id);
 
   /** Charaktere in der Form, die der Cover-Picker braucht (Name, Porträt, Protagonist). */
   const coverCharaktere = characters.map((c) => ({
@@ -289,141 +273,6 @@ export default function ScenarioDetailPage({
 
   // Laden, Speichern/Verwerfen und das localStorage-Gedächtnis der Lauf-Parameter
   // liegen jetzt im Dokument-Kern (`useScenarioDocument`, oben).
-
-  // Alle Szenarien fürs Zuordnungs-Menü des Detail-Modals. Getrennt vom
-  // Haupt-Load, weil es unabhängig und nicht kritisch ist – schlägt es fehl,
-  // bleibt die Liste leer (das Menü zeigt dann nur „kein Szenario").
-  useEffect(() => {
-    listScenarios()
-      .then(setAllScenarios)
-      .catch(() => {});
-  }, []);
-
-  // ---------------------------------------------------------------------------
-  // Angehängten Charakter bearbeiten (dasselbe Detail-Modal wie in der Galerie)
-  // ---------------------------------------------------------------------------
-
-  async function charLoeschen(cid: string) {
-    await deleteCharacter(cid);
-    setCharacters((cs) => cs.filter((c) => c.id !== cid));
-    setSelectedChar(null);
-  }
-
-  async function charInhaltSpeichern(
-    cid: string,
-    character: GeneratedCharacter,
-    storyHooks: string,
-    genre: string,
-  ) {
-    const updated = await updateCharacterContent(
-      cid,
-      character,
-      storyHooks,
-      genre,
-    );
-    setCharacters((cs) => cs.map((c) => (c.id === cid ? updated : c)));
-    setSelectedChar(updated);
-  }
-
-  // Bild-Operationen im Modal liefern den vollständigen aktualisierten Charakter
-  // zurück – hier in Liste und Auswahl übernehmen.
-  function charAktualisiert(updated: StoredCharacter) {
-    setCharacters((cs) => cs.map((c) => (c.id === updated.id ? updated : c)));
-    setSelectedChar(updated);
-  }
-
-  /**
-   * Genre-Änderung an den Festlegungen abfangen: Wird das Genre auf ein
-   * **anderes, nicht-leeres** Genre gesetzt und tragen zugeordnete Figuren ein
-   * abweichendes Genre, öffnet sich die Rückfrage `GenreSyncModal`. Der
-   * Feld-Wert selbst wird immer übernommen (`setDetails`) – die Übertragung auf
-   * die Figuren ist davon unabhängig und nur auf Bestätigung. Ein Wechsel auf
-   * „— keins —" fragt nicht (den Figuren ein leeres Genre aufzudrücken hieße,
-   * sie auf „Gegenwart" zurückzustufen).
-   */
-  function festlegungenAendern(next: ScenarioDetails) {
-    if (
-      next.genre &&
-      next.genre !== details.genre &&
-      characters.some((c) => c.input.genre !== next.genre)
-    ) {
-      const betroffen = characters.filter((c) => c.input.genre !== next.genre);
-      setGenreSyncFehler(null);
-      setGenreSync({ genre: next.genre, betroffen });
-    }
-    setDetails(next);
-  }
-
-  /**
-   * Das neue Genre auf die betroffenen Figuren übertragen (Teil-PATCH je Figur,
-   * nur das Genre). Sofort persistiert – unabhängig vom „Änderungen speichern"
-   * der Festlegungen, wie die übrigen Figuren-Operationen dieser Seite.
-   */
-  async function genreUebertragen() {
-    if (!genreSync || genreSyncBusy) return;
-    setGenreSyncBusy(true);
-    setGenreSyncFehler(null);
-    try {
-      const aktualisiert = await Promise.all(
-        genreSync.betroffen.map((c) => updateCharacterGenre(c.id, genreSync.genre)),
-      );
-      const beiId = new Map(aktualisiert.map((c) => [c.id, c]));
-      setCharacters((cs) => cs.map((c) => beiId.get(c.id) ?? c));
-      setSelectedChar((sel) => (sel ? beiId.get(sel.id) ?? sel : sel));
-      setGenreSync(null);
-    } catch (e) {
-      setGenreSyncFehler(e instanceof Error ? e.message : "Übertragen fehlgeschlagen.");
-    } finally {
-      setGenreSyncBusy(false);
-    }
-  }
-
-  /**
-   * Zuordnung ändern. Wird der Charakter einem **anderen** Szenario (oder
-   * keinem) zugewiesen, gehört er nicht mehr hierher – dann fällt seine Kachel
-   * weg und das Modal schließt. Bleibt er bei diesem Szenario, wird er nur
-   * aktualisiert.
-   */
-  async function charZuordnen(cid: string, scenarioId: string | null) {
-    const updated = await updateCharacterScenario(cid, scenarioId);
-    if (updated.scenarioId === id) {
-      setCharacters((cs) => cs.map((c) => (c.id === cid ? updated : c)));
-      setSelectedChar(updated);
-    } else {
-      setCharacters((cs) => cs.filter((c) => c.id !== cid));
-      setSelectedChar(null);
-    }
-  }
-
-  /**
-   * Ein über „Charakter hinzufügen" zugeordneter oder kopierter Charakter –
-   * in die Kachelliste einreihen. Dedupe nach Id, falls er (z. B. nach einem
-   * Reload im Modal) schon dabei wäre.
-   */
-  function charHinzugefuegt(neu: StoredCharacter) {
-    setCharacters((cs) =>
-      cs.some((c) => c.id === neu.id) ? cs : [...cs, neu],
-    );
-  }
-
-  /**
-   * Eine Figur als Protagonist markieren/entmarken. Wie die Zuordnung sofort
-   * persistiert (eigener PATCH, kann nichts halb geändert sein). Ist das
-   * Detail-Modal für dieselbe Figur offen, zieht seine Auswahl mit.
-   */
-  async function protagonistUmschalten(c: StoredCharacter) {
-    if (protagonistBusy) return;
-    setProtagonistBusy(c.id);
-    try {
-      const updated = await updateCharacterProtagonist(c.id, !c.isProtagonist);
-      setCharacters((cs) => cs.map((x) => (x.id === c.id ? updated : x)));
-      setSelectedChar((sel) => (sel && sel.id === c.id ? updated : sel));
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setProtagonistBusy(null);
-    }
-  }
 
   // Das anzuzeigende Weltbild – das Primärbild (wie beim Charakter abgeleitet).
   const weltbildVorschau = primaryImage({ images: bilder })?.thumbnail ?? null;
