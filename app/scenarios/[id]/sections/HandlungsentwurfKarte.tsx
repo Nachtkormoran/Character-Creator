@@ -514,7 +514,8 @@ export function HandlungsentwurfKarte({
         Fortsetzung wird angehängt. Nur sichtbar, wenn ein Entwurf da ist.
       */}
       {details.handlung.trim() && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3">
+          <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={onHandlungFortsetzen}
@@ -552,6 +553,17 @@ export function HandlungsentwurfKarte({
               </>
             )}
           </button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Beide bauen auf dem <strong>angezeigten</strong> Entwurf auf.{" "}
+            <strong>Entwurf fortsetzen</strong> schreibt an seinem Ende weiter –
+            im selben Reiter, der Text wächst. <strong>Personen einweben</strong>{" "}
+            flicht die Figuren und Charaktere ein, die im Entwurf noch fehlen
+            (automatisch erkannt), und behält Handlung, Aufbau und Ton bei – das
+            Ergebnis kommt als <strong>neuer Reiter</strong>, der angezeigte
+            bleibt erhalten. Das Stichwörter-Feld oben kann das Einweben zuspitzen
+            („besonders Matthew einweben“).
+          </p>
         </div>
       )}
 
