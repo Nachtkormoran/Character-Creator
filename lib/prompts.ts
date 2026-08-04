@@ -478,11 +478,21 @@ export function buildScenarioPlotPrompt(
    * vorher.
    */
   fortsetzenArg?: boolean,
+  /**
+   * **Personen einweben**: den bestehenden Entwurf (`basis`) **behutsam**
+   * überarbeiten und die Figuren/Charaktere, die darin noch nicht vorkommen,
+   * einflechten – Handlung, Aufbau und Ton bleiben. Anders als der gewöhnliche
+   * `basis`-Fall (eine „eigenständige neue Fassung") wird hier **erhalten und
+   * ergänzt**, nicht neu geworfen. Braucht `basis`, schließt sich mit
+   * `fortsetzen` aus.
+   */
+  einwebenArg?: boolean,
 ): string {
   const nutzeBasis = !!basis?.trim();
   // Fortsetzen braucht einen vorhandenen Entwurf; ohne Basis fällt es auf das
   // gewöhnliche Verhalten zurück (der Aufrufer sperrt den Knopf zwar schon).
   const fortsetzen = !!fortsetzenArg && nutzeBasis;
+  const einweben = !!einwebenArg && nutzeBasis && !fortsetzen;
   const anzahlNeue = Math.max(
     0,
     Math.min(MAX_NEUE_PLOT_PERSONEN, Math.floor(neuePersonen ?? 0)),
@@ -566,7 +576,9 @@ export function buildScenarioPlotPrompt(
   // offene Ausgangslage oder eine vollständige Geschichte bis zum Ende.
   const auftrag = fortsetzen
     ? "Setze den vorhandenen Handlungsentwurf fort: Knüpf nahtlos an sein Ende an und erzähl weiter, was als Nächstes geschieht – dieselbe Welt, dieselben Figuren, derselbe Ton."
-    : nutzeBasis
+    : einweben
+      ? "Überarbeite den vorhandenen Handlungsentwurf **behutsam** und flicht die Personen ein, die darin noch nicht vorkommen: dieselbe Welt, derselbe Konflikt, derselbe Ton. Es entsteht **keine neue Fassung**, sondern der bewährte Entwurf, um neue Fäden ergänzt."
+      : nutzeBasis
       ? weiterspinnen
         ? "Überarbeite den vorhandenen Handlungsentwurf und spinne ihn zu einer vollständigen Geschichte weiter – dieselbe Welt, dieselben Figuren, aber von der Ausgangslage bis zu einem Ende."
         : "Überarbeite den vorhandenen Handlungsentwurf zu einer eigenständigen neuen Fassung – dieselbe Welt, dieselben Figuren, aber ein frischer Wurf."
@@ -577,29 +589,37 @@ export function buildScenarioPlotPrompt(
   const basisBlock = nutzeBasis
     ? fortsetzen
       ? `\nBisheriger Handlungsentwurf, den du fortsetzt:\n${basis!.trim()}\n`
-      : `\nBisheriger Handlungsentwurf – deine Grundlage:\n${basis!.trim()}\n`
+      : einweben
+        ? `\nBisheriger Handlungsentwurf, den du behutsam ergänzt (lass ihn, wo möglich, unverändert):\n${basis!.trim()}\n`
+        : `\nBisheriger Handlungsentwurf – deine Grundlage:\n${basis!.trim()}\n`
     : "";
 
   const basisAnforderung = fortsetzen
     ? "\n- Knüpfe unmittelbar an das Ende des bisherigen Entwurfs an und führe die Handlung weiter. Wiederhole nichts davon und formuliere es nicht um – schreibe ausschließlich, wie es weitergeht."
-    : nutzeBasis
-      ? "\n- Nimm den bisherigen Entwurf als Ausgangspunkt: Behalte seinen tragenden Konflikt und die beteiligten Figuren, forme daraus aber eine **eigenständige neue Fassung** – kein bloßes Umformulieren, sondern eine echte Alternative, die Schwerpunkte verschiebt und den Auslöser schärft."
-      : "";
+    : einweben
+      ? "\n- Behalte die bestehende Handlung, ihre Figuren, ihren Aufbau und ihren Ton. Erkenne, welche der oben genannten Personen im bisherigen Entwurf **noch nicht** vorkommen, und webe **genau diese** ein – jede mit einem glaubhaften eigenen Faden, der ans Bestehende anknüpft (Verbündete, Widersacher, Angehörige o. Ä.). Wirf nichts Bewährtes um; du **ergänzt**, statt neu zu schreiben."
+      : nutzeBasis
+        ? "\n- Nimm den bisherigen Entwurf als Ausgangspunkt: Behalte seinen tragenden Konflikt und die beteiligten Figuren, forme daraus aber eine **eigenständige neue Fassung** – kein bloßes Umformulieren, sondern eine echte Alternative, die Schwerpunkte verschiebt und den Auslöser schärft."
+        : "";
 
   // Länge und Ergebnis-Anforderung hängen am Weiterspinnen: eine vollständige
   // Geschichte braucht etwas mehr Platz und **schreibt** ihr Ende, eine offene
   // Ausgangslage lässt es bewusst weg.
-  const laengeZeile = weiterspinnen
-    ? "- Drei bis fünf kurze Absätze (insgesamt ca. 1000–1800 Zeichen)."
-    : "- Drei bis vier kurze Absätze (insgesamt ca. 900–1400 Zeichen).";
+  const laengeZeile = einweben
+    ? "- Etwa so lang wie der bisherige Entwurf, plus den Raum für die neuen Fäden – ein paar Sätze mehr sind in Ordnung."
+    : weiterspinnen
+      ? "- Drei bis fünf kurze Absätze (insgesamt ca. 1000–1800 Zeichen)."
+      : "- Drei bis vier kurze Absätze (insgesamt ca. 900–1400 Zeichen).";
 
   const ergebnisAnforderung = fortsetzen
     ? weiterspinnen
       ? "- Führe die Geschichte in dieser Fortsetzung bis zu einem Ende – Zuspitzung, Wendepunkt und ein Ausgang, der aus den Figuren und ihrem Konflikt folgt. Schreibe auch, **wie es ausgeht**."
       : "- Führe die Handlung eine deutliche Etappe weiter, ohne sie abzuschließen: eine neue Entwicklung, Zuspitzung oder Wendung. Lass den Ausgang offen."
-    : weiterspinnen
-      ? "- Skizziere eine **vollständige Geschichte**: von der Ausgangslage über Zuspitzung und Wendepunkt bis zu einem Ende, das aus den Figuren und ihrem Konflikt folgt. Schreibe auch, **wie es ausgeht**."
-      : "- Kein fertiger Plot mit Auflösung: eine Ausgangslage mit offenem Ausgang. Schreibe nicht, wie es endet.";
+    : einweben
+      ? "- Behalte den Ausgang wie im bisherigen Entwurf: War er offen, bleibt er offen; war er abgeschlossen, bleibt er abgeschlossen. Gib den **vollständigen** überarbeiteten Entwurf zurück, nicht nur die Ergänzung."
+      : weiterspinnen
+        ? "- Skizziere eine **vollständige Geschichte**: von der Ausgangslage über Zuspitzung und Wendepunkt bis zu einem Ende, das aus den Figuren und ihrem Konflikt folgt. Schreibe auch, **wie es ausgeht**."
+        : "- Kein fertiger Plot mit Auflösung: eine Ausgangslage mit offenem Ausgang. Schreibe nicht, wie es endet.";
 
   // Die Figuren-Regel hat zwei Fassungen. Ohne neue Personen (Default) die harte
   // Sperre wie bisher; auf Wunsch die gezielte Lockerung – genau so viele neue

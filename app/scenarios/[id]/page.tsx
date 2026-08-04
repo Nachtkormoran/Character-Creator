@@ -158,6 +158,7 @@ function ScenarioDetail({
     nameFehler,
     handleGenerate,
     handlungFortsetzen,
+    handlungEinweben,
     nameErzeugen,
   } = useScenarioFeldGen(doc, id, handlungProvider);
 
@@ -444,6 +445,7 @@ function ScenarioDetail({
         handlungNeuePersonenWunsch={handlungNeuePersonenWunsch}
         onHandlungNeuePersonenWunschChange={setHandlungNeuePersonenWunsch}
         onHandlungFortsetzen={handlungFortsetzen}
+        onEinweben={handlungEinweben}
         personenSuchen={personenSuchen}
         suchend={suchend}
         personen={personen}

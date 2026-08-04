@@ -217,6 +217,76 @@ export function useScenarioFeldGen(
   }
 
   /**
+   * **Personen in den aktuellen Entwurf einweben.** Nimmt den bestehenden
+   * Entwurf als Basis und lässt die Route ihn **behutsam** überarbeiten – die
+   * Figuren/Charaktere, die darin noch nicht vorkommen, werden eingeflochten,
+   * Handlung/Aufbau/Ton bleiben. Das Ergebnis hängt als **neue Variante** an (wie
+   * „Neu erzeugen"), damit der alte Entwurf erhalten bleibt. Keine erfundenen
+   * neuen Personen – es geht um die bestehende Besetzung.
+   */
+  async function handlungEinweben() {
+    if (generatingField || saving) return;
+    if (!details.handlung.trim()) return;
+    if (aktuelleVarianten().length >= MAX_PLOT_VARIANTS) {
+      setSaveError(
+        `Mehr als ${MAX_PLOT_VARIANTS} Entwürfe werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
+      );
+      return;
+    }
+    setGeneratingField("handlung");
+    setSaveError(null);
+    try {
+      const { handlung, model } = await generateScenarioPlot(
+        id,
+        name.trim(),
+        {
+          ...details,
+          figuren: aktiveFiguren(details.figuren),
+          handlungselemente: aktiveEintraege(details.handlungselemente),
+        },
+        zusatz.handlung ?? "",
+        details.handlung, // basis = der bestehende Entwurf
+        false, // weiterspinnen: einweben erhält den Charakter des Entwurfs
+        handlungTon,
+        0, // keine erfundenen neuen Personen – die bestehende Besetzung wird eingewoben
+        "",
+        handlungForm,
+        handlungProvider,
+        false, // fortsetzen
+        true, // einweben
+      );
+      let titel = "";
+      try {
+        titel = await generateStoryTitle(handlung, "entwurf");
+      } catch {
+        // Titel ist Beiwerk.
+      }
+      const alt = aktuelleVarianten();
+      setVarianten([...alt, handlung]);
+      setAktiv(alt.length);
+      setDetails((d) => ({ ...d, handlung }));
+      setVariantenMeta([
+        ...ausgerichtet(variantenMeta, alt.length),
+        {
+          titel,
+          form: handlungForm,
+          ton: handlungTon,
+          favorit: false,
+          quelle: "",
+          modell: model,
+          werkform: "",
+          cover: "",
+          alsBuch: false,
+        },
+      ]);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Fehler.");
+    } finally {
+      setGeneratingField(null);
+    }
+  }
+
+  /**
    * Namen aus den Welt-Feldern (Beschreibung/Ort/Zeit/Regeln) per KI erzeugen.
    * Der Vorschlag geht ins Namensfeld (Bearbeitungs-Zustand → `dirty`).
    */
@@ -250,6 +320,7 @@ export function useScenarioFeldGen(
     nameFehler,
     handleGenerate,
     handlungFortsetzen,
+    handlungEinweben,
     nameErzeugen,
   };
 }

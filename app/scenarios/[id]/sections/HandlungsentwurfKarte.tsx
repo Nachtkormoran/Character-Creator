@@ -6,6 +6,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Sparkles,
   Star,
   Users,
   X,
@@ -69,6 +70,7 @@ export function HandlungsentwurfKarte({
   handlungNeuePersonenWunsch,
   onHandlungNeuePersonenWunschChange,
   onHandlungFortsetzen,
+  onEinweben,
   personenSuchen,
   suchend,
   personen,
@@ -109,6 +111,7 @@ export function HandlungsentwurfKarte({
   handlungNeuePersonenWunsch: string;
   onHandlungNeuePersonenWunschChange: (v: string) => void;
   onHandlungFortsetzen: () => void;
+  onEinweben: () => void;
   personenSuchen: () => void;
   suchend: boolean;
   personen: PlotPerson[] | null;
@@ -511,7 +514,7 @@ export function HandlungsentwurfKarte({
         Fortsetzung wird angehängt. Nur sichtbar, wenn ein Entwurf da ist.
       */}
       {details.handlung.trim() && (
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={onHandlungFortsetzen}
@@ -525,6 +528,27 @@ export function HandlungsentwurfKarte({
               <>
                 <ChevronsRight size={16} strokeWidth={1.75} aria-hidden="true" />
                 Entwurf fortsetzen
+              </>
+            )}
+          </button>
+          {/*
+            Personen einweben: überarbeitet den bestehenden Entwurf behutsam und
+            flicht die noch fehlenden Figuren/Charaktere ein – Handlung, Aufbau
+            und Ton bleiben. Ergebnis als **neuer Reiter** (der alte bleibt).
+          */}
+          <button
+            type="button"
+            onClick={onEinweben}
+            disabled={saving || generatingField !== null}
+            title="Überarbeitet den aktuellen Entwurf behutsam und flicht die Figuren/Charaktere ein, die darin noch nicht vorkommen (automatisch erkannt). Handlung, Aufbau und Ton bleiben; das Ergebnis kommt als neuer Reiter. Das Stichwörter-Feld oben kann zuspitzen („besonders Matthew einweben“)."
+            className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
+          >
+            {generatingField === "handlung" ? (
+              "Webe ein …"
+            ) : (
+              <>
+                <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
+                Personen einweben
               </>
             )}
           </button>

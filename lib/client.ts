@@ -907,6 +907,13 @@ export function generateScenarioPlot(
    * hängt sie an den vorhandenen Text an. Braucht `basis`.
    */
   fortsetzen = false,
+  /**
+   * **Personen einweben**: den vorhandenen Entwurf (`basis`) behutsam
+   * überarbeiten und die noch fehlenden Figuren/Charaktere einflechten – die
+   * Antwort ist der **vollständige** überarbeitete Entwurf (der Aufrufer hängt
+   * ihn als neue Variante an). Braucht `basis`; schließt sich mit `fortsetzen` aus.
+   */
+  einweben = false,
 ) {
   return postJson<{ handlung: string; characters: number; model: string }>(
     "/api/scenario-plot",
@@ -918,6 +925,7 @@ export function generateScenarioPlot(
       basis,
       weiterspinnen,
       fortsetzen,
+      einweben,
       ton,
       neuePersonen,
       neuePersonenWunsch,

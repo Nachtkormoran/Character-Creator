@@ -42,6 +42,10 @@ const bodySchema = z.object({
   // Fortsetzung** liefern – der Client hängt sie an. Braucht `basis`; ohne
   // fällt es auf das gewöhnliche Verhalten zurück.
   fortsetzen: z.boolean().optional().default(false),
+  // „einweben": den vorhandenen Entwurf (`basis`) **behutsam** überarbeiten und
+  // die Personen einflechten, die darin noch nicht vorkommen – Handlung/Aufbau/
+  // Ton bleiben. Braucht `basis`; schließt sich mit `fortsetzen` aus.
+  einweben: z.boolean().optional().default(false),
   // Ton und Sprache – nicht gespeichert. Ohne Allowlist als String: ein
   // unbekannter Wert liefert bloß keinen Ton-Block (`toneHint` gibt "").
   ton: z.string().trim().max(40).optional().default(""),
@@ -83,6 +87,7 @@ export async function POST(request: Request) {
       basis,
       weiterspinnen,
       fortsetzen,
+      einweben,
       ton,
       neuePersonen,
       neuePersonenWunsch,
@@ -143,9 +148,11 @@ export async function POST(request: Request) {
           role: "system",
           content: fortsetzen
             ? "Du bist Dramaturg. Du setzt einen vorhandenen Handlungsentwurf nahtlos fort und antwortest ausschließlich mit der Fortsetzung – ohne den bisherigen Text zu wiederholen."
-            : weiterspinnen
-              ? "Du bist Dramaturg. Du entwirfst vollständige Geschichten – von der Ausgangslage bis zu einem Ende – und antwortest ausschließlich mit dem Entwurf selbst."
-              : "Du bist Dramaturg. Du entwirfst Ausgangslagen, aus denen sich Geschichten entwickeln, und antwortest ausschließlich mit dem Entwurf selbst.",
+            : einweben
+              ? "Du bist Dramaturg. Du überarbeitest einen vorhandenen Handlungsentwurf behutsam, flichtst die noch fehlenden Figuren ein und behältst Handlung, Aufbau und Ton bei – du antwortest ausschließlich mit dem vollständigen überarbeiteten Entwurf."
+              : weiterspinnen
+                ? "Du bist Dramaturg. Du entwirfst vollständige Geschichten – von der Ausgangslage bis zu einem Ende – und antwortest ausschließlich mit dem Entwurf selbst."
+                : "Du bist Dramaturg. Du entwirfst Ausgangslagen, aus denen sich Geschichten entwickeln, und antwortest ausschließlich mit dem Entwurf selbst.",
         },
         {
           role: "user",
@@ -161,6 +168,7 @@ export async function POST(request: Request) {
             neuePersonenWunsch,
             form,
             fortsetzen,
+            einweben,
           ),
         },
       ],
