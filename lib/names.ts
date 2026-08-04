@@ -551,3 +551,32 @@ export function randomName(options: {
 
   return `${pick(pool)} ${pick(culture.surnames)}`;
 }
+
+/**
+ * **Namens-Bausteine für die KI-Erzeugung** – eine Handvoll frischer Vor- und
+ * Nachnamen aus dem zum Genre passenden Kulturkreis. Sprachmodelle greifen sonst
+ * immer wieder zu denselben „Lieblingsnamen"; gibt man ihnen je Aufruf einen
+ * anderen Zufalls-Satz echter Namen zur Kombination mit, bricht das die
+ * Wiederholung und erdet die Namen in Herkunft/Genre.
+ *
+ * Der Kulturkreis wird wie bei `randomName` über `genre` bestimmt (ein
+ * zufälliger aus den passenden), damit die Figuren einer Erzeugung in einem
+ * stimmigen Register liegen statt kulturell zu mischen.
+ */
+export function namensBausteine(
+  genre: string | undefined,
+  anzahl = 8,
+): { kultur: string; vornamen: string[]; nachnamen: string[] } {
+  const ids = (genre && GENRE_CULTURES[genre]) || FALLBACK_CULTURES;
+  const cultureId = pick(ids);
+  const culture =
+    NAME_CULTURES.find((c) => c.id === cultureId) ?? NAME_CULTURES[0];
+  // Ziehen ohne Wiederholung: mischen und die ersten `anzahl` nehmen.
+  const zieh = (list: readonly string[], n: number) =>
+    [...list].sort(() => Math.random() - 0.5).slice(0, n);
+  return {
+    kultur: culture.label,
+    vornamen: zieh([...culture.female, ...culture.male], anzahl),
+    nachnamen: zieh(culture.surnames, anzahl),
+  };
+}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTextClient } from "@/lib/openai";
 import { figurenText } from "@/lib/figuren";
+import { namensBausteine } from "@/lib/names";
 import { buildScenarioFiguresPrompt } from "@/lib/prompts";
 import {
   SCENARIO_MAXLENGTHS,
@@ -97,6 +98,9 @@ export async function POST(request: Request) {
             maxLen,
             anzahl,
             charaktere,
+            // Frische Namens-Bausteine aus dem genre-passenden Kulturkreis –
+            // gegen die „Lieblingsnamen" des Modells; je Aufruf ein anderer Satz.
+            namensBausteine(details.genre),
           ),
         },
       ],

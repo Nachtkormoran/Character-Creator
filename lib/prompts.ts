@@ -2190,6 +2190,12 @@ export function buildScenarioFiguresPrompt(
    * bestehenden Charakter als Figur nochmal (z. B. wenn ein Stichwort ihn nennt).
    */
   charaktere: FigurCharakterKontext[] = [],
+  /**
+   * Frische Namens-Bausteine (Vor-/Nachnamen) aus dem genre-passenden
+   * Kulturkreis (`namensBausteine` aus `names.ts`). Bricht die „Lieblingsnamen"
+   * des Modells und erdet die Namen; je Aufruf ein anderer Satz.
+   */
+  bausteine?: { kultur: string; vornamen: string[]; nachnamen: string[] },
 ): string {
   const kontext =
     line("Szenario", name) +
@@ -2219,6 +2225,11 @@ export function buildScenarioFiguresPrompt(
   const zusatzBlock = zusatz?.trim()
     ? `\nBesonders wichtig – berücksichtige diese Stichwörter:\n${zusatz.trim()}\n`
     : "";
+
+  const namensBlock =
+    bausteine && bausteine.vornamen.length
+      ? `\nNamensvielfalt (wichtig): Greife **nicht** immer zu denselben Standardnamen. Bilde die Namen der neuen Figuren – sofern die Stichwörter keinen Namen vorgeben – aus diesen frischen Bausteinen (${bausteine.kultur}; Vor- und Nachname frei kombinierbar):\n- Vornamen: ${bausteine.vornamen.join(", ")}\n- Nachnamen: ${bausteine.nachnamen.join(", ")}\n`
+      : "";
 
   const budgetBlock =
     bestand && maxLen
@@ -2257,7 +2268,7 @@ Anforderungen:
       ? "\n- Nenne **keine** neue Figur wie eine der oben gelisteten, bereits angelegten Personen. Nennt ein Stichwort eine solche Person, ist die neue Figur eine **andere** Person **mit Bezug zu ihr** – niemals diese Person selbst."
       : ""
   }
-${budgetBlock}${zusatzBlock}
+${namensBlock}${budgetBlock}${zusatzBlock}
 Form der Antwort: **eine Figur je Zeile**, durch Zeilenumbrüche getrennt. Keine Nummerierung, keine Spiegelstriche, kein Markdown, keine Einleitung und keine Erklärung. Antworte mit **nichts als den Figuren-Zeilen**${
     bestand ? " – die vorhandenen zuerst, wörtlich, dann die neuen" : ""
   }.`;
