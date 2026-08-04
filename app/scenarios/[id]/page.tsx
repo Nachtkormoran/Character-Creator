@@ -81,6 +81,15 @@ import {
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
 import {
+  ausgerichtet,
+  currentSnapshot,
+  isDirty,
+  LEER_META,
+  mergeArcs,
+  mergeVarianten,
+  savedSnapshot,
+} from "@/lib/scenarioDocument";
+import {
   aktiveEintraege,
   aktiveFiguren,
   joinFigurenDetail,
@@ -100,27 +109,8 @@ import { ScenarioFields } from "../../components/ScenarioFields";
 import { ScenarioImageModal } from "../../components/ScenarioImageModal";
 import { StoryArcSection } from "../../components/StoryArcSection";
 
-/** Leere Metadaten – für neue leere/von Hand angelegte Varianten und als Rückfall. */
-const LEER_META: VariantMeta = {
-  titel: "",
-  form: "",
-  ton: "",
-  favorit: false,
-  quelle: "",
-  modell: "",
-  werkform: "",
-  cover: "",
-  alsBuch: false,
-};
-
-/**
- * Bringt eine Metadaten-Liste auf genau `laenge` Einträge (fehlende leer,
- * überzählige weg) – hält `meta` mit der Variantenliste deckungsgleich, egal
- * was der Zustand gerade hält.
- */
-function ausgerichtet(meta: VariantMeta[], laenge: number): VariantMeta[] {
-  return Array.from({ length: laenge }, (_, i) => meta[i] ?? LEER_META);
-}
+// `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
+// getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
 
 export default function ScenarioDetailPage({
   params,
@@ -441,9 +431,7 @@ export default function ScenarioDetailPage({
    * keine gespeicherte Liste, wird ein von Hand getippter Entwurf zu Variante 1.
    */
   function aktuelleVarianten(): string[] {
-    if (varianten.length === 0)
-      return details.handlung.trim() ? [details.handlung] : [];
-    return varianten.map((v, i) => (i === aktiv ? details.handlung : v));
+    return mergeVarianten(varianten, aktiv, details.handlung);
   }
 
   /** Auf einen anderen Entwurf umschalten – der bisherige wird zuvor gesichert. */
@@ -592,9 +580,7 @@ export default function ScenarioDetailPage({
    * aufgebauter Arc zu Arc 1.
    */
   function aktuelleArcs(): StoryArc[] {
-    if (arcVarianten.length === 0)
-      return storyArc.stufen.length > 0 ? [storyArc] : [];
-    return arcVarianten.map((v, i) => (i === arcAktiv ? storyArc : v));
+    return mergeArcs(arcVarianten, arcAktiv, storyArc);
   }
 
   /** Auf einen anderen Arc umschalten – der bisherige wird zuvor gesichert. */
@@ -982,11 +968,11 @@ export default function ScenarioDetailPage({
         setCharacters(characters);
         setBilder(scenario.images);
         setSaved(
-          JSON.stringify({
+          savedSnapshot({
             name: scenario.name,
             details: scenario.details,
-            plot: scenario.plotVariants,
-            arc: scenario.storyArcVariants,
+            plotVariants: scenario.plotVariants,
+            storyArcVariants: scenario.storyArcVariants,
           }),
         );
         // Gemerkte Lauf-Parameter dieses Szenarios anwenden, dann den
@@ -1178,25 +1164,24 @@ export default function ScenarioDetailPage({
   // Der aktuelle Stand als Vergleichswert für den „Ungespeichert"-Balken. Die
   // Handlungsvarianten gehören dazu: Umschalten und Anhängen sind Änderungen,
   // die gespeichert werden wollen.
-  const dirty =
-    saved !== "" &&
-    JSON.stringify({
+  // `meta` geht mit in den Vergleich – sonst wiche er schon an der fehlenden
+  // Metadaten-Liste ab (die `saved` enthält). Ein neuer Titel oder eine
+  // gelöschte Variante markiert damit korrekt „ungespeichert". Die exakte
+  // (asymmetrische) Form steckt in `@/lib/scenarioDocument` und ist dort getestet.
+  const dirty = isDirty(
+    saved,
+    currentSnapshot({
       name,
       details,
-      // `meta` muss mit – sonst wiche der Vergleich schon an der fehlenden
-      // Metadaten-Liste ab (die `saved` enthält). Ein neuer Titel oder eine
-      // gelöschte Variante markiert damit korrekt „ungespeichert".
-      plot: {
-        items: aktuelleVarianten(),
-        aktiv,
-        meta: ausgerichtet(variantenMeta, aktuelleVarianten().length),
-      },
-      arc: {
-        items: aktuelleArcs(),
-        aktiv: arcAktiv,
-        meta: ausgerichtet(arcMeta, aktuelleArcs().length),
-      },
-    }) !== saved;
+      varianten,
+      aktiv,
+      variantenMeta,
+      storyArc,
+      arcVarianten,
+      arcAktiv,
+      arcMeta,
+    }),
+  );
   const nameValid = name.trim().length > 0;
   // Das anzuzeigende Weltbild – das Primärbild (wie beim Charakter abgeleitet).
   const weltbildVorschau = primaryImage({ images: bilder })?.thumbnail ?? null;
@@ -1561,11 +1546,11 @@ export default function ScenarioDetailPage({
       setArcAktiv(aktualisiert.storyArcVariants.aktiv);
       setArcMeta(aktualisiert.storyArcVariants.meta);
       setSaved(
-        JSON.stringify({
+        savedSnapshot({
           name: aktualisiert.name,
           details: aktualisiert.details,
-          plot: aktualisiert.plotVariants,
-          arc: aktualisiert.storyArcVariants,
+          plotVariants: aktualisiert.plotVariants,
+          storyArcVariants: aktualisiert.storyArcVariants,
         }),
       );
       return true;
