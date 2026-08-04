@@ -602,7 +602,7 @@ export function buildScenarioPlotPrompt(
   const basisAnforderung = fortsetzen
     ? "\n- Knüpfe unmittelbar an das Ende des bisherigen Entwurfs an und führe die Handlung weiter. Wiederhole nichts davon und formuliere es nicht um – schreibe ausschließlich, wie es weitergeht."
     : einweben
-      ? "\n- Behalte die bestehende Handlung, ihre Figuren, ihren Aufbau und ihren Ton. Erkenne, welche der oben genannten Personen im bisherigen Entwurf **noch nicht** vorkommen, und webe **genau diese** ein – jede mit einem glaubhaften eigenen Faden, der ans Bestehende anknüpft (Verbündete, Widersacher, Angehörige o. Ä.). Wirf nichts Bewährtes um; du **ergänzt**, statt neu zu schreiben."
+      ? "\n- Behalte die bestehende Handlung, ihren Aufbau und ihren Ton. Erkenne, welche der oben genannten Personen im bisherigen Entwurf **noch nicht** vorkommen, und webe **genau diese** ein.\n- **Jede neu eingewobene Person braucht einen durchgehenden Faden – keine bloße Erwähnung am Anfang.** Sie muss etwas **tun**, das den Verlauf berührt (eine Handlung, eine Begegnung, eine Folge für andere), und **auch im weiteren Verlauf wieder vorkommen** – in der Zuspitzung, an der Wende und beim Ausgang, nicht nur in der Vorstellung der Figuren. Verknüpfe ihren Faden mit dem bestehenden Konflikt, statt sie in einem Nebensatz aufzuzählen und dann fallenzulassen.\n- Wirf nichts Bewährtes um; du **ergänzt**, statt neu zu schreiben."
       : nutzeBasis
         ? "\n- Nimm den bisherigen Entwurf als Ausgangspunkt: Behalte seinen tragenden Konflikt und die beteiligten Figuren, forme daraus aber eine **eigenständige neue Fassung** – kein bloßes Umformulieren, sondern eine echte Alternative, die Schwerpunkte verschiebt und den Auslöser schärft."
         : "";
