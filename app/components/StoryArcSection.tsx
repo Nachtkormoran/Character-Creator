@@ -44,6 +44,7 @@ import {
   ListTree,
   Mountain,
   Pencil,
+  Plus,
   Sparkles,
   Star,
   User,
@@ -251,6 +252,21 @@ export function StoryArcSection({
   const kannAbleiten = handlung.trim().length > 0 && !busy && !disabled;
   const kannHinzufuegen = stufen.length < MAX_ARC_STUFEN;
 
+  // Master-Detail: welche Station gerade **ausgearbeitet** wird. Die Leiste zeigt
+  // alle Akte kompakt, rechts steht nur die gewählte – so bleibt die Sektion
+  // kurz, egal wie ausgearbeitet der Arc ist. Der Index wird auf die aktuelle
+  // Länge geklemmt (nach Löschen/Arc-Wechsel bleibt er gültig).
+  const [gewaehlteStufe, setGewaehlteStufe] = useState(0);
+  const sel = stufen.length ? Math.min(gewaehlteStufe, stufen.length - 1) : 0;
+  /** Fortschritt einer Station: „done" = alle Kapitel mit Prosa, „teil" = Kapitel
+   * abgeleitet aber Prosa unvollständig, „offen" = noch keine Kapitel. */
+  function stufeStatus(s: StoryArc["stufen"][number]): "done" | "teil" | "offen" {
+    const kap = s.kapitel.length;
+    if (kap === 0) return "offen";
+    const prosa = s.kapitel.filter((k) => k.text.trim() !== "").length;
+    return prosa === kap ? "done" : "teil";
+  }
+
   // Buch-Reader: offen/zu, und ob es überhaupt etwas zu lesen gibt (mindestens
   // ein Kapitel mit ausformuliertem Prosatext im aktiven Arc). Der Buchtitel ist
   // der Titel des aktiven Arcs – mit demselben Rückfall wie in der Reiter-Leiste.
@@ -302,6 +318,14 @@ export function StoryArcSection({
     const next = stufen.slice();
     [next[i], next[j]] = [next[j], next[i]];
     onChange({ stufen: next });
+  }
+  // Aus dem Detail heraus verschoben: die Auswahl wandert mit der Station mit,
+  // damit das Detail nicht plötzlich eine andere Station zeigt.
+  function stufeVerschiebenUndFolgen(richtung: -1 | 1) {
+    const j = sel + richtung;
+    if (j < 0 || j >= stufen.length) return;
+    stufeVerschieben(sel, richtung);
+    setGewaehlteStufe(j);
   }
   function stufeHinzufuegen() {
     if (!kannHinzufuegen) return;
@@ -1033,13 +1057,103 @@ export function StoryArcSection({
       )}
 
       {hatArc && (
-        <ol className="relative mt-5">
-          {/* durchgehende Linie hinter den Punkten */}
-          <span
-            aria-hidden
-            className="absolute top-3 bottom-3 left-[0.34rem] w-px bg-black/10"
-          />
-          {stufen.map((s, i) => {
+        <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-[16rem_1fr]">
+          {/*
+            Master: die Stations-Leiste. Alle Akte kompakt mit Status-Punkt –
+            der Fortschritt des ganzen Fünfakters auf einen Blick, ohne Scrollen.
+          */}
+          <nav
+            aria-label="Stationen des Story Arcs"
+            className="flex flex-col gap-2 md:sticky md:top-4 md:self-start"
+          >
+            <div className="flex items-baseline justify-between px-1 text-[0.7rem] font-semibold tracking-wide text-muted-foreground uppercase">
+              <span>Stationen</span>
+              <span className="tabular-nums">
+                {stufen.filter((x) => x.kapitel.length > 0).length} /{" "}
+                {stufen.length} mit Kapiteln
+              </span>
+            </div>
+            {stufen.map((s, i) => {
+              const st = stufeStatus(s);
+              const kap = s.kapitel.length;
+              const prosa = s.kapitel.filter((k) => k.text.trim() !== "").length;
+              const phaseLabel =
+                ARC_PHASES.find((p) => p.value === s.phase)?.label ?? "";
+              const dotCls =
+                st === "done"
+                  ? "bg-emerald-500"
+                  : st === "teil"
+                    ? "bg-amber-500"
+                    : "bg-muted-foreground/40";
+              const prog =
+                kap === 0
+                  ? "noch keine Kapitel"
+                  : prosa === kap
+                    ? `${kap} Kapitel · Prosa fertig`
+                    : `${kap} Kapitel · ${prosa}/${kap} Prosa`;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setGewaehlteStufe(i)}
+                  aria-current={i === sel}
+                  className={`flex items-start gap-2.5 rounded-lg border p-2.5 text-left transition ${
+                    i === sel
+                      ? "border-primary bg-card shadow-sm ring-1 ring-primary/60"
+                      : "border-border bg-card hover:bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`mt-1 size-2.5 shrink-0 rounded-full ${dotCls}`}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[0.62rem] tracking-wide text-muted-foreground uppercase">
+                      {`Akt ${i + 1} · ${phaseLabel}`}
+                    </span>
+                    <span className="block truncate text-sm font-semibold">
+                      {s.titel.trim() || `Station ${i + 1}`}
+                    </span>
+                    <span className="block text-[0.72rem] tabular-nums text-muted-foreground">
+                      {prog}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => {
+                stufeHinzufuegen();
+                setGewaehlteStufe(stufen.length);
+              }}
+              disabled={disabled || !kannHinzufuegen}
+              title={
+                kannHinzufuegen
+                  ? "Fügt eine leere Station am Ende an"
+                  : `Mehr als ${MAX_ARC_STUFEN} Stationen werden nicht gespeichert`
+              }
+              className={`${CHIP_BTN} justify-center`}
+            >
+              <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
+              Station
+            </button>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 px-1 pt-1 text-[0.68rem] text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-emerald-500" /> Prosa fertig
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-amber-500" /> Kapitel da
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-muted-foreground/40" /> offen
+              </span>
+            </div>
+          </nav>
+
+          {/* Detail: nur die **gewählte** Station wird voll ausgearbeitet. */}
+          <div>
+            {stufen.map((s, i) => {
             const stil = PHASE_STYLE[s.phase];
             const kapitelLaeuft = kapitelBusy === i;
             // Kapitelgrenzen (`---`) in der Beschreibung → feste Abschnitte. Ab
@@ -1047,17 +1161,13 @@ export function StoryArcSection({
             // Abschnitt, die Kapitelzahl-Wahl greift dann nicht.
             const segmentZahl = splitKapitelSegmente(s.beschreibung).length;
             const hatSegmente = segmentZahl >= 2;
+            // Master-Detail: nur die gewählte Station voll rendern.
+            if (i !== sel) return null;
             return (
-              <li
+              <div
                 key={i}
-                className="relative grid grid-cols-[1.25rem_1fr] gap-3 pb-4 last:pb-0"
+                className="rounded-lg border border-border bg-muted p-3"
               >
-                <div className="relative">
-                  <span
-                    className={`absolute top-2 left-0 size-3 rounded-full ring-4 ring-white dark:ring-[#0a0a0a] ${stil.dot}`}
-                  />
-                </div>
-                <div className="rounded-lg border border-border bg-muted p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold tabular-nums text-muted-foreground">
@@ -1097,7 +1207,7 @@ export function StoryArcSection({
                     <div className="flex items-center gap-0.5">
                       <button
                         type="button"
-                        onClick={() => stufeVerschieben(i, -1)}
+                        onClick={() => stufeVerschiebenUndFolgen(-1)}
                         disabled={disabled || i === 0}
                         aria-label={`Station ${i + 1} nach oben`}
                         title="Nach oben"
@@ -1107,7 +1217,7 @@ export function StoryArcSection({
                       </button>
                       <button
                         type="button"
-                        onClick={() => stufeVerschieben(i, 1)}
+                        onClick={() => stufeVerschiebenUndFolgen(1)}
                         disabled={disabled || i === stufen.length - 1}
                         aria-label={`Station ${i + 1} nach unten`}
                         title="Nach unten"
@@ -1158,7 +1268,8 @@ export function StoryArcSection({
                       title="Eine Kapitelgrenze (---) an der Cursorposition einfügen. Jeder so abgetrennte Abschnitt wird beim Ableiten zu genau einem Kapitel."
                       className={CHIP_BTN}
                     >
-                      ➕ Kapitelgrenze
+                      <Plus size={14} strokeWidth={1.75} aria-hidden="true" />
+                      Kapitelgrenze
                     </button>
                     {hatSegmente && (
                       <span className="text-xs text-muted-foreground">
@@ -1451,28 +1562,31 @@ export function StoryArcSection({
                     )}
                   </div>
                 </div>
-              </li>
             );
           })}
-        </ol>
+          </div>
+        </div>
       )}
 
-      {/* Station hinzufügen – auch bei leerem Arc, um von Hand aufzubauen. */}
-      <div className="mt-3">
-        <button
-          type="button"
-          onClick={stufeHinzufuegen}
-          disabled={disabled || !kannHinzufuegen}
-          title={
-            kannHinzufuegen
-              ? "Fügt eine leere Station am Ende an – per ▲▼ verschiebbar"
-              : `Mehr als ${MAX_ARC_STUFEN} Stationen werden nicht gespeichert`
-          }
-          className={CHIP_BTN}
-        >
-          ➕ Station hinzufügen
-        </button>
-      </div>
+      {/* Bei noch leerem Arc: von Hand die erste Station aufbauen (im Master
+          steht der Hinzufügen-Knopf, sobald es Stationen gibt). */}
+      {!hatArc && (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => {
+              stufeHinzufuegen();
+              setGewaehlteStufe(0);
+            }}
+            disabled={disabled || !kannHinzufuegen}
+            title="Fügt eine leere Station an, um den Arc von Hand aufzubauen"
+            className={CHIP_BTN}
+          >
+            <Plus size={15} strokeWidth={1.75} aria-hidden="true" />
+            Station hinzufügen
+          </button>
+        </div>
+      )}
 
       {readerOffen && (
         <StoryReaderModal
