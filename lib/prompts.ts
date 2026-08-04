@@ -561,7 +561,12 @@ export function buildScenarioPlotPrompt(
   // vorher (dieselbe Regel wie beim Figuren-Feld).
   const handlungselemente = (details.handlungselemente ?? "").trim();
   const handlungselementeBlock = handlungselemente
-    ? `\nVorgegebene Handlungselemente – diese Aspekte sollen den Entwurf tragen und darin vorkommen:\n${handlungselemente}\n`
+    ? einweben
+      ? // Beim Einweben wird der Entwurf nur behutsam ergänzt – die Elemente
+        // tragen ihn längst, hier kein „mach sie zentral"-Druck, der die sanfte
+        // Überarbeitung stören würde. Neu hinzugekommene werden mit eingewoben.
+        `\nVorgegebene Handlungselemente – diese Aspekte tragen den Entwurf bereits; behalte sie bei und flicht neu hinzugekommene ebenso ein wie die neuen Personen:\n${handlungselemente}\n`
+      : `\nVorgegebene Handlungselemente – diese Aspekte sollen den Entwurf tragen und darin vorkommen:\n${handlungselemente}\n`
     : "";
 
   const zusatzBlock = zusatz?.trim()
