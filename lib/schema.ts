@@ -1459,7 +1459,7 @@ export const kapitelListeSchema = z.object({
  */
 export const kapitelStoredSchema = z.object({
   titel: z.string().trim().max(200),
-  inhalt: z.string().trim().max(2000),
+  inhalt: z.string().trim().max(3500),
   /**
    * Der **ausformulierte Prosatext** des Kapitels (Personen + Tätigkeiten,
    * Atmosphäre des Ortes, Dialog in wörtlicher Rede) – auf Knopfdruck erzeugt,
