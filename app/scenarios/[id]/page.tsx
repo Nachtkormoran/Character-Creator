@@ -1,7 +1,6 @@
 "use client";
 
 import { use, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -34,13 +33,10 @@ import { ladeRunParams, speichereRunParams } from "@/lib/scenarioRunParams";
 import {
   ChevronsRight,
   Copy,
-  Images,
-  Mountain,
   Pencil,
   Plus,
   Search,
   Star,
-  User,
   Users,
   X,
 } from "../../components/ui/icons";
@@ -109,6 +105,8 @@ import { ScenarioImageModal } from "../../components/ScenarioImageModal";
 import { StoryArcSection } from "../../components/StoryArcSection";
 import { ExportLeiste } from "./sections/ExportLeiste";
 import { ScenarioHeader } from "./sections/ScenarioHeader";
+import { WeltKarte } from "./sections/WeltKarte";
+import { CharaktereKarte } from "./sections/CharaktereKarte";
 
 // `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
 // getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
@@ -1696,110 +1694,23 @@ export default function ScenarioDetailPage({
         saveError={saveError}
       />
 
-      {/*
-        Kopfblock wie in der Charakter-Detailansicht: links der Fließtext (dort
-        die Person, hier die Welt), rechts das Bild mit seiner Steuerung
-        darunter. `order-*` zeigt das Bild auf schmalen Schirmen zuerst – wie
-        beim Charakter.
-      */}
-      <section className="rounded-xl border border-border bg-card p-5">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_240px]">
-          {/* Links: die Beschreibung – der Fließtext über die Welt. */}
-          <div className="order-2 md:order-1">
-            <ScenarioFields
-              details={details}
-              onChange={setDetails}
-              disabled={saving}
-              fields={["beschreibung"]}
-              generatable={ERZEUGBAR}
-              onGenerate={handleGenerate}
-              generatingField={generatingField}
-              zusatz={zusatz}
-              onZusatzChange={(key, value) =>
-                setZusatz((z) => ({ ...z, [key]: value }))
-              }
-            />
-          </div>
-
-          {/*
-            Rechts nur noch das Weltbild und ein Knopf, der die Bild-Ansicht
-            öffnet – die gesamte Bedienung liegt in `ScenarioImageModal`. Das
-            hält die Detailansicht ruhig: neben der Weltbeschreibung steht ein
-            Bild, kein Bedienfeld.
-          */}
-          <div className="order-1 flex flex-col gap-3 md:order-2">
-            <span className="text-sm font-medium">
-              {bilder.length > 1 ? `Weltbilder (${bilder.length})` : "Weltbild"}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setBildModalOffen(true)}
-              title={
-                bilder.length > 0 ? "Weltbilder verwalten" : "Weltbild hinzufügen"
-              }
-              className="relative aspect-square w-full overflow-hidden rounded-lg border border-border bg-muted transition hover:border-border"
-            >
-              {weltbildVorschau ? (
-                <Image
-                  src={weltbildVorschau}
-                  alt={`Weltbild von ${name}`}
-                  fill
-                  sizes="240px"
-                  className="object-cover"
-                  unoptimized
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-muted-foreground">
-                  <Mountain size={44} strokeWidth={1.25} aria-hidden="true" />
-                </div>
-              )}
-              {bilder.length > 1 && (
-                <span className="absolute top-2 right-2 rounded-md bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
-                  +{bilder.length - 1}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setBildModalOffen(true)}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted"
-            >
-              {bilder.length > 0 ? (
-                <>
-                  <Images size={16} strokeWidth={1.75} aria-hidden="true" />
-                  Weltbilder verwalten
-                </>
-              ) : (
-                <>
-                  <Mountain size={16} strokeWidth={1.75} aria-hidden="true" />
-                  Weltbild hinzufügen
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-border bg-card p-5">
-        <h2 className="mb-4 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-          Festlegungen
-        </h2>
-        <ScenarioFields
-          details={details}
-          onChange={festlegungenAendern}
-          disabled={saving}
-          fields={["genre", "ort", "zeit", "regeln"]}
-          generatable={ERZEUGBAR}
-          onGenerate={handleGenerate}
-          generatingField={generatingField}
-          zusatz={zusatz}
-          onZusatzChange={(key, value) =>
-            setZusatz((z) => ({ ...z, [key]: value }))
-          }
-        />
-      </section>
+      <WeltKarte
+        details={details}
+        name={name}
+        saving={saving}
+        generatable={ERZEUGBAR}
+        onGenerate={handleGenerate}
+        generatingField={generatingField}
+        zusatz={zusatz}
+        onZusatzChange={(key, value) =>
+          setZusatz((z) => ({ ...z, [key]: value }))
+        }
+        onBeschreibungChange={setDetails}
+        onFestlegungenChange={festlegungenAendern}
+        bilder={bilder}
+        weltbildVorschau={weltbildVorschau}
+        onBildModalOffen={() => setBildModalOffen(true)}
+      />
 
       {/*
         Die **Besetzung** in einer Karte: oben die schon angelegten
@@ -1810,184 +1721,28 @@ export default function ScenarioDetailPage({
         standen die Charaktere ganz unten; hier stehen sie bei den Figuren, aus
         denen sie hervorgehen.
       */}
-      <section className="rounded-xl border border-border bg-card p-5">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-            Charaktere ({characters.length})
-          </h2>
-          <div className="flex flex-wrap items-center gap-2">
-            {/*
-              Bestehenden Charakter zuordnen: zeigt nur Figuren, die noch nicht
-              hier sind. Gehört eine schon zu einem anderen Szenario, wird auf
-              Wunsch eine Kopie angelegt. Ein Knopf und kein Link – es öffnet ein
-              Modal, keine Navigation.
-            */}
-            <button
-              type="button"
-              onClick={() => setAddOffen(true)}
-              title="Einen bereits vorhandenen Charakter diesem Szenario zuordnen"
-              className="rounded-md border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-muted"
-            >
-              + Vorhandenen hinzufügen
-            </button>
-            {/*
-              Führt aufs Erstellen-Formular, mit dem Szenario im Parameter: es
-              belegt Genre, Setting und Weltkontext vor und ist als Zuordnung
-              ausgewählt. Bewusst ein Link und kein Knopf – es ist eine
-              Navigation, und man soll ihn in einem neuen Tab öffnen können.
-            */}
-            <Link
-              href={`/?scenario=${id}`}
-              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:opacity-90"
-            >
-              + Neuen erstellen
-            </Link>
-          </div>
-        </div>
-        {characters.length > 0 && (
-          <p className="mb-3 text-xs text-muted-foreground">
-            Mit dem Stern markierst du <strong>Protagonisten</strong> – der
-            Handlungsentwurf dreht sich dann um sie, die übrigen sind
-            Nebenfiguren. Ohne Markierung bleibt alles wie bisher.
-          </p>
-        )}
-        {dirty && (
-          <p className="mb-3 text-xs text-amber-700 dark:text-amber-400">
-            Ungespeicherte Änderungen werden nicht übernommen – erst speichern,
-            dann den Charakter anlegen.
-          </p>
-        )}
-        {characters.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-            Diesem Szenario ist noch niemand zugeordnet. Füge über die Knöpfe
-            oben einen vorhandenen Charakter hinzu, erstelle einen neuen – oder
-            lege unten aus einer Figur einen an.
-          </div>
-        ) : (
-          // Rund halb so große Kacheln wie in der Galerie: doppelt so viele
-          // Spalten, engere Abstände. Weil eine kleine Kachel keinen Platz für
-          // zwei Zeilen Beschreibung hat, steht hier nur der Name – die
-          // Kurzbeschreibung wandert in den `title` (Tooltip beim Überfahren).
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
-            {characters.map((c) => {
-              const preview = primaryImage(c)?.thumbnail;
-              // Wrapper, damit der Stern ein **Geschwister** des Kachel-Knopfes
-              // ist – verschachtelte Buttons sind ungültiges HTML.
-              return (
-                <div key={c.id} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedChar(c)}
-                    title={c.character.kurzbeschreibung}
-                    className={`flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border bg-card text-left transition hover:shadow-md ${
-                      c.isProtagonist
-                        ? "border-amber-400 ring-1 ring-amber-400/60 dark:border-amber-400/70"
-                        : "border-border"
-                    }`}
-                  >
-                    <div className="relative aspect-square w-full bg-muted">
-                      {preview ? (
-                        <Image
-                          src={preview}
-                          alt={c.character.name}
-                          fill
-                          sizes="(max-width: 640px) 50vw, 16vw"
-                          className="object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="flex h-full items-center justify-center text-muted-foreground">
-                          <User size={28} strokeWidth={1.25} aria-hidden="true" />
-                        </div>
-                      )}
-                    </div>
-                    <span className="block truncate p-1.5 text-xs font-medium">
-                      {c.character.name}
-                    </span>
-                  </button>
-                  {/*
-                    Protagonisten-Stern, oben rechts über dem Bild. Eigener
-                    Button (nicht im Kachel-Knopf), mit gut lesbarem Chip über
-                    dem Thumbnail. Sofort persistiert.
-                  */}
-                  <button
-                    type="button"
-                    onClick={() => protagonistUmschalten(c)}
-                    disabled={protagonistBusy === c.id}
-                    aria-pressed={c.isProtagonist}
-                    aria-label={
-                      c.isProtagonist
-                        ? `${c.character.name} als Protagonist aufheben`
-                        : `${c.character.name} als Protagonist markieren`
-                    }
-                    title={
-                      c.isProtagonist
-                        ? "Protagonist – klicken zum Aufheben"
-                        : "Als Protagonist markieren (der Handlungsentwurf dreht sich dann um die Protagonisten)"
-                    }
-                    className={`absolute right-1 top-1 inline-flex items-center justify-center rounded-full bg-black/45 p-1.5 leading-none backdrop-blur-sm transition hover:bg-black/60 disabled:opacity-50 ${
-                      c.isProtagonist
-                        ? "text-amber-300"
-                        : "text-white/75 hover:text-amber-200"
-                    }`}
-                  >
-                    <Star
-                      size={15}
-                      strokeWidth={1.75}
-                      aria-hidden="true"
-                      className={c.isProtagonist ? "fill-current" : ""}
-                    />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/*
-          Die **Figuren**-Notizen unter den fertigen Charakteren, in derselben
-          Karte: wichtige Personen, aus denen noch Charaktere werden sollen.
-          „✨ Charakter" an einer Figur legt sie an; das Häkchen je Figur
-          entscheidet, ob sie in Handlungsentwurf und Story Arc einfließt (Default
-          an). Kein Erzeugen-Knopf für das Feld selbst (nicht in ERZEUGBAR) –
-          gefüllt wird von Hand, per Würfel/KI-Ergänzen oder vom „Zufälligen
-          Szenario".
-        */}
-        <div className="mt-6 border-t border-border pt-5">
-          <h3 className="mb-1 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
-            Figuren
-          </h3>
-          <p className="mb-3 text-xs text-muted-foreground">
-            Notizen zu wichtigen Personen, aus denen noch kein Charakter angelegt
-            ist. „✨ Charakter“ macht aus einer Figur einen Charakter für dieses
-            Szenario.
-          </p>
-          <ScenarioFields
-            details={details}
-            onChange={setDetails}
-            disabled={saving}
-            fields={["figuren"]}
-            generatable={ERZEUGBAR}
-            onGenerate={handleGenerate}
-            generatingField={generatingField}
-            zusatz={zusatz}
-            onZusatzChange={(key, value) =>
-              setZusatz((z) => ({ ...z, [key]: value }))
-            }
-            onFigurCharakter={figurCharakterExtrahieren}
-            figurBusy={figurBusy}
-            figurFehler={figurFehler}
-          />
-
-          {details.figuren.trim() && (
-            <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
-              Das Häkchen je Figur entscheidet, ob sie in Handlungsentwurf und
-              Story Arc einfließt. Abgehakte Figuren bleiben in der Liste, werden
-              dort aber übergangen.
-            </p>
-          )}
-        </div>
-      </section>
+      <CharaktereKarte
+        id={id}
+        characters={characters}
+        dirty={dirty}
+        onAddOffen={() => setAddOffen(true)}
+        onSelectChar={setSelectedChar}
+        onProtagonistUmschalten={protagonistUmschalten}
+        protagonistBusy={protagonistBusy}
+        details={details}
+        saving={saving}
+        generatable={ERZEUGBAR}
+        onGenerate={handleGenerate}
+        generatingField={generatingField}
+        zusatz={zusatz}
+        onZusatzChange={(key, value) =>
+          setZusatz((z) => ({ ...z, [key]: value }))
+        }
+        onFigurenChange={setDetails}
+        onFigurCharakter={figurCharakterExtrahieren}
+        figurBusy={figurBusy}
+        figurFehler={figurFehler}
+      />
 
       {/*
         Eine Karte, zwei Teile in dieser Reihenfolge: **oben die
