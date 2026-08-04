@@ -18,18 +18,33 @@ Ist-Stand (Codeanalyse 03.08.2026), nicht Schätzung.**
   `ExportLeiste` (rein präsentierend; tsc erzwingt die Prop-Verträge).
   **`page.tsx` 2760 → 1925 Zeilen**, ~1200 Zeilen JSX in fokussierte Dateien.
 
-**Bewusst noch nicht (Empfehlung: als *laufzeit-verifizierter* Folgeschritt):**
-Die **Hook-Schicht** (`useScenarioDocument`-Kern + Feature-Hooks). Grund: Sie
-relokiert die **fragile Speicher-Einheit** (Load, `saved`/`dirty`/`speichern`/
-`verwerfen`) und die Run-Params-Effekt-Reihenfolge – anders als die
-Sektionen (deren Prop-Verträge `tsc` **vollständig** absichert) ist ihr
-Verhaltensrisiko nur teilweise compilerprüfbar und braucht einen Smoke-Test in
-der laufenden App (tippen→ungespeichert, speichern, neu laden, Variante/Arc
-wechseln, ableiten, exportieren). Zudem: `useScenarioExport`/`useScenarioBilder`
-lassen sich **erst nach** dem Kern sauber schneiden (sonst ~14 injizierte
-Parameter). Das fragilste Stück – die Invarianten – ist über
-`lib/scenarioDocument.ts` bereits **herausgelöst und getestet**, also der
-riskanteste Teil bereits entschärft.
+**Hook-Schicht ebenfalls erledigt (Branch `szenario-hooks`, 04.08.2026).** Der
+zuvor als Folgeschritt zurückgestellte Teil ist umgesetzt und – dank
+DB-Erlaubnis des Nutzers – **laufzeit-verifiziert per jsdom-Hook-Tests** (nicht
+nur `tsc`):
+
+- **`useScenarioDocument`** (Kern): geteilte Speicher-Einheit, Laden,
+  `dirty`/`speichern`/`save`/`verwerfen`, Run-Params (Form/Ton/`arcParams`) +
+  localStorage-Persistenz in **einem** Hook (Effekt-Reihenfolge Load→Persist 1:1,
+  die „skip-once"-Regel). **6 renderHook-Tests** mocken `lib/client` +
+  `scenarioRunParams`: Laden→nicht dirty, tippen→dirty, `save`→korrekter
+  PATCH-Payload + danach nicht dirty, `verwerfen`, save-ohne-Änderung→kein PATCH,
+  **Run-Params A→B→A ohne Durchsickern**.
+- **Feature-Hooks** auf dem Kern: `usePlotVarianten`, `useStoryArc` (+
+  `storyArcAbleiten`), `useKapitel`, `useScenarioFeldGen` (Feld-/Name-Erzeugung +
+  Handlungsentwurf-Lauf-Parameter), `useScenarioCharacters` (sofort-persistente
+  Besetzung + Genre-Sync + Szenarienliste), `usePlotPersonen` (Suche +
+  Figur→Charakter), `useScenarioExport` (Export/Löschen).
+- **`useRunParams`** wurde bewusst **nicht** eigenständig, sondern in den Kern
+  gefaltet – die Run-Param-States *sind* Feature-States, und die Effekt-
+  Reihenfolge ist nur in *einem* Hook sicher zu halten. `useScenarioBilder`
+  entfiel: nur zwei triviale Modal-Flags ohne Logik bleiben als lokale
+  UI-Schalter im Orchestrator.
+
+**Ergebnis:** `app/scenarios/[id]/page.tsx` von **2760 → 553 Zeilen** (ein
+dünner Orchestrator: Hooks komponieren, Sektionen anordnen, Modale schalten);
+9 Hook-/Test-Dateien unter `hooks/` (~1770 Zeilen), 22 Tests grün. Jede Stufe
+einzeln committet, `tsc`+`lint`+`npm test` grün, Route 200.
 
 ## Context
 
