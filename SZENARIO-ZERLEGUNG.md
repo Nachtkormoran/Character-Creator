@@ -5,6 +5,32 @@ Plandokument neben den übrigen (`VERCEL+SUPABASE.md`, `HOSTINGER_VPS.md`,
 `STRUKTUR.md`). Konkretisiert Alternative 1 aus `STRUKTUR.md`. **Verifizierter
 Ist-Stand (Codeanalyse 03.08.2026), nicht Schätzung.**
 
+## Umsetzungsstand (Branch `szenario-zerlegung`, 04.08.2026)
+
+**Erledigt (jede Stufe einzeln committet, `tsc`+`lint`+`npm test` grün, Route 200):**
+- **Test-Harness + pure Invarianten** – `vitest` (nur pure `lib/`-Logik),
+  `lib/scenarioDocument.ts` (`ausgerichtet`/`mergeVarianten`/`mergeArcs`/
+  `currentSnapshot`/`savedSnapshot`/`isDirty` + `LEER_META`), **16 Tests** inkl.
+  Byte-Vergleich gegen die alte Inline-Form und der current/saved-Asymmetrie. Die
+  Seite delegiert `dirty`/`saved`/`aktuelleVarianten`/`aktuelleArcs` dorthin.
+- **Fünf Sektions-Komponenten** unter `app/scenarios/[id]/sections/`:
+  `ScenarioHeader`, `WeltKarte`, `CharaktereKarte`, `HandlungsentwurfKarte`,
+  `ExportLeiste` (rein präsentierend; tsc erzwingt die Prop-Verträge).
+  **`page.tsx` 2760 → 1925 Zeilen**, ~1200 Zeilen JSX in fokussierte Dateien.
+
+**Bewusst noch nicht (Empfehlung: als *laufzeit-verifizierter* Folgeschritt):**
+Die **Hook-Schicht** (`useScenarioDocument`-Kern + Feature-Hooks). Grund: Sie
+relokiert die **fragile Speicher-Einheit** (Load, `saved`/`dirty`/`speichern`/
+`verwerfen`) und die Run-Params-Effekt-Reihenfolge – anders als die
+Sektionen (deren Prop-Verträge `tsc` **vollständig** absichert) ist ihr
+Verhaltensrisiko nur teilweise compilerprüfbar und braucht einen Smoke-Test in
+der laufenden App (tippen→ungespeichert, speichern, neu laden, Variante/Arc
+wechseln, ableiten, exportieren). Zudem: `useScenarioExport`/`useScenarioBilder`
+lassen sich **erst nach** dem Kern sauber schneiden (sonst ~14 injizierte
+Parameter). Das fragilste Stück – die Invarianten – ist über
+`lib/scenarioDocument.ts` bereits **herausgelöst und getestet**, also der
+riskanteste Teil bereits entschärft.
+
 ## Context
 
 `app/scenarios/[id]/page.tsx` ist mit **2760 Zeilen**, **57 `useState`**, 4
