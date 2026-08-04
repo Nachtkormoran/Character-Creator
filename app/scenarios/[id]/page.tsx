@@ -3,20 +3,10 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  findFigurePersons,
-  findPlotPersons,
-  getSettings,
-} from "@/lib/client";
+import { getSettings } from "@/lib/client";
 import { GENRE_TEMPLATES } from "@/lib/templates";
-import {
-  type TextProvider,
-  type PlotPerson,
-  type ScenarioDetails,
-} from "@/lib/schema";
-import { stashPlotPerson } from "@/lib/personHandoff";
+import { type TextProvider, type ScenarioDetails } from "@/lib/schema";
 import { ausgerichtet } from "@/lib/scenarioDocument";
-import { joinFigurenDetail, splitFigurenDetail } from "@/lib/figuren";
 import { primaryImage } from "@/lib/serialize";
 import { AddCharacterToScenarioModal } from "../../components/AddCharacterToScenarioModal";
 import { CharacterDetailModal } from "../../components/CharacterDetailModal";
@@ -36,6 +26,7 @@ import { useStoryArc } from "./hooks/useStoryArc";
 import { useKapitel } from "./hooks/useKapitel";
 import { useScenarioFeldGen } from "./hooks/useScenarioFeldGen";
 import { useScenarioCharacters } from "./hooks/useScenarioCharacters";
+import { usePlotPersonen } from "./hooks/usePlotPersonen";
 
 // `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
 // getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
@@ -80,7 +71,6 @@ export default function ScenarioDetailPage({
     aktuelleArcs,
     dirty,
     nameValid,
-    speichern,
     save,
     verwerfen,
   } = doc;
@@ -150,21 +140,23 @@ export default function ScenarioDetailPage({
    * es dafür nicht mehr.
    */
 
-  /**
-   * Aus einer einzelnen Figur einen Charakter ableiten (Knopf je Figur-Karte).
-   * `figurBusy` hält die gerade ausgelesene Figur (sperrt die Knöpfe),
-   * `figurFehler` einen Fehler dazu, `figurKandidat` die ausgelesene Person samt
-   * ihrer Figur – sie öffnet denselben `PlotPersonModal` wie die Plot-Suche.
-   */
-  const [figurBusy, setFigurBusy] = useState<string | null>(null);
-  const [figurFehler, setFigurFehler] = useState<{
-    figur: string;
-    text: string;
-  } | null>(null);
-  const [figurKandidat, setFigurKandidat] = useState<{
-    person: PlotPerson;
-    figur: string;
-  } | null>(null);
+  // Personensuche im Entwurf + Figur→Charakter-Extraktion liegen im Hook
+  // `usePlotPersonen` (inkl. dem speichern-vor-Navigation-Trick).
+  const {
+    suchend,
+    personen,
+    suchFehler,
+    gewaehlt,
+    setGewaehlt,
+    figurBusy,
+    figurFehler,
+    figurKandidat,
+    setFigurKandidat,
+    personenSuchen,
+    personAnlegen,
+    figurCharakterExtrahieren,
+    figurCharakterAnlegen,
+  } = usePlotPersonen(doc, id, router);
 
   // -------------------------------------------------------------------------
   // Weltbild des Szenarios
@@ -280,136 +272,6 @@ export default function ScenarioDetailPage({
   // Stand. Die Leiste erscheint erst ab zwei – bei einem gibt es nichts zu
   // wählen, und der Handlungsentwurf steht ohnehin im Feld darunter.
   const variantenAnzeige = aktuelleVarianten();
-
-  // -------------------------------------------------------------------------
-  // Personen aus dem Handlungsentwurf
-  // -------------------------------------------------------------------------
-
-  /**
-   * Das Suchergebnis **zusammen mit dem Text, zu dem es gehört**.
-   *
-   * Ändert sich der Entwurf, ist das Ergebnis hinfällig – es verweist auf
-   * Sätze, die so nicht mehr dastehen. Statt es in einem Effekt zurückzusetzen
-   * (was einen Moment lang die falsche Liste zeigt und das Zurücksetzen an
-   * jeder Änderungsstelle erzwingt), wird die Gültigkeit **abgeleitet**: Ein
-   * Ergebnis zählt nur, solange sein Text noch der aktuelle ist.
-   */
-  const [ergebnis, setErgebnis] = useState<{
-    handlung: string;
-    personen: PlotPerson[] | null;
-    fehler: string | null;
-  } | null>(null);
-  const [suchend, setSuchend] = useState(false);
-  /** Die Person, für die gerade die Rückfrage offen ist. */
-  const [gewaehlt, setGewaehlt] = useState<PlotPerson | null>(null);
-
-  const aktuell =
-    ergebnis && ergebnis.handlung === details.handlung ? ergebnis : null;
-  /** `null` heißt „noch nicht gesucht", `[]` heißt „gesucht, nichts gefunden". */
-  const personen = aktuell?.personen ?? null;
-  const suchFehler = aktuell?.fehler ?? null;
-
-  async function personenSuchen() {
-    const handlung = details.handlung;
-    if (suchend || !handlung.trim()) return;
-    setSuchend(true);
-    setErgebnis(null);
-    try {
-      const { personen } = await findPlotPersons(id, handlung);
-      setErgebnis({ handlung, personen, fehler: null });
-    } catch (e) {
-      setErgebnis({
-        handlung,
-        personen: null,
-        fehler: e instanceof Error ? e.message : "Fehler.",
-      });
-    } finally {
-      setSuchend(false);
-    }
-  }
-
-  /**
-   * Die Person ans Erstellen-Formular übergeben. Der Umweg über
-   * `sessionStorage` statt über die Adresse ist in `personHandoff.ts`
-   * begründet; `?scenario=` bleibt daneben stehen, weil es die Zuordnung und
-   * die Weltvorbelegung auslöst – beides gilt hier genauso.
-   *
-   * Von **beiden** Suchen genutzt (Handlungsentwurf und Figuren-Feld) – die
-   * Übergabe ist gleich, nur die Quelle des Vorschlags unterscheidet sich.
-   */
-  function personAnlegen(person: PlotPerson) {
-    stashPlotPerson(person);
-    router.push(`/?scenario=${id}`);
-  }
-
-  /**
-   * Aus **einer** Figur einen Charakter ableiten – der Knopf je Figur-Karte.
-   * Er löst dieselbe Extraktion aus wie die frühere „Personen im Figuren-Feld
-   * suchen", nur auf genau diese eine Notiz statt auf das ganze Feld: Die Route
-   * liest daraus Name, Rolle und die weiteren Angaben und schlägt eine Person
-   * vor, die dann `PlotPersonModal` zur Bestätigung zeigt (`figurKandidat`).
-   *
-   * Findet die Route nichts Neues (etwa weil es die Figur schon als Charakter
-   * gibt), erscheint der Hinweis an der Karte statt eines leeren Dialogs.
-   */
-  async function figurCharakterExtrahieren(figur: string) {
-    if (figurBusy) return;
-    const text = figur.trim();
-    if (!text) return;
-    setFigurBusy(figur);
-    setFigurFehler(null);
-    try {
-      const { personen } = await findFigurePersons(id, text);
-      if (personen.length === 0) {
-        setFigurFehler({
-          figur,
-          text: "Kein neuer Charakter ableitbar – vielleicht gibt es die Figur schon.",
-        });
-      } else {
-        setFigurKandidat({ person: personen[0], figur });
-      }
-    } catch (e) {
-      setFigurFehler({
-        figur,
-        text: e instanceof Error ? e.message : "Fehler.",
-      });
-    } finally {
-      setFigurBusy(null);
-    }
-  }
-
-  /**
-   * Die aus einer Figur abgeleitete Person ans Erstellen-Formular übergeben –
-   * und **die Figur aus der Liste nehmen**: Sie wird zum Charakter, die Notiz ist
-   * damit erledigt. Damit die Entfernung den Seitenwechsel überlebt (die
-   * Navigation zum Formular verwirft ungespeicherte Änderungen), wird der
-   * bearbeitete Stand mit der entfernten Figur zuvor **gespeichert** – das nimmt
-   * dem „erst speichern"-Hinweis zugleich seinen Grund. Schlägt das Speichern
-   * fehl, bleibt man auf der Seite (mit Fehlermeldung) statt den Charakter ohne
-   * gesicherte Entfernung anzulegen.
-   */
-  async function figurCharakterAnlegen() {
-    if (!figurKandidat) return;
-    const { person, figur } = figurKandidat;
-    // Über die **normalisierte** Form vergleichen: Die Karte kann einen internen
-    // Umbruch tragen, den `details.figuren` längst zu einem Leerzeichen eingeebnet
-    // hat – ein roher `!==`-Vergleich träfe die Figur dann nicht. Die Aktiv-Wahl
-    // der übrigen Figuren bleibt dabei erhalten (`splitFigurenDetail`).
-    const ziel = figur.replace(/\s*\n\s*/g, " ").trim();
-    const rest = splitFigurenDetail(details.figuren).filter(
-      (f) => f.text !== ziel,
-    );
-    const neueDetails = { ...details, figuren: joinFigurenDetail(rest) };
-    setDetails(neueDetails);
-    setFigurKandidat(null);
-    if (nameValid) {
-      const ok = await speichern(neueDetails);
-      if (!ok) return;
-    }
-    stashPlotPerson(person);
-    router.push(`/?scenario=${id}`);
-  }
-
 
   // `speichern`/`save`/`verwerfen` sowie Export/Löschen liegen jetzt in Hooks
   // auf dem Dokument-Kern (`useScenarioDocument`/`useScenarioExport`).
