@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { generateChapterText, generateStoryArcChapters } from "@/lib/client";
+import { aktiveFiguren } from "@/lib/figuren";
 import type { TextProvider } from "@/lib/schema";
 import type { ScenarioDocument } from "./useScenarioDocument";
 
@@ -64,6 +65,11 @@ export function useKapitel(
           ton: arcParams.ton,
           form: arcParams.form,
           textProvider: provider,
+          // Volle Besetzung (opt-in): Charaktere lädt die Route über die
+          // scenarioId, die aktiven Figuren-Notizen gehen als Text mit.
+          mitBesetzung: arcParams.kapitelMitBesetzung,
+          scenarioId: id,
+          figurenNotizen: aktiveFiguren(details.figuren),
         },
       );
       setKapitelModell((m) => ({ ...m, [stufeIndex]: model }));

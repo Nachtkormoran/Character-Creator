@@ -2,15 +2,17 @@ import { NextResponse } from "next/server";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
 import { getTextClient, hatKaputteZeichen } from "@/lib/openai";
-import { buildStoryArcChaptersPrompt } from "@/lib/prompts";
+import { buildStoryArcChaptersPrompt, type PlotCharacter } from "@/lib/prompts";
 import {
   DEFAULT_KAPITEL_COUNT,
   KAPITEL_COUNTS,
   kapitelListeSchema,
   kapitelSpanne,
   MAX_KAPITEL_PRO_STUFE,
+  normalizeTraits,
   splitKapitelSegmente,
 } from "@/lib/schema";
+import { prisma } from "@/lib/prisma";
 import { randomSparks } from "@/lib/storyArcSparks";
 
 export const runtime = "nodejs";
@@ -54,6 +56,13 @@ const bodySchema = z.object({
   // Modell-Anbieter für **diesen** Aufruf (Selektor beim Story Arc – gilt auch
   // für die Kapitelableitung). Leer/unbekannt → die Einstellung greift.
   textProvider: z.string().trim().max(40).optional().default(""),
+  // **Volle Besetzung heranziehen** (Checkbox): dann lädt die Route die
+  // Charaktere des Szenarios (wie `scenario-arc`) und gibt sie samt Figuren-
+  // Notizen in den Prompt. Ohne das arbeitet die Ableitung wie bisher allein aus
+  // der Station. Braucht dann die `scenarioId`; `figurenNotizen` = `details.figuren`.
+  mitBesetzung: z.boolean().optional().default(false),
+  scenarioId: z.string().min(1).optional(),
+  figurenNotizen: z.string().trim().max(3000).optional().default(""),
 });
 
 export async function POST(request: Request) {
@@ -67,8 +76,47 @@ export async function POST(request: Request) {
       );
     }
 
-    const { stufe, kreativ, anzahl, ton, form, textProvider } = parsed.data;
+    const {
+      stufe,
+      kreativ,
+      anzahl,
+      ton,
+      form,
+      textProvider,
+      mitBesetzung,
+      scenarioId,
+      figurenNotizen,
+    } = parsed.data;
     const { min, max } = kapitelSpanne(anzahl);
+
+    // Volle Besetzung (opt-in): die Charaktere des Szenarios laden – wie
+    // `scenario-arc` – und samt Figuren-Notizen in den Prompt geben. Ohne die
+    // Checkbox bleibt `besetzung` undefined und die Ableitung arbeitet wie bisher
+    // allein aus der Station.
+    let besetzung: { characters: PlotCharacter[]; figuren: string } | undefined;
+    if (mitBesetzung && scenarioId) {
+      const rows = await prisma.character.findMany({
+        where: { scenarioId },
+        orderBy: { createdAt: "asc" },
+        select: {
+          name: true,
+          shortDescription: true,
+          description: true,
+          traits: true,
+          storyHooks: true,
+          isProtagonist: true,
+        },
+      });
+      const characters: PlotCharacter[] = rows.map((r) => ({
+        name: r.name ?? "",
+        kurzbeschreibung: r.shortDescription ?? "",
+        beschreibung: r.description,
+        merkmale: normalizeTraits(JSON.parse(r.traits)),
+        storyHooks: r.storyHooks ?? "",
+        isProtagonist: r.isProtagonist,
+      }));
+      besetzung = { characters, figuren: figurenNotizen };
+    }
 
     // Kapitelgrenzen (`---`) in der Beschreibung → feste Abschnitte. Ab zwei
     // Abschnitten gilt der Segment-Modus: genau ein Kapitel je Abschnitt, die
@@ -99,6 +147,7 @@ export async function POST(request: Request) {
       form,
       minZeichen: MIN_KAPITEL_LEN,
       segmente,
+      besetzung,
     });
 
     const versuch = () =>

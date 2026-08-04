@@ -1014,6 +1014,14 @@ export function buildStoryArcChaptersPrompt(
      * Teilen. Leer/ein Eintrag → modellgesteuerte Zerlegung wie bisher.
      */
     segmente?: string[];
+    /**
+     * **Volle Besetzung** (Charaktere mit Kurzbeschreibung/Merkmalen/Beschreibung/
+     * Ansatzpunkten + Figuren-Notizen) – wie beim Story Arc. Optional: nur wenn
+     * die Checkbox „volle Besetzungsdaten" aktiv ist, sonst arbeitet die Ableitung
+     * wie bisher allein aus der Station. Gibt dem Modell mehr Kontext, damit die
+     * Kapitel zu den Figuren passen.
+     */
+    besetzung?: { characters: PlotCharacter[]; figuren: string };
   } = {},
 ): string {
   const kreativ = !!options.kreativ;
@@ -1045,6 +1053,41 @@ export function buildStoryArcChaptersPrompt(
           .join("\n")}\n`
       : "";
 
+  // Volle Besetzung (opt-in): Charaktere mit allen Angaben + Figuren-Notizen –
+  // damit die Kapitel zu den Figuren passen. Merkmale laufen wie im
+  // Handlungsentwurf über `TRAIT_LABELS` (jedes zählt), leere Werte bleiben weg.
+  const besetzung = options.besetzung;
+  const besetzungBlock =
+    besetzung && (besetzung.characters.length || besetzung.figuren.trim())
+      ? `\nBesetzung – nutze diese Angaben, damit die Kapitel zu den Figuren passen (erfinde nichts, was ihnen widerspricht):\n${besetzung.characters
+          .map((c) => {
+            const merkmale = (
+              Object.keys(TRAIT_LABELS) as Array<keyof CharacterTraits>
+            )
+              .map((k) => {
+                const w = String(c.merkmale[k] ?? "").trim();
+                return w && w !== "0" ? `${TRAIT_LABELS[k]}: ${w}` : null;
+              })
+              .filter(Boolean)
+              .join(" · ");
+            const zeilen = [
+              c.kurzbeschreibung.trim() && `   ${c.kurzbeschreibung.trim()}`,
+              merkmale && `   Merkmale: ${merkmale}`,
+              c.beschreibung.trim() && `   Beschreibung: ${c.beschreibung.trim()}`,
+              c.storyHooks.trim() && `   Ansatzpunkte: ${c.storyHooks.trim()}`,
+            ].filter(Boolean);
+            return [
+              `- ${c.name}${c.isProtagonist ? " (Protagonist)" : ""}`,
+              ...zeilen,
+            ].join("\n");
+          })
+          .join("\n")}${
+          besetzung.figuren.trim()
+            ? `\nWeitere Figuren (Notizen): ${besetzung.figuren.trim()}`
+            : ""
+        }\n`
+      : "";
+
   // Segment-Modus: Die Beschreibung ist bereits per `---` in feste Abschnitte
   // geteilt. Jeder Abschnitt wird zu **genau einem** Kapitel – die Grenzen sind
   // vorgegeben, das Modell fasst nicht zusammen und teilt nicht feiner. Als
@@ -1056,7 +1099,7 @@ export function buildStoryArcChaptersPrompt(
       .join("\n\n");
     return `Formuliere die folgende Station eines Story Arcs zu **genau ${segmente.length} Kapiteln** aus.
 
-Station: ${stufe.titel.trim() || "(ohne Titel)"}${figurenZeile}
+Station: ${stufe.titel.trim() || "(ohne Titel)"}${figurenZeile}${besetzungBlock}
 
 Die Station ist bereits in ${segmente.length} Abschnitte vorgegeben. Schreibe **genau ein Kapitel je Abschnitt**, in dieser Reihenfolge. Fasse keine Abschnitte zusammen und teile keinen weiter auf – die Grenzen sind gesetzt. Jedes Kapitel bleibt in dem, was **sein** Abschnitt hergibt, und greift nicht auf spätere Abschnitte vor.
 
@@ -1093,7 +1136,7 @@ ${formHinweis(options.form)}${tonHinweis(options.ton)}${sparksBlock}`;
 
 Station: ${stufe.titel.trim() || "(ohne Titel)"}
 Was in ihr geschieht:
-${stufe.beschreibung.trim() || "(keine Beschreibung)"}${figurenZeile}
+${stufe.beschreibung.trim() || "(keine Beschreibung)"}${figurenZeile}${besetzungBlock}
 
 ${abschlussSatz}
 

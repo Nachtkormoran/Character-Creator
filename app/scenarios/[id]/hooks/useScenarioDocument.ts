@@ -50,6 +50,12 @@ export interface ArcParams {
   kapitelLaenge: KapitelLaenge;
   ton: StoryTone;
   form: StoryForm;
+  /**
+   * Beim **Kapitel-Ableiten** die volle Besetzung (Charaktere + Figuren) mit in
+   * den Prompt geben – wie beim Story Arc. Default aus (die Ableitung arbeitet
+   * dann wie bisher allein aus der Station). Lauf-Parameter, nicht gespeichert.
+   */
+  kapitelMitBesetzung: boolean;
 }
 
 const ARC_PARAMS_DEFAULT: ArcParams = {
@@ -63,6 +69,7 @@ const ARC_PARAMS_DEFAULT: ArcParams = {
   kapitelLaenge: DEFAULT_KAPITEL_LAENGE,
   ton: DEFAULT_STORY_TONE,
   form: DEFAULT_STORY_FORM,
+  kapitelMitBesetzung: false,
 };
 
 /**

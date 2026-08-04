@@ -154,6 +154,7 @@ export function StoryArcSection({
     kapitelLaenge: KapitelLaenge;
     ton: StoryTone;
     form: StoryForm;
+    kapitelMitBesetzung: boolean;
   };
   onParamsChange: (p: {
     werkform: Werkform;
@@ -166,6 +167,7 @@ export function StoryArcSection({
     kapitelLaenge: KapitelLaenge;
     ton: StoryTone;
     form: StoryForm;
+    kapitelMitBesetzung: boolean;
   }) => void;
   /** Kapitel für die Station am Index ableiten. */
   onKapitelAbleiten: (stufeIndex: number) => void;
@@ -993,6 +995,35 @@ export function StoryArcSection({
         <span className="flex items-center gap-1.5">
           <Sparkles size={14} strokeWidth={1.75} aria-hidden="true" />
           Kreativ – Impulse und lebendigere Ausarbeitung
+        </span>
+      </label>
+
+      {/*
+        Volle Besetzung beim Kapitel-Ableiten: Standardmäßig arbeitet die
+        Ableitung nur aus der Stationsbeschreibung + den Figuren-Namen der
+        Station. Angehakt fließen – wie beim Story Arc – die vollen
+        Charakter-Daten (Kurzbeschreibung, Merkmale, Beschreibung, Ansatzpunkte)
+        und die Figuren-Notizen mit ein.
+      */}
+      <label
+        className="mt-2 flex w-fit cursor-pointer items-center gap-2 text-sm text-muted-foreground"
+        title="Beim „Kapitel ableiten“ die vollen Charakter-Daten (Kurzbeschreibung, Merkmale, Beschreibung, Ansatzpunkte) und die Figuren-Notizen mit in den Prompt geben – wie beim Story Arc. Ohne Haken arbeitet die Ableitung wie bisher allein aus der Stationsbeschreibung."
+      >
+        <input
+          type="checkbox"
+          checked={params.kapitelMitBesetzung}
+          onChange={(e) =>
+            onParamsChange({
+              ...params,
+              kapitelMitBesetzung: e.target.checked,
+            })
+          }
+          disabled={disabled}
+          className="size-4 accent-primary"
+        />
+        <span className="flex items-center gap-1.5">
+          <User size={14} strokeWidth={1.75} aria-hidden="true" />
+          Beim Kapitel-Ableiten volle Besetzung heranziehen
         </span>
       </label>
 

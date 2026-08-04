@@ -1009,6 +1009,15 @@ export function generateStoryArcChapters(
     form?: string;
     /** Modell-Anbieter für diesen Aufruf (`TEXT_PROVIDERS`). Leer = Einstellung. */
     textProvider?: string;
+    /**
+     * **Volle Besetzung heranziehen** (Checkbox): dann lädt die Route die
+     * Charaktere des Szenarios (Merkmale/Beschreibung/Ansatzpunkte) und gibt sie
+     * samt Figuren-Notizen in den Prompt – wie beim Story Arc. Braucht dann
+     * `scenarioId`; `figurenNotizen` = `details.figuren`.
+     */
+    mitBesetzung?: boolean;
+    scenarioId?: string;
+    figurenNotizen?: string;
   } = {},
 ) {
   return postJson<{ kapitel: Kapitel[]; model: string }>("/api/story-arc-chapters", {
