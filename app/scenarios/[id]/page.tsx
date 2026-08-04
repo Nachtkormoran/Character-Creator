@@ -12,10 +12,7 @@ import {
   generateScenarioFigures,
   generateScenarioName,
   generateScenarioPlot,
-  generateStoryArc,
   generateStoryTitle,
-  generateChapterText,
-  generateStoryArcChapters,
   getSettings,
   listScenarios,
   updateCharacterContent,
@@ -26,14 +23,11 @@ import {
 import { GENRE_TEMPLATES } from "@/lib/templates";
 import {
   MAX_PLOT_VARIANTS,
-  MAX_STORY_ARCS,
   SCENARIO_LABELS,
   type TextProvider,
   type GeneratedCharacter,
   type PlotPerson,
   type ScenarioDetails,
-  type StoryArc,
-  type VariantMeta,
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
 import { ausgerichtet } from "@/lib/scenarioDocument";
@@ -62,6 +56,8 @@ import { HandlungsentwurfKarte } from "./sections/HandlungsentwurfKarte";
 import { useScenarioDocument } from "./hooks/useScenarioDocument";
 import { usePlotVarianten } from "./hooks/usePlotVarianten";
 import { useScenarioExport } from "./hooks/useScenarioExport";
+import { useStoryArc } from "./hooks/useStoryArc";
+import { useKapitel } from "./hooks/useKapitel";
 
 // `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
 // getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
@@ -90,11 +86,8 @@ export default function ScenarioDetailPage({
     setVariantenMeta,
     storyArc,
     setStoryArc,
-    setArcVarianten,
     arcAktiv,
-    setArcAktiv,
     arcMeta,
-    setArcMeta,
     characters,
     setCharacters,
     bilder,
@@ -124,31 +117,8 @@ export default function ScenarioDetailPage({
   // speichern" wie jede andere Namensänderung. Nicht gespeichert: nur Busy/Fehler.
   const [nameBusy, setNameBusy] = useState(false);
   const [nameFehler, setNameFehler] = useState<string | null>(null);
-  const [arcBusy, setArcBusy] = useState(false);
-  const [arcFehler, setArcFehler] = useState<string | null>(null);
-  // Welcher Arc gerade einen neuen Titel per KI erzeugt (Index) – für Sperre
-  // und Spinner am ✨-Knopf des Reiters.
-  const [arcTitelBusy, setArcTitelBusy] = useState<number | null>(null);
-  /** Welche Station gerade Kapitel erzeugt, und ein etwaiger Fehler dazu. */
-  const [kapitelBusy, setKapitelBusy] = useState<number | null>(null);
-  const [kapitelFehler, setKapitelFehler] = useState<{
-    index: number;
-    text: string;
-  } | null>(null);
-  /**
-   * Welches Kapitel gerade seinen **Prosatext** erzeugt (Station + Kapitel), und
-   * ein etwaiger Fehler dazu. Getrennt vom Kapitel-Ableiten oben, weil beides
-   * unabhängig läuft.
-   */
-  const [kapitelTextBusy, setKapitelTextBusy] = useState<{
-    stufe: number;
-    kapitel: number;
-  } | null>(null);
-  const [kapitelTextFehler, setKapitelTextFehler] = useState<{
-    stufe: number;
-    kapitel: number;
-    text: string;
-  } | null>(null);
+  // Arc-Busy/Fehler und die Kapitel-Busy/Fehler/Modell-Zustände liegen jetzt in
+  // den Hooks `useStoryArc`/`useKapitel`.
   /**
    * Einstellung „Verwendetes Modell anzeigen" (aus den App-Einstellungen). Steuert
    * nur die Anzeige, nicht die Erzeugung. Default aus, bis die Einstellung geladen ist.
@@ -166,16 +136,6 @@ export default function ScenarioDetailPage({
     "",
   );
   const [arcProvider, setArcProvider] = useState<TextProvider | "">("");
-  /**
-   * **Transiente** Modell-Anzeige für die Kapitel-Ableitung je Station (Index →
-   * Modellname). Anders als bei Entwurf/Arc nicht in den Metadaten persistiert –
-   * die Station kennt keine `meta`-Liste; hier genügt der Hinweis für die Sitzung.
-   */
-  const [kapitelModell, setKapitelModell] = useState<Record<number, string>>({});
-  /** Transiente Modell-Anzeige für die Kapitel-Prosa, Schlüssel `"stufe-kapitel"`. */
-  const [storyTextModell, setStoryTextModell] = useState<Record<string, string>>(
-    {},
-  );
   /**
    * Rückfrage nach einer Genre-Änderung: Soll das neue Genre auch auf die
    * zugeordneten Figuren übertragen werden? `betroffen` sind die Figuren mit
@@ -324,101 +284,34 @@ export default function ScenarioDetailPage({
     leerenEntwurfHinzufuegen,
   } = usePlotVarianten(doc, generatingField);
 
-  // --- Story-Arc-Varianten (analog zu den Handlungsentwürfen) --------------
-
-  /** Auf einen anderen Arc umschalten – der bisherige wird zuvor gesichert. */
-  function arcWaehlen(i: number) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length || i === arcAktiv) return;
-    setArcVarianten(items);
-    setArcAktiv(i);
-    setStoryArc(items[i]);
-  }
-
-  /** Den Titel eines Story Arcs ändern (✎ am Reiter) – analog zu `titelAendern`. */
-  function arcTitelAendern(i: number) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(arcMeta, items.length);
-    const neu = window.prompt(`Titel für Story Arc ${i + 1}:`, meta[i].titel);
-    if (neu === null) return;
-    setArcMeta(
-      meta.map((m, k) =>
-        k === i ? { ...m, titel: neu.trim().slice(0, 120) } : m,
-      ),
-    );
-  }
-
-  /**
-   * Einen **neuen Titel per KI** für einen Story Arc erzeugen (✨ am Reiter) –
-   * dieselbe Zusammenfassung der Stationen wie beim Ableiten (`generateStoryTitle`
-   * mit `art: "arc"`). Ersetzt den bisherigen Titel in `meta[i]`; das geht wie
-   * die manuelle Änderung in `dirty` ein und wird über „Änderungen speichern"
-   * abgelegt. Persistiert selbst nichts.
-   */
-  async function arcTitelNeu(i: number) {
-    if (arcBusy || saving || arcTitelBusy !== null) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    const arcText = items[i].stufen
-      .map((s) => [s.titel, s.beschreibung].filter(Boolean).join(": "))
-      .join("\n")
-      // Die Route deckelt den Text bei 8000 Zeichen; für einen Titel genügt eine
-      // Zusammenfassung, also vorsorglich kappen.
-      .slice(0, 8000);
-    if (!arcText.trim()) return;
-    setArcTitelBusy(i);
-    setArcFehler(null);
-    try {
-      const titel = await generateStoryTitle(arcText, "arc");
-      const neu = titel.trim().slice(0, 120);
-      if (neu) {
-        const meta = ausgerichtet(arcMeta, items.length);
-        setArcMeta(meta.map((m, k) => (k === i ? { ...m, titel: neu } : m)));
-      }
-    } catch (e) {
-      setArcFehler(e instanceof Error ? e.message : "Titel fehlgeschlagen.");
-    } finally {
-      setArcTitelBusy(null);
-    }
-  }
-
-  /** Einen Story Arc als **Favorit** markieren/entmarken – analog zu `favoritUmschalten`. */
-  function arcFavoritUmschalten(i: number) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(arcMeta, items.length);
-    setArcMeta(meta.map((m, k) => (k === i ? { ...m, favorit: !m.favorit } : m)));
-  }
-
-  /**
-   * Das **Cover** eines Story Arcs setzen (`""` = Weltbild, `"char:<id>"` =
-   * Charakterporträt). Steuert das Titelbild in der Bibliothek; geht wie Titel/
-   * Favorit in `dirty` ein und wird über „Änderungen speichern" abgelegt.
-   */
-  function arcCoverSetzen(i: number, cover: string) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(arcMeta, items.length);
-    setArcMeta(meta.map((m, k) => (k === i ? { ...m, cover } : m)));
-  }
-
-  /**
-   * Den Story Arc `i` als **Buch in der Bibliothek** an-/abwählen
-   * (`meta.alsBuch`, Default aus). Wie Cover/Titel/Favorit ein Metadaten-Belang:
-   * geht in `dirty` ein und wird über „Änderungen speichern" abgelegt.
-   */
-  function arcAlsBuchSetzen(i: number, alsBuch: boolean) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    const meta = ausgerichtet(arcMeta, items.length);
-    setArcMeta(meta.map((m, k) => (k === i ? { ...m, alsBuch } : m)));
-  }
+  // Story-Arc-Varianten (Reiter + Ableiten) und die Kapitel-Erzeugung liegen in
+  // eigenen Hooks auf dem Dokument-Kern. `arcProvider` (Pro-Lauf-Modell) deckt
+  // Arc, Kapitelableitung und Kapitel-Prosa gemeinsam ab.
+  const {
+    arcBusy,
+    arcFehler,
+    arcTitelBusy,
+    arcWaehlen,
+    arcTitelAendern,
+    arcTitelNeu,
+    arcFavoritUmschalten,
+    arcCoverSetzen,
+    arcAlsBuchSetzen,
+    arcKopieren,
+    arcLoeschen,
+    alleArcsLoeschen,
+    storyArcAbleiten,
+  } = useStoryArc(doc, id, arcProvider);
+  const {
+    kapitelBusy,
+    kapitelFehler,
+    kapitelTextBusy,
+    kapitelTextFehler,
+    kapitelModell,
+    storyTextModell,
+    kapitelAbleiten,
+    kapitelTextGenerieren,
+  } = useKapitel(doc, id, arcProvider);
 
   /** Charaktere in der Form, die der Cover-Picker braucht (Name, Porträt, Protagonist). */
   const coverCharaktere = characters.map((c) => ({
@@ -427,78 +320,6 @@ export default function ScenarioDetailPage({
     thumbnail: primaryImage(c)?.thumbnail ?? null,
     isProtagonist: c.isProtagonist,
   }));
-
-  /**
-   * Einen bestehenden Story Arc **kopieren** – eine eigenständige Kopie des
-   * Arcs am Index `i` (tiefe Kopie samt Stationen und Kapiteln), angehängt und
-   * aktiv geschaltet. Der Titel bekommt „(Kopie)", Form/Ton/Quelle reisen mit,
-   * die Favorit-Markierung nicht. Kein KI-Aufruf; nur im Bearbeitungs-Zustand.
-   */
-  function arcKopieren(i: number) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (i < 0 || i >= items.length) return;
-    if (items.length >= MAX_STORY_ARCS) {
-      setArcFehler(
-        `Mehr als ${MAX_STORY_ARCS} Story Arcs werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
-      );
-      return;
-    }
-    // Tiefe Kopie, damit das Bearbeiten der Kopie das Original nicht anrührt.
-    const kopie = JSON.parse(JSON.stringify(items[i])) as StoryArc;
-    const meta = ausgerichtet(arcMeta, items.length);
-    const q = meta[i];
-    const kopieMeta: VariantMeta = {
-      ...q,
-      titel: q.titel.trim() ? `${q.titel.trim()} (Kopie)` : "",
-      favorit: false,
-      // Die Kopie ist ein frischer Arbeitsstand – nicht automatisch ein Buch.
-      alsBuch: false,
-    };
-    setArcVarianten([...items, kopie]);
-    setArcAktiv(items.length);
-    setStoryArc(kopie);
-    setArcMeta([...meta, kopieMeta]);
-  }
-
-  /**
-   * Einen Arc löschen. Wie beim Handlungsentwurf mit Rückfrage – ein Arc ist
-   * eine große, teuer erzeugte Struktur. Der letzte verbliebene lässt sich nicht
-   * über die Leiste löschen; dafür ist „Alle löschen" da.
-   */
-  function arcLoeschen(i: number) {
-    if (arcBusy || saving) return;
-    const items = aktuelleArcs();
-    if (items.length <= 1) return;
-    if (!confirm(`Story Arc ${i + 1} löschen?`)) return;
-    const rest = items.filter((_, k) => k !== i);
-    const na =
-      i === arcAktiv
-        ? Math.min(i, rest.length - 1)
-        : i < arcAktiv
-          ? arcAktiv - 1
-          : arcAktiv;
-    setArcVarianten(rest);
-    setArcAktiv(na);
-    setStoryArc(rest[na]);
-    setArcMeta(ausgerichtet(arcMeta, items.length).filter((_, k) => k !== i));
-  }
-
-  /**
-   * Alle Arcs auf einmal löschen – zurück zum ruhenden Zustand `{ stufen: [] }`.
-   * Rückfrage mit Zahl. Nur im Bearbeitungs-Zustand; „Verwerfen" holt die
-   * gespeicherten Arcs zurück.
-   */
-  function alleArcsLoeschen() {
-    if (arcBusy || saving) return;
-    const anzahl = aktuelleArcs().length;
-    if (anzahl === 0) return;
-    if (!confirm(`Alle ${anzahl} Story Arcs löschen?`)) return;
-    setArcVarianten([]);
-    setArcAktiv(0);
-    setStoryArc({ stufen: [] });
-    setArcMeta([]);
-  }
 
   /**
    * Ein Textfeld per KI erzeugen. Das Ergebnis landet als **ungespeicherte
@@ -978,195 +799,6 @@ export default function ScenarioDetailPage({
     router.push(`/?scenario=${id}`);
   }
 
-  /**
-   * Den Story Arc aus dem **aktiven** Handlungsentwurf ableiten. Das Ergebnis
-   * landet als ungespeicherte Änderung im Bearbeitungs-Zustand – wie überall
-   * muss „Verwerfen" den vorherigen Arc zurückbringen können. Der Entwurf geht
-   * im aktuellen, womöglich ungespeicherten Stand mit (`details.handlung`); die
-   * Figuren lädt die Route selbst über die gespeicherte Zuordnung.
-   *
-   * Wie beim Handlungsentwurf **hängt** jedes Ableiten einen weiteren Arc an,
-   * statt den vorigen zu ersetzen – der häufigste Fall ist, dass ein Arc den
-   * Aufbau besser trifft und ein anderer das Ende, und man will beide
-   * nebeneinander halten. Die Reiter-Leiste schaltet um. Keine Rückfrage: der
-   * Knopf ersetzt nichts mehr, „Verwerfen" bleibt der Rückweg.
-   */
-  async function storyArcAbleiten() {
-    if (arcBusy || !details.handlung.trim()) return;
-    if (aktuelleArcs().length >= MAX_STORY_ARCS) {
-      setArcFehler(
-        `Mehr als ${MAX_STORY_ARCS} Story Arcs werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
-      );
-      return;
-    }
-    setArcBusy(true);
-    setArcFehler(null);
-    try {
-      const { storyArc: neu, model } = await generateStoryArc(id, details.handlung, {
-        laenge: arcParams.laenge,
-        format: arcParams.format,
-        zusatz: arcParams.zusatz,
-        kreativ: arcParams.kreativ,
-        weiterspinnen: arcParams.weiterspinnen,
-        ton: arcParams.ton,
-        form: arcParams.form,
-        // Nur die **aktiven** Figuren (reiner Text); sind keine aktiv, leer.
-        figuren: aktiveFiguren(details.figuren),
-        textProvider: arcProvider,
-      });
-      // Titel für die Reiter-Leiste – aus einer Zusammenfassung der Stationen
-      // (Titel + Beschreibung). Scheitert er, bleibt er leer („Arc N").
-      const arcText = neu.stufen
-        .map((s) => [s.titel, s.beschreibung].filter(Boolean).join(": "))
-        .join("\n");
-      let titel = "";
-      try {
-        titel = await generateStoryTitle(arcText, "arc");
-      } catch {
-        // Titel ist Beiwerk.
-      }
-      // Label des Handlungsentwurfs, aus dem dieser Arc abgeleitet wird – als
-      // Schnappschuss an der Arc-Variante festgehalten (Reiter zeigen ihn an).
-      const quelle =
-        variantenMeta[aktiv]?.titel?.trim() || `Entwurf ${aktiv + 1}`;
-      const alt = aktuelleArcs();
-      setArcVarianten([...alt, neu]);
-      setArcAktiv(alt.length);
-      setStoryArc(neu);
-      setArcMeta([
-        ...ausgerichtet(arcMeta, alt.length),
-        {
-          titel,
-          form: arcParams.form,
-          ton: arcParams.ton,
-          favorit: false,
-          quelle,
-          modell: model,
-          // Werkform zum Erzeugungszeitpunkt an der Arc-Variante festhalten.
-          werkform: arcParams.werkform,
-          // Cover wählt man später in der Story-Arc-Sektion; Default = Weltbild.
-          cover: "",
-          // Frisch abgeleitet ist ein Arbeitsstand: erst per Häkchen ein Buch.
-          alsBuch: false,
-        },
-      ]);
-    } catch (e) {
-      setArcFehler(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setArcBusy(false);
-    }
-  }
-
-  /**
-   * Kapitel für eine Station ableiten (zwei bis drei). Die Station geht im
-   * **aktuell bearbeiteten** Stand mit; das Ergebnis ersetzt ihre Kapitel als
-   * ungespeicherte Änderung – „Verwerfen" bringt die alten zurück. Ein
-   * funktionales Update, damit parallele Bearbeitungen nicht verlorengehen.
-   */
-  async function kapitelAbleiten(stufeIndex: number) {
-    if (kapitelBusy !== null) return;
-    const stufe = storyArc.stufen[stufeIndex];
-    if (!stufe || !stufe.beschreibung.trim()) return;
-    setKapitelBusy(stufeIndex);
-    setKapitelFehler(null);
-    try {
-      const { kapitel, model } = await generateStoryArcChapters(
-        {
-          titel: stufe.titel,
-          beschreibung: stufe.beschreibung,
-          figuren: stufe.figuren,
-        },
-        {
-          kreativ: arcParams.kreativ,
-          anzahl: arcParams.kapitelAnzahl,
-          ton: arcParams.ton,
-          form: arcParams.form,
-          textProvider: arcProvider,
-        },
-      );
-      setKapitelModell((m) => ({ ...m, [stufeIndex]: model }));
-      // Die Route liefert nur Titel und Inhalt; der Prosatext (`text`) entsteht
-      // erst später auf Knopfdruck – hier leer auffüllen, damit das Kapitel dem
-      // Typ genügt und die Ausklapp-Ansicht kein `undefined` bekommt.
-      setStoryArc((arc) => ({
-        stufen: arc.stufen.map((s, k) =>
-          k === stufeIndex
-            ? { ...s, kapitel: kapitel.map((c) => ({ ...c, text: c.text ?? "" })) }
-            : s,
-        ),
-      }));
-    } catch (e) {
-      setKapitelFehler({
-        index: stufeIndex,
-        text: e instanceof Error ? e.message : "Fehler.",
-      });
-    } finally {
-      setKapitelBusy(null);
-    }
-  }
-
-  /**
-   * Den **Prosatext** eines Kapitels erzeugen (Personen + Tätigkeiten,
-   * Atmosphäre, Dialog). Station und Kapitel gehen im aktuell bearbeiteten Stand
-   * mit; die Figuren lädt die Route selbst über die Zuordnung. Das Ergebnis
-   * ersetzt `kapitel.text` als ungespeicherte Änderung – „Verwerfen" bringt den
-   * alten zurück. Funktionales Update gegen verlorene Parallel-Bearbeitungen.
-   */
-  async function kapitelTextGenerieren(stufeIndex: number, kapitelIndex: number) {
-    if (kapitelTextBusy) return;
-    const stufe = storyArc.stufen[stufeIndex];
-    const kapitel = stufe?.kapitel[kapitelIndex];
-    if (!kapitel || (!kapitel.inhalt.trim() && !kapitel.titel.trim())) return;
-    setKapitelTextBusy({ stufe: stufeIndex, kapitel: kapitelIndex });
-    setKapitelTextFehler(null);
-    try {
-      const { text, model } = await generateChapterText(
-        id,
-        details,
-        {
-          titel: stufe.titel,
-          beschreibung: stufe.beschreibung,
-          figuren: stufe.figuren,
-        },
-        // Die **ganze** Kapitelliste der Station plus der Index – so schreibt die
-        // Route nur dieses eine Kapitel aus, nicht die ganze Station.
-        stufe.kapitel.map((c) => ({ titel: c.titel, inhalt: c.inhalt })),
-        kapitelIndex,
-        {
-          ton: arcParams.ton,
-          kreativ: arcParams.kreativ,
-          form: arcParams.form,
-          kapitelLaenge: arcParams.kapitelLaenge,
-          werkform: arcParams.werkform,
-          textProvider: arcProvider,
-        },
-      );
-      setStoryTextModell((m) => ({
-        ...m,
-        [`${stufeIndex}-${kapitelIndex}`]: model,
-      }));
-      setStoryArc((arc) => ({
-        stufen: arc.stufen.map((s, si) =>
-          si === stufeIndex
-            ? {
-                ...s,
-                kapitel: s.kapitel.map((c, ki) =>
-                  ki === kapitelIndex ? { ...c, text } : c,
-                ),
-              }
-            : s,
-        ),
-      }));
-    } catch (e) {
-      setKapitelTextFehler({
-        stufe: stufeIndex,
-        kapitel: kapitelIndex,
-        text: e instanceof Error ? e.message : "Fehler.",
-      });
-    } finally {
-      setKapitelTextBusy(null);
-    }
-  }
 
   // `speichern`/`save`/`verwerfen` sowie Export/Löschen liegen jetzt in Hooks
   // auf dem Dokument-Kern (`useScenarioDocument`/`useScenarioExport`).
