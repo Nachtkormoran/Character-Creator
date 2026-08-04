@@ -2260,8 +2260,9 @@ Anforderungen:
       ? `Ergänze **${anzahl}** weitere ${anzahl === 1 ? "Figur" : "Figuren"}`
       : `Entwirf **${anzahl}** ${anzahl === 1 ? "Figur" : "Figuren"}`
   }, jede in **einer Zeile**.
-- Form je Zeile: „Name: was die Figur in dieser Welt tut; woran sie kippt." – erst ein Name, dann ihre Rolle, dann nach einem Semikolon ihr **Riss**.
-- Der **Riss** ist der Kern: etwas Verschwiegenes, Ersehntes oder Ungelöstes, an dem sich eine Geschichte entzünden kann. Ein bloßer Beruf ist kein Riss.
+- Form je Zeile: „Name: was die Figur in dieser Welt tut; und die Spannung, die in ihr steckt." – erst ein Name, dann ihre Rolle, dann nach einem Semikolon ihr **Riss**.
+- Der **Riss** ist der Kern: eine Spannung, aus der eine Geschichte entstehen kann – etwas Verschwiegenes, Ersehntes oder Ungelöstes, ein Widerspruch, ein Ehrgeiz oder eine Sehnsucht. Er muss **nicht** dunkel oder tragisch sein und die Figur nicht „zerbrechen"; er soll sie interessant machen. **Variiere die Formulierung** – nicht immer „zerbricht an …". Ein bloßer Beruf ist kein Riss.
+- Nennen die Stichwörter eine **Persönlichkeit oder Stimmung** (z. B. „positiv", „fröhlich", „loyal"), **verkörpert die Figur genau diese** – der Riss passt dann **dazu** und widerspricht ihr nicht: eine positive Figur bleibt positiv, ihre Spannung ist dann eher ein Wunsch, ein Ehrgeiz oder eine leise Sorge, kein Bruch.
 - Die Namen passen zu Herkunft und Genre; die Figuren passen zueinander und zur Welt und bergen Reibung.
 - **Alles muss zu den Festlegungen oben passen** – widersprich ihnen nie; das Genre bindet am stärksten.${
     charaktere.length
