@@ -4,9 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  buildScenarioFile,
   deleteCharacter,
-  deleteScenario,
   findFigurePersons,
   findPlotPersons,
   generateScenarioDescription,
@@ -25,8 +23,6 @@ import {
   updateCharacterProtagonist,
   updateCharacterScenario,
 } from "@/lib/client";
-import { downloadBlob, safeFileName } from "@/lib/download";
-import { scenarioFileName } from "@/lib/scenarioFile";
 import { GENRE_TEMPLATES } from "@/lib/templates";
 import {
   MAX_PLOT_VARIANTS,
@@ -65,6 +61,7 @@ import { CharaktereKarte } from "./sections/CharaktereKarte";
 import { HandlungsentwurfKarte } from "./sections/HandlungsentwurfKarte";
 import { useScenarioDocument } from "./hooks/useScenarioDocument";
 import { usePlotVarianten } from "./hooks/usePlotVarianten";
+import { useScenarioExport } from "./hooks/useScenarioExport";
 
 // `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
 // getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
@@ -203,20 +200,18 @@ export default function ScenarioDetailPage({
    */
   const [allScenarios, setAllScenarios] = useState<StoredScenario[]>([]);
 
-  /**
-   * Export. `mitCharakteren` steht auf **an**: Ein Szenario weiterzugeben und
-   * seine Besetzung dabei wegzulassen ist der seltenere Fall – und der
-   * teurere Weg (Bild-Originale, einige Dutzend MB) ist derselbe, den man
-   * sonst von Hand über je einen Charakter-Export nachbauen müsste.
-   */
-  const [mitCharakteren, setMitCharakteren] = useState(true);
-  /**
-   * Bilder (Weltbild + Charakter-Bilder) mit exportieren. Default **an** – ohne
-   * Häkchen entsteht eine schlanke Datei nur aus Texten/Festlegungen.
-   */
-  const [mitBildern, setMitBildern] = useState(true);
-  const [exportiert, setExportiert] = useState(false);
-  const [exportFehler, setExportFehler] = useState<string | null>(null);
+  // Export/Löschen (Optionen + Handler) liegen im Hook `useScenarioExport` auf
+  // dem Dokument-Kern.
+  const {
+    mitCharakteren,
+    setMitCharakteren,
+    mitBildern,
+    setMitBildern,
+    exportiert,
+    exportFehler,
+    exportieren,
+    entfernen,
+  } = useScenarioExport(doc, id, router);
   const [generatingField, setGeneratingField] = useState<
     keyof ScenarioDetails | null
   >(null);
@@ -1173,82 +1168,8 @@ export default function ScenarioDetailPage({
     }
   }
 
-  // `speichern`/`save`/`verwerfen` liegen jetzt im Dokument-Kern
-  // (`useScenarioDocument`) und kommen oben aus `doc`.
-
-  /**
-   * Das Szenario als Datei sichern – wahlweise mit seiner Besetzung.
-   *
-   * Wie beim Charakter-Export **ohne eigene Route**: Festlegungen und Texte
-   * liegen längst im Client, nur die Bild-Originale holt `buildScenarioFile`
-   * einzeln nach (die Listen-Antworten führen sie aus Größengründen nicht mit).
-   *
-   * Exportiert wird der **bearbeitete** Stand, so wie er auf dem Bildschirm
-   * steht – dieselbe Regel wie bei „Text neu erzeugen", der Ableitung und dem
-   * Handlungsentwurf: Wer gerade die Regeln umgeschrieben hat und dann
-   * exportiert, meint die neuen. Speichern und Exportieren sind zwei
-   * verschiedene Handlungen, und die Datei ist keine Kopie der Datenbank,
-   * sondern dessen, was man vor sich hat.
-   *
-   * Die Charaktere sind davon nicht betroffen: Sie lassen sich auf dieser Seite
-   * gar nicht bearbeiten, es gibt also nur einen Stand.
-   */
-  async function exportieren() {
-    setExportiert(true);
-    setExportFehler(null);
-    try {
-      const datei = await buildScenarioFile(
-        {
-          name: name.trim(),
-          details,
-          // Der **bearbeitete** Stand, wie bei den Festlegungen: alle Entwürfe
-          // und alle Story Arcs samt aktivem Index und Metadaten (Titel/Form/Ton).
-          plotVariants: {
-            items: aktuelleVarianten(),
-            aktiv,
-            meta: ausgerichtet(variantenMeta, aktuelleVarianten().length),
-          },
-          storyArc,
-          storyArcVariants: {
-            items: aktuelleArcs(),
-            aktiv: arcAktiv,
-            meta: ausgerichtet(arcMeta, aktuelleArcs().length),
-          },
-        },
-        mitCharakteren ? characters : [],
-        // Die Weltbilder sind unabhängig vom bearbeiteten Stand (eigene Route,
-        // sofort gespeichert) – `buildScenarioFile` holt je Bild das Original.
-        { scenarioId: id, images: bilder },
-        // Ohne Häkchen „mit Bildern" bleibt Weltbild + Charakter-Bilder weg.
-        !mitBildern,
-      );
-      const blob = new Blob([JSON.stringify(datei, null, 2)], {
-        type: "application/json",
-      });
-      downloadBlob(blob, scenarioFileName(safeFileName(name.trim())));
-    } catch (e) {
-      setExportFehler(
-        e instanceof Error ? e.message : "Export fehlgeschlagen.",
-      );
-    } finally {
-      setExportiert(false);
-    }
-  }
-
-  async function entfernen() {
-    if (
-      !confirm(
-        `Szenario „${name}" löschen? Die ${characters.length} zugeordneten Charaktere bleiben erhalten und sind danach ohne Szenario.`,
-      )
-    )
-      return;
-    try {
-      await deleteScenario(id);
-      router.push("/scenarios");
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Löschen fehlgeschlagen.");
-    }
-  }
+  // `speichern`/`save`/`verwerfen` sowie Export/Löschen liegen jetzt in Hooks
+  // auf dem Dokument-Kern (`useScenarioDocument`/`useScenarioExport`).
 
   if (loading) return <p className="text-muted-foreground">Lade Szenario …</p>;
   if (error) {
