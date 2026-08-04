@@ -2206,14 +2206,17 @@ export function buildScenarioFiguresPrompt(
     line("Beschreibung", umfeld.beschreibung);
 
   const charaktereBlock = charaktere.length
-    ? `\nDiese Personen sind in diesem Szenario **schon als Charaktere angelegt**. Sie sind **keine** Figuren-Notiz – erzeuge sie **niemals erneut als Figur** und verwende ihre Namen **nicht** für neue Figuren. Lass die neuen Figuren stattdessen zu ihnen in **Beziehung** treten (Abhängigkeit, Reibung, gemeinsame Geschichte), besonders zu den mit ★ markierten **Protagonisten**:\n${charaktere
+    ? `\n=== NUR KONTEXT – diese Zeilen NIEMALS ausgeben ===
+In diesem Szenario sind folgende Personen bereits **als Charaktere angelegt** (keine Figuren-Notizen). Übernimm sie **nicht** in deine Antwort, erzeuge **keine** Figur mit einem dieser Namen. Die neuen Figuren sollen sich nur zu ihnen **verhalten** (Reibung, Abhängigkeit, gemeinsame Geschichte), besonders zu den Protagonist:innen (★):
+${charaktere
         .map(
           (c) =>
-            `- ${c.isProtagonist ? "★ " : ""}${c.name}${
-              c.kurzbeschreibung.trim() ? ` – ${c.kurzbeschreibung.trim()}` : ""
+            `  › ${c.name}${c.isProtagonist ? " (★ Protagonist:in)" : ""}${
+              c.kurzbeschreibung.trim() ? `: ${c.kurzbeschreibung.trim()}` : ""
             }`,
         )
-        .join("\n")}\n`
+        .join("\n")}
+=== ENDE KONTEXT ===\n`
     : "";
 
   const bestand = vorhanden.trim();
@@ -2272,7 +2275,11 @@ Anforderungen:
 ${namensBlock}${budgetBlock}${zusatzBlock}
 Form der Antwort: **eine Figur je Zeile**, durch Zeilenumbrüche getrennt. Keine Nummerierung, keine Spiegelstriche, kein Markdown, keine Einleitung und keine Erklärung. Antworte mit **nichts als den Figuren-Zeilen**${
     bestand ? " – die vorhandenen zuerst, wörtlich, dann die neuen" : ""
-  }.`;
+  }.${
+    charaktere.length
+      ? " Die oben als Kontext gelisteten **Charaktere** gehören **nicht** in die Antwort."
+      : ""
+  }`;
 }
 
 /**

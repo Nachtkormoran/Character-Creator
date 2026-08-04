@@ -113,6 +113,28 @@ export async function POST(request: Request) {
 
     let wert = (completion.choices[0]?.message?.content ?? "").trim();
 
+    // Deterministische Absicherung: Zeilen, deren Name einem **angelegten
+    // Charakter** entspricht, gehören nicht ins Figuren-Feld. Das Modell kopiert
+    // die Charakter-Kontextliste gelegentlich mit in die Ausgabe – der Prompt
+    // wehrt das ab, aber sicher ist nur dieser Filter. Vergleich über den ganzen
+    // Namen (vor „:" oder „–"/„-"), normalisiert. Räumt zugleich Felder auf, die
+    // durch einen früheren Lauf schon verunreinigt sind (Bestand wird echot).
+    if (charaktere.length > 0) {
+      const charNamen = new Set(
+        charaktere.map((c) => c.name.trim().toLowerCase()),
+      );
+      wert = wert
+        .split("\n")
+        .filter((zeile) => {
+          const t = zeile.trim();
+          if (!t) return true;
+          const name = t.split(/:|\s[–—-]\s/)[0].trim().toLowerCase();
+          return !charNamen.has(name);
+        })
+        .join("\n")
+        .trim();
+    }
+
     // Letzte Absicherung wie bei `scenario-field`: an einer Zeilen-/Wortgrenze
     // kürzen, falls die Antwort das Limit doch reißt – besser knapp als beim
     // Speichern abgewiesen.
