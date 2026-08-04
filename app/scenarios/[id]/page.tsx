@@ -39,7 +39,6 @@ import {
   Pencil,
   Plus,
   Search,
-  Sparkles,
   Star,
   User,
   Users,
@@ -108,6 +107,8 @@ import { PlotPersonModal } from "../../components/PlotPersonModal";
 import { ScenarioFields } from "../../components/ScenarioFields";
 import { ScenarioImageModal } from "../../components/ScenarioImageModal";
 import { StoryArcSection } from "../../components/StoryArcSection";
+import { ExportLeiste } from "./sections/ExportLeiste";
+import { ScenarioHeader } from "./sections/ScenarioHeader";
 
 // `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
 // getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
@@ -1568,6 +1569,29 @@ export default function ScenarioDetailPage({
   }
 
   /**
+   * „Verwerfen" – holt den zuletzt gespeicherten Stand aus `saved` zurück
+   * (Name, Festlegungen, alle Entwürfe und Story Arcs samt aktivem Index). Der
+   * aktive Arc wird zusätzlich in `storyArc` gespiegelt (die Merge-Invariante).
+   */
+  function verwerfen() {
+    const s = JSON.parse(saved) as {
+      name: string;
+      details: ScenarioDetails;
+      plot: PlotVariants;
+      arc: StoryArcVariants;
+    };
+    setName(s.name);
+    setDetails(s.details);
+    setVarianten(s.plot.items);
+    setAktiv(s.plot.aktiv);
+    setVariantenMeta(s.plot.meta);
+    setArcVarianten(s.arc.items);
+    setArcAktiv(s.arc.aktiv);
+    setArcMeta(s.arc.meta);
+    setStoryArc(s.arc.items[s.arc.aktiv] ?? { stufen: [] });
+  }
+
+  /**
    * Das Szenario als Datei sichern – wahlweise mit seiner Besetzung.
    *
    * Wie beim Charakter-Export **ohne eigene Route**: Festlegungen und Texte
@@ -1657,98 +1681,20 @@ export default function ScenarioDetailPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <Link
-          href="/scenarios"
-          className="text-sm text-muted-foreground transition hover:text-foreground"
-        >
-          ← Szenarien
-        </Link>
-        <div className="mt-1 -mx-2 flex items-center gap-1">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            aria-label="Name des Szenarios"
-            className="w-full rounded-md border border-transparent bg-transparent px-2 py-1 font-display text-3xl font-semibold tracking-tight outline-none transition hover:border-border focus:border-primary/50"
-          />
-          {/*
-            KI-Name aus Beschreibung/Ort/Zeit/Regeln. Ersetzt das Feld (geht in
-            den Bearbeitungs-Zustand, „Verwerfen" holt den alten Namen zurück).
-            Gesperrt, solange keins der vier Felder etwas hergibt.
-          */}
-          <button
-            type="button"
-            onClick={nameErzeugen}
-            disabled={
-              saving ||
-              nameBusy ||
-              !(
-                details.beschreibung.trim() ||
-                details.ort.trim() ||
-                details.zeit.trim() ||
-                details.regeln.trim()
-              )
-            }
-            title="Namen aus Beschreibung, Ort, Zeit und Regeln erzeugen"
-            aria-label="Namen per KI erzeugen"
-            className="inline-flex shrink-0 items-center justify-center rounded-md border border-border px-2.5 py-2 transition hover:bg-muted disabled:opacity-40"
-          >
-            {nameBusy ? (
-              <span className="animate-pulse">…</span>
-            ) : (
-              <Sparkles size={16} strokeWidth={1.75} aria-hidden="true" />
-            )}
-          </button>
-        </div>
-        {nameFehler && (
-          <p className="mt-1 text-xs text-destructive">
-            {nameFehler}
-          </p>
-        )}
-      </div>
-
-      {dirty && (
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-          <span className="text-sm text-amber-800 dark:text-amber-300">
-            Ungespeicherte Änderungen
-          </span>
-          <button
-            onClick={save}
-            disabled={saving || !nameValid}
-            className="ml-auto rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
-          >
-            {saving ? "Speichere …" : "Änderungen speichern"}
-          </button>
-          <button
-            onClick={() => {
-              const s = JSON.parse(saved) as {
-                name: string;
-                details: ScenarioDetails;
-                plot: PlotVariants;
-                arc: StoryArcVariants;
-              };
-              setName(s.name);
-              setDetails(s.details);
-              setVarianten(s.plot.items);
-              setAktiv(s.plot.aktiv);
-              setVariantenMeta(s.plot.meta);
-              setArcVarianten(s.arc.items);
-              setArcAktiv(s.arc.aktiv);
-              setArcMeta(s.arc.meta);
-              setStoryArc(s.arc.items[s.arc.aktiv] ?? { stufen: [] });
-            }}
-            disabled={saving}
-            className="text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-50"
-          >
-            Verwerfen
-          </button>
-          {saveError && (
-            <span className="w-full text-xs text-destructive">
-              {saveError}
-            </span>
-          )}
-        </div>
-      )}
+      <ScenarioHeader
+        name={name}
+        onNameChange={setName}
+        details={details}
+        onNameErzeugen={nameErzeugen}
+        nameBusy={nameBusy}
+        nameFehler={nameFehler}
+        saving={saving}
+        dirty={dirty}
+        nameValid={nameValid}
+        onSave={save}
+        onVerwerfen={verwerfen}
+        saveError={saveError}
+      />
 
       {/*
         Kopfblock wie in der Charakter-Detailansicht: links der Fließtext (dort
@@ -2593,72 +2539,17 @@ export default function ScenarioDetailPage({
         onProviderChange={setArcProvider}
       />
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-        <button
-          onClick={exportieren}
-          disabled={exportiert}
-          title="Schreibt Festlegungen und – wenn angehakt – die zugeordneten Charaktere samt Bildern in eine Datei"
-          className="rounded-md border border-border px-4 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50"
-        >
-          {exportiert ? "Sammle Daten …" : "Als Datei exportieren"}
-        </button>
-
-        {/*
-          Die Checkbox steht **neben** dem Knopf und nicht darüber: Anders als
-          bei der Ableitung gibt es hier keinen Startzustand, in dem man sie
-          allein anträfe – der Export ist ein einzelner Klick, und die Wahl
-          gehört unmittelbar an ihn.
-
-          Ausgegraut, sobald das Szenario leer ist: Ein Häkchen, das nichts
-          bewirken kann, wäre ein falsches Versprechen.
-        */}
-        <label
-          className={`flex items-center gap-2 text-sm ${
-            characters.length === 0
-              ? "cursor-not-allowed text-muted-foreground"
-              : "cursor-pointer text-muted-foreground"
-          }`}
-        >
-          <input
-            type="checkbox"
-            checked={mitCharakteren && characters.length > 0}
-            onChange={(e) => setMitCharakteren(e.target.checked)}
-            disabled={exportiert || characters.length === 0}
-            className="size-4 accent-primary"
-          />
-          {characters.length === 0
-            ? "Keine Charaktere zugeordnet"
-            : `Charaktere mitexportieren (${characters.length})`}
-        </label>
-
-        {/*
-          Bilder mitexportieren – Default an. Ohne Häkchen bleiben Weltbild und
-          Charakter-Bilder weg: eine schlanke Datei nur aus Texten/Festlegungen.
-        */}
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={mitBildern}
-            onChange={(e) => setMitBildern(e.target.checked)}
-            disabled={exportiert}
-            className="size-4 accent-primary"
-          />
-          Bilder mitexportieren
-        </label>
-
-        {exportFehler && (
-          <span className="text-sm text-destructive">
-            {exportFehler}
-          </span>
-        )}
-
-        <button
-          onClick={entfernen}
-          className="ml-auto rounded-md border border-destructive/40 px-4 py-2 text-sm font-medium text-destructive transition hover:bg-destructive/10"
-        >
-          Szenario löschen
-        </button>
-      </div>
+      <ExportLeiste
+        exportieren={exportieren}
+        exportiert={exportiert}
+        anzahlCharaktere={characters.length}
+        mitCharakteren={mitCharakteren}
+        onMitCharakterenChange={setMitCharakteren}
+        mitBildern={mitBildern}
+        onMitBildernChange={setMitBildern}
+        exportFehler={exportFehler}
+        entfernen={entfernen}
+      />
 
       {gewaehlt && (
         <PlotPersonModal
