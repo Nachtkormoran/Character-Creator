@@ -1,8 +1,8 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useState, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getSettings } from "@/lib/client";
 import { GENRE_TEMPLATES } from "@/lib/templates";
 import { type TextProvider, type ScenarioDetails } from "@/lib/schema";
@@ -19,6 +19,12 @@ import { ScenarioHeader } from "./sections/ScenarioHeader";
 import { WeltKarte } from "./sections/WeltKarte";
 import { CharaktereKarte } from "./sections/CharaktereKarte";
 import { HandlungsentwurfKarte } from "./sections/HandlungsentwurfKarte";
+import { BesetzungsLeiste } from "./sections/BesetzungsLeiste";
+import {
+  ScenarioTabs,
+  alsScenarioTab,
+  type ScenarioTab,
+} from "./sections/ScenarioTabs";
 import { useScenarioDocument } from "./hooks/useScenarioDocument";
 import { usePlotVarianten } from "./hooks/usePlotVarianten";
 import { useScenarioExport } from "./hooks/useScenarioExport";
@@ -31,13 +37,38 @@ import { usePlotPersonen } from "./hooks/usePlotPersonen";
 // `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
 // getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
 
-export default function ScenarioDetailPage({
+export default function ScenarioDetailPage(props: {
+  params: Promise<{ id: string }>;
+}) {
+  // `useSearchParams` (für den Tab in der URL) verlangt eine Suspense-Grenze –
+  // dieselbe Hülle wie bei `app/page.tsx`.
+  return (
+    <Suspense
+      fallback={<p className="text-muted-foreground">Lade Szenario …</p>}
+    >
+      <ScenarioDetail {...props} />
+    </Suspense>
+  );
+}
+
+function ScenarioDetail({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Aktiver Tab aus der URL (`?tab=`) – so überleben Reload/Zurück/Teilen den Tab.
+  const tab = alsScenarioTab(searchParams.get("tab"));
+  function setTab(t: ScenarioTab) {
+    const q = new URLSearchParams(searchParams.toString());
+    q.set("tab", t);
+    // `push`, damit der Browser-Zurück-Knopf zwischen den Tabs wechselt.
+    router.push(`${pathname}?${q.toString()}`, { scroll: false });
+  }
 
   // Der Dokument-Kern: geteilte Speicher-Einheit (Name/Festlegungen/Entwürfe/
   // Arcs), Laden, `dirty`/`speichern`/`verwerfen`, Lauf-Parameter. Alles Weitere
@@ -307,6 +338,14 @@ export default function ScenarioDetailPage({
         saveError={saveError}
       />
 
+      <ScenarioTabs
+        tab={tab}
+        onTab={setTab}
+        handlungCount={aktuelleVarianten().length}
+        arcCount={aktuelleArcs().length}
+      />
+
+      {tab === "welt" && (
       <WeltKarte
         details={details}
         name={name}
@@ -324,7 +363,10 @@ export default function ScenarioDetailPage({
         weltbildVorschau={weltbildVorschau}
         onBildModalOffen={() => setBildModalOffen(true)}
       />
+      )}
 
+      {tab === "handlung" && (
+        <>
       {/*
         Die **Besetzung** in einer Karte: oben die schon angelegten
         **Charaktere** samt den Knöpfen zum Zuordnen und Erstellen, darunter die
@@ -408,12 +450,24 @@ export default function ScenarioDetailPage({
         suchFehler={suchFehler}
         onPersonWaehlen={setGewaehlt}
       />
+        </>
+      )}
+
+      {tab === "arc" && (
+        <>
+      {/*
+        Besetzungs-Leiste: im Story-Arc-Tab fehlt die volle Besetzung sonst –
+        hier die Figuren als Kurzreferenz zum Anschauen und Anspringen.
+      */}
+      <BesetzungsLeiste
+        characters={characters}
+        onSelect={setSelectedChar}
+        onGoToBesetzung={() => setTab("handlung")}
+      />
 
       {/*
-        Der Story Arc sitzt direkt unter dem Handlungsentwurf: Er ist dessen
-        dramaturgische Zerlegung und leitet sich aus der **aktiven** Variante ab.
-        Wie die Varianten und Ansatzpunkte lebt er im Bearbeitungs-Zustand und
-        geht über „Änderungen speichern" bzw. „Verwerfen".
+        Der Story Arc: die dramaturgische Zerlegung der **aktiven** Variante.
+        Lebt im Bearbeitungs-Zustand und geht über „Änderungen speichern".
       */}
       <StoryArcSection
         storyArc={storyArc}
@@ -455,6 +509,8 @@ export default function ScenarioDetailPage({
         provider={arcProvider}
         onProviderChange={setArcProvider}
       />
+        </>
+      )}
 
       <ExportLeiste
         exportieren={exportieren}
