@@ -7,12 +7,6 @@ import {
   deleteCharacter,
   findFigurePersons,
   findPlotPersons,
-  generateScenarioDescription,
-  generateScenarioField,
-  generateScenarioFigures,
-  generateScenarioName,
-  generateScenarioPlot,
-  generateStoryTitle,
   getSettings,
   listScenarios,
   updateCharacterContent,
@@ -22,8 +16,6 @@ import {
 } from "@/lib/client";
 import { GENRE_TEMPLATES } from "@/lib/templates";
 import {
-  MAX_PLOT_VARIANTS,
-  SCENARIO_LABELS,
   type TextProvider,
   type GeneratedCharacter,
   type PlotPerson,
@@ -31,12 +23,7 @@ import {
 } from "@/lib/schema";
 import { stashPlotPerson } from "@/lib/personHandoff";
 import { ausgerichtet } from "@/lib/scenarioDocument";
-import {
-  aktiveEintraege,
-  aktiveFiguren,
-  joinFigurenDetail,
-  splitFigurenDetail,
-} from "@/lib/figuren";
+import { joinFigurenDetail, splitFigurenDetail } from "@/lib/figuren";
 import {
   primaryImage,
   type StoredCharacter,
@@ -58,6 +45,7 @@ import { usePlotVarianten } from "./hooks/usePlotVarianten";
 import { useScenarioExport } from "./hooks/useScenarioExport";
 import { useStoryArc } from "./hooks/useStoryArc";
 import { useKapitel } from "./hooks/useKapitel";
+import { useScenarioFeldGen } from "./hooks/useScenarioFeldGen";
 
 // `LEER_META` und `ausgerichtet` liegen jetzt in `@/lib/scenarioDocument` (pur,
 // getestet) – zusammen mit den Merge-Invarianten und den Snapshot-Buildern.
@@ -79,11 +67,8 @@ export default function ScenarioDetailPage({
     setName,
     details,
     setDetails,
-    setVarianten,
     aktiv,
-    setAktiv,
     variantenMeta,
-    setVariantenMeta,
     storyArc,
     setStoryArc,
     arcAktiv,
@@ -112,13 +97,8 @@ export default function ScenarioDetailPage({
     verwerfen,
   } = doc;
 
-  // KI-Namensvorschlag aus den Welt-Feldern (Beschreibung/Ort/Zeit/Regeln).
-  // Der Name geht in den Bearbeitungs-Zustand; gespeichert wird über „Änderungen
-  // speichern" wie jede andere Namensänderung. Nicht gespeichert: nur Busy/Fehler.
-  const [nameBusy, setNameBusy] = useState(false);
-  const [nameFehler, setNameFehler] = useState<string | null>(null);
-  // Arc-Busy/Fehler und die Kapitel-Busy/Fehler/Modell-Zustände liegen jetzt in
-  // den Hooks `useStoryArc`/`useKapitel`.
+  // Feld-Erzeugung (✨-Knöpfe, Fortsetzen, KI-Name) samt ihrer Lauf-Parameter und
+  // Arc-/Kapitel-Busy-Zustände liegen in eigenen Hooks (s. weiter unten).
   /**
    * Einstellung „Verwendetes Modell anzeigen" (aus den App-Einstellungen). Steuert
    * nur die Anzeige, nicht die Erzeugung. Default aus, bis die Einstellung geladen ist.
@@ -172,52 +152,26 @@ export default function ScenarioDetailPage({
     exportieren,
     entfernen,
   } = useScenarioExport(doc, id, router);
-  const [generatingField, setGeneratingField] = useState<
-    keyof ScenarioDetails | null
-  >(null);
-
-  /**
-   * Zusätzliche Wünsche für die Erzeugung, je Feld.
-   *
-   * **Wird nicht gespeichert** – wie „Bindung" und „Richtung" bei den
-   * Ansatzpunkten beschreibt der Wunsch nichts am Szenario, sondern wie man es
-   * gerade befragen will. Beim nächsten Öffnen der Seite ist das Feld leer,
-   * und das ist richtig so: Der Entwurf steht dann längst da.
-   *
-   * Er bleibt aber **nach** dem Erzeugen stehen, statt geleert zu werden – der
-   * häufigste Fall ist, dass man den Entwurf nicht mag und mit demselben
-   * Wunsch plus einer Ergänzung noch einmal drückt.
-   */
-  const [zusatz, setZusatz] = useState<
-    Partial<Record<keyof ScenarioDetails, string>>
-  >({});
-
-  /**
-   * Ob der nächste Handlungsentwurf den **aktuellen** als Grundlage nimmt
-   * (Checkbox „aktuellen Handlungsentwurf verwenden"). Dann geht `details.handlung`
-   * als `basis` mit, und die Stichwörter steuern zusätzlich, wohin sich die
-   * neue Fassung verschiebt. Wie der Zusatzwunsch **nicht gespeichert** – die
-   * Wahl beschreibt einen Lauf, nicht das Szenario.
-   */
-  const [handlungAlsBasis, setHandlungAlsBasis] = useState(false);
-
-  /**
-   * Ob der nächste Handlungsentwurf eine **vollständige Geschichte** skizziert
-   * (Checkbox „Handlung weiterspinnen") statt einer offenen Ausgangslage. Gilt
-   * unabhängig von der Basis-Option – frisch wie auf Basis eines vorhandenen
-   * Entwurfs. Nicht gespeichert (beschreibt einen Lauf).
-   */
-  const [handlungWeiterspinnen, setHandlungWeiterspinnen] = useState(false);
-
-  /**
-   * Wie viele **neue benannte Personen** der nächste Entwurf zusätzlich einführt
-   * (0 = keine, wie bisher). Dazu optionale Namens-/Rollen-Vorgaben. Beides gilt
-   * für „Neu erzeugen" – frisch wie auf Basis eines vorhandenen Entwurfs – und
-   * wird **nicht gespeichert** (beschreibt einen Lauf, wie Ton und Weiterspinnen).
-   */
-  const [handlungNeuePersonen, setHandlungNeuePersonen] = useState(0);
-  const [handlungNeuePersonenWunsch, setHandlungNeuePersonenWunsch] =
-    useState("");
+  // Feld-Erzeugung + Handlungsentwurf-Lauf-Parameter (nicht gespeichert) im Hook
+  // `useScenarioFeldGen`. `generatingField` sperrt u. a. die Varianten-Knöpfe.
+  const {
+    generatingField,
+    zusatz,
+    setZusatz,
+    handlungAlsBasis,
+    setHandlungAlsBasis,
+    handlungWeiterspinnen,
+    setHandlungWeiterspinnen,
+    handlungNeuePersonen,
+    setHandlungNeuePersonen,
+    handlungNeuePersonenWunsch,
+    setHandlungNeuePersonenWunsch,
+    nameBusy,
+    nameFehler,
+    handleGenerate,
+    handlungFortsetzen,
+    nameErzeugen,
+  } = useScenarioFeldGen(doc, id, handlungProvider);
 
   /**
    * Ob eine Figur in Handlungsentwurf/Story Arc einfließt, entscheidet ihr
@@ -321,179 +275,6 @@ export default function ScenarioDetailPage({
     isProtagonist: c.isProtagonist,
   }));
 
-  /**
-   * Ein Textfeld per KI erzeugen. Das Ergebnis landet als **ungespeicherte
-   * Änderung** im Formular – wie überall sonst muss „Verwerfen" den alten Text
-   * zurückbringen können. Die Rückfrage schützt von Hand Geschriebenes.
-   *
-   * Die Festlegungen gehen im **aktuellen, womöglich ungespeicherten** Stand
-   * mit: wer gerade die Regeln umgeschrieben hat, meint die neuen. Die
-   * Charaktere für den Handlungsentwurf lädt dagegen die Route selbst – die
-   * gespeicherte Zuordnung ist dort die einzige, die es gibt.
-   */
-  async function handleGenerate(key: keyof ScenarioDetails, anzahl?: number) {
-    if (generatingField) return;
-    // Ort, Zeit und Regeln werden **ergänzt**, der Handlungsentwurf **angehängt**
-    // (als neue Variante) – in allen dreien kann nichts verlorengehen, also
-    // fragt nichts nach. Nur die Beschreibung wird ersetzt; von Hand
-    // Geschriebenes wäre dort sonst still weg.
-    const ersetzt = key === "beschreibung";
-    if (
-      ersetzt &&
-      details[key].trim() &&
-      !confirm(`${SCENARIO_LABELS[key]} wird ersetzt. Fortfahren?`)
-    )
-      return;
-    setGeneratingField(key);
-    setSaveError(null);
-    try {
-      if (key === "ort" || key === "zeit" || key === "regeln") {
-        // Ergänzen statt ersetzen: Was im Feld steht, geht als Vorgabe mit und
-        // kommt im Ergebnis wieder vor. Deshalb hier auch keine Rückfrage –
-        // es kann nichts verlorengehen.
-        const { wert } = await generateScenarioField(
-          key,
-          name.trim(),
-          details,
-          zusatz[key] ?? "",
-        );
-        setDetails((d) => ({ ...d, [key]: wert }));
-      } else if (key === "figuren") {
-        // Wie Ort/Zeit/Regeln **ergänzt**: Vorhandenes bleibt stehen und prägt
-        // die neuen Figuren; die Route gibt das ganze Feld zurück (Vorhandenes
-        // + etwa drei neue). Deshalb keine Rückfrage.
-        const { wert } = await generateScenarioFigures(
-          name.trim(),
-          details,
-          zusatz.figuren ?? "",
-          anzahl,
-        );
-        setDetails((d) => ({ ...d, figuren: wert }));
-      } else if (key === "handlung") {
-        // Jeder Lauf hängt einen **neuen** Entwurf an und schaltet auf ihn um –
-        // der vorige bleibt als Variante erhalten.
-        if (aktuelleVarianten().length >= MAX_PLOT_VARIANTS) {
-          setSaveError(
-            `Mehr als ${MAX_PLOT_VARIANTS} Entwürfe werden nicht gespeichert. Lösche einen, um Platz zu schaffen.`,
-          );
-          return;
-        }
-        // Ist die Checkbox an, geht der **aktive** Entwurf als Grundlage mit –
-        // im live editierten Stand, wie überall. Sonst leer (Entwurf aus Welt
-        // und Figuren wie bisher).
-        const basis =
-          handlungAlsBasis && details.handlung.trim() ? details.handlung : "";
-        const { handlung, model } = await generateScenarioPlot(
-          id,
-          name.trim(),
-          // Nur **aktive** Figuren und **aktive** Handlungselemente (reiner Text
-          // ohne Markup) fließen ein; sind keine aktiv, ist das jeweilige Feld
-          // leer und der Prompt zeichengenau der von vorher.
-          {
-            ...details,
-            figuren: aktiveFiguren(details.figuren),
-            handlungselemente: aktiveEintraege(details.handlungselemente),
-          },
-          zusatz.handlung ?? "",
-          basis,
-          handlungWeiterspinnen,
-          handlungTon,
-          handlungNeuePersonen,
-          handlungNeuePersonenWunsch,
-          handlungForm,
-          handlungProvider,
-        );
-        // Kurzer Titel für die Reiter-Leiste. Scheitert der Aufruf, bleibt er
-        // leer – der Reiter zeigt dann „Entwurf N", der Entwurf entsteht trotzdem.
-        let titel = "";
-        try {
-          titel = await generateStoryTitle(handlung, "entwurf");
-        } catch {
-          // Titel ist Beiwerk.
-        }
-        const alt = aktuelleVarianten();
-        setVarianten([...alt, handlung]);
-        setAktiv(alt.length);
-        setDetails((d) => ({ ...d, handlung }));
-        setVariantenMeta([
-          ...ausgerichtet(variantenMeta, alt.length),
-          {
-            titel,
-            form: handlungForm,
-            ton: handlungTon,
-            favorit: false,
-            quelle: "",
-            modell: model,
-            // Handlungsentwürfe kennen keine Werkform – leer.
-            werkform: "",
-            // Cover ist ein Buch-/Arc-Belang; Handlungsentwürfe tragen keins.
-            cover: "",
-            // „Als Buch" ist ein Arc-Belang; Handlungsentwürfe tragen es nicht.
-            alsBuch: false,
-          },
-        ]);
-      } else {
-        const { beschreibung } = await generateScenarioDescription(
-          name.trim(),
-          details,
-          zusatz.beschreibung ?? "",
-        );
-        setDetails((d) => ({ ...d, beschreibung }));
-      }
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setGeneratingField(null);
-    }
-  }
-
-  /**
-   * **Den aktiven Handlungsentwurf fortsetzen** – anders als „✨ Neu erzeugen"
-   * kein neuer Reiter, sondern der vorhandene Text im Feld wächst weiter. Die
-   * Route bekommt den aktuellen Text als `basis` und liefert **nur die
-   * Fortsetzung**; die wird an `details.handlung` angehängt (die live-Wahrheit
-   * der aktiven Variante). Geht damit in `dirty` – gespeichert wird über
-   * „Änderungen speichern". Nutzt dieselben Lauf-Parameter wie „Neu erzeugen"
-   * (Ton, Erzählform, Weiterspinnen, neue Personen, Modell, Stichwörter).
-   */
-  async function handlungFortsetzen() {
-    if (generatingField || saving) return;
-    if (!details.handlung.trim()) return;
-    setGeneratingField("handlung");
-    setSaveError(null);
-    try {
-      const { handlung: fortsetzung } = await generateScenarioPlot(
-        id,
-        name.trim(),
-        {
-          ...details,
-          figuren: aktiveFiguren(details.figuren),
-          handlungselemente: aktiveEintraege(details.handlungselemente),
-        },
-        zusatz.handlung ?? "",
-        details.handlung, // basis = der fortzusetzende Text
-        handlungWeiterspinnen,
-        handlungTon,
-        handlungNeuePersonen,
-        handlungNeuePersonenWunsch,
-        handlungForm,
-        handlungProvider,
-        true, // fortsetzen
-      );
-      const neu = fortsetzung.trim();
-      if (neu) {
-        setDetails((d) => ({
-          ...d,
-          handlung: `${d.handlung.trimEnd()}\n\n${neu}`,
-        }));
-      }
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : "Fehler.");
-    } finally {
-      setGeneratingField(null);
-    }
-  }
-
   // Anzeige-Einstellung laden (ob das verwendete Modell mit angezeigt wird).
   // Scheitert der Aufruf, bleibt es beim Default aus.
   useEffect(() => {
@@ -594,25 +375,6 @@ export default function ScenarioDetailPage({
       setGenreSyncFehler(e instanceof Error ? e.message : "Übertragen fehlgeschlagen.");
     } finally {
       setGenreSyncBusy(false);
-    }
-  }
-
-  /**
-   * Namen aus den Welt-Feldern (Beschreibung/Ort/Zeit/Regeln) per KI erzeugen.
-   * Der Vorschlag geht ins Namensfeld (Bearbeitungs-Zustand → `dirty`); die
-   * Route persistiert nichts, gespeichert wird über „Änderungen speichern".
-   */
-  async function nameErzeugen() {
-    if (nameBusy) return;
-    setNameBusy(true);
-    setNameFehler(null);
-    try {
-      const vorschlag = await generateScenarioName(details);
-      if (vorschlag) setName(vorschlag);
-    } catch (e) {
-      setNameFehler(e instanceof Error ? e.message : "Name fehlgeschlagen.");
-    } finally {
-      setNameBusy(false);
     }
   }
 
